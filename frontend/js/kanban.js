@@ -88,9 +88,10 @@ function createTaskCard(task) {
     }).join('');
 
     const timeAgo = getTimeAgo(new Date(task.updated_at));
+    const skipBadge = task.skip_ai_review ? '<span class="badge-skip-ai">⏭️ Skip AI Review</span>' : '';
 
     card.innerHTML = `
-        <h3>${task.title}</h3>
+        <h3>${task.title} ${skipBadge}</h3>
         <p>${task.description}</p>
         <div class="task-phases">
             ${phaseBars}
@@ -199,6 +200,7 @@ function setupNewTaskButton() {
     createTaskBtn.addEventListener('click', async () => {
         const title = document.getElementById('task-title').value.trim();
         const description = document.getElementById('task-description').value.trim();
+        const skipAiReview = document.getElementById('skip-ai-review').checked;
 
         if (!title || !description) {
             alert('Please fill in all fields');
@@ -206,7 +208,7 @@ function setupNewTaskButton() {
         }
 
         try {
-            await API.tasks.create({ title, description });
+            await API.tasks.create({ title, description, skip_ai_review: skipAiReview });
             newTaskModal.classList.add('hidden');
             form.reset();
             await loadTasks();

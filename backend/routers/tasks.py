@@ -162,8 +162,12 @@ async def execute_task_background(task_id: str, project_path: str):
         result = await execute_all_phases(task, str(worktree_path), log_handler)
 
         if result["success"]:
-            task.status = TaskStatus.AI_REVIEW
-            await log_handler("\n=== All phases completed successfully ===")
+            if task.skip_ai_review:
+                task.status = TaskStatus.HUMAN_REVIEW
+                await log_handler("\n=== All phases completed successfully (AI Review skipped) ===")
+            else:
+                task.status = TaskStatus.AI_REVIEW
+                await log_handler("\n=== All phases completed successfully ===")
         else:
             task.status = TaskStatus.IN_PROGRESS
             await log_handler("\n=== Execution stopped due to errors ===")
