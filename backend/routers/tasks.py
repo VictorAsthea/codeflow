@@ -77,7 +77,8 @@ async def create_new_task(task_data: TaskCreate):
         title=task_data.title,
         description=task_data.description,
         status=TaskStatus.BACKLOG,
-        phases=create_default_phases()
+        phases=create_default_phases(),
+        skip_ai_review=task_data.skip_ai_review
     )
 
     await db_create_task(task)
@@ -106,6 +107,8 @@ async def update_task_detail(task_id: str, task_data: TaskUpdate):
         task.description = task_data.description
     if task_data.status is not None:
         task.status = task_data.status
+    if task_data.skip_ai_review is not None:
+        task.skip_ai_review = task_data.skip_ai_review
 
     task.updated_at = datetime.now()
     await update_task(task)

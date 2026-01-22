@@ -42,6 +42,7 @@ class Task(BaseModel):
     worktree_path: str | None = None
     branch_name: str | None = None
     pr_url: str | None = None
+    skip_ai_review: bool = False
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
@@ -56,12 +57,14 @@ class GlobalConfig(BaseModel):
 class TaskCreate(BaseModel):
     title: str
     description: str
+    skip_ai_review: bool = False
 
 
 class TaskUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
     status: TaskStatus | None = None
+    skip_ai_review: bool | None = None
 
 
 class PhaseConfigUpdate(BaseModel):
