@@ -9,6 +9,14 @@
   --accent-green: #3fb950;
   --accent-red: #f85149;
   --accent-blue: #58a6ff;
+
+  /* Log colors */
+  --log-info: #58a6ff;
+  --log-tool: #d29922;
+  --log-read: #3fb950;
+  --log-write: #a371f7;
+  --log-bash: #f85149;
+  --log-error: #ff6b6b;
 }
 
 * {

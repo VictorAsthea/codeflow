@@ -193,10 +193,12 @@ function renderPhasesTab() {
 }
 
 function renderLogsTab() {
-    const container = document.getElementById('tab-logs');
-    const phases = ['planning', 'coding', 'validation'];
+    const logEntriesContainer = document.getElementById('log-entries');
+    if (!logEntriesContainer) return;
 
+    const phases = ['planning', 'coding', 'validation'];
     let allLogs = [];
+
     phases.forEach(phaseName => {
         const phase = currentTask.phases[phaseName];
         if (phase && phase.logs && phase.logs.length > 0) {
@@ -206,11 +208,14 @@ function renderLogsTab() {
         }
     });
 
-    const logsText = allLogs.length > 0 ? allLogs.join('\n') : 'No logs yet';
+    const logsStream = allLogs.join('\n');
 
-    container.innerHTML = `
-        <div class="logs-container" id="logs-display">${logsText}</div>
-    `;
+    if (window.logViewer) {
+        window.logViewer.loadLogs(logsStream);
+    } else {
+        window.logViewer = new LogViewer('#log-entries');
+        window.logViewer.loadLogs(logsStream);
+    }
 }
 
 function setupTabs() {
