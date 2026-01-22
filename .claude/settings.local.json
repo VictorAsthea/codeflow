@@ -13,7 +13,9 @@
       "Bash(pip install:*)",
       "Bash(python:*)",
       "Bash(curl:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(git worktree:*)",
+      "Bash(where:*)"
     ]
   }
 }

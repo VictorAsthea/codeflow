@@ -1,6 +1,21 @@
 import asyncio
 import json
+import os
+import shutil
 from typing import Callable, Any
+
+
+def find_claude_cli():
+    """Find claude CLI executable"""
+    claude_path = shutil.which("claude")
+    if claude_path:
+        return claude_path
+
+    npm_path = os.path.join(os.environ.get("APPDATA", ""), "npm", "claude.cmd")
+    if os.path.exists(npm_path):
+        return npm_path
+
+    return "claude"
 
 
 async def run_claude(
@@ -25,8 +40,10 @@ async def run_claude(
     Returns:
         dict with exit_code and output
     """
+    claude_cmd = find_claude_cli()
+
     cmd = [
-        "claude",
+        claude_cmd,
         "-p", prompt,
         "--model", model,
         "--maxTurns", str(max_turns)

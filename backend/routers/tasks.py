@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from datetime import datetime
 import re
 import asyncio
+import threading
 from backend.models import (
     Task, TaskCreate, TaskUpdate, TaskStatus, PhaseConfigUpdate,
     Phase, PhaseConfig, PhaseStatus
