@@ -24,4 +24,4 @@ if __name__ == "__main__":
     import threading
     threading.Timer(1.5, open_browser).start()
 
-    uvicorn.run("backend.main:app", host="127.0.0.1", port=8765, reload=True)
+    uvicorn.run("backend.main:app", host="127.0.0.1", port=8765, reload=False)
