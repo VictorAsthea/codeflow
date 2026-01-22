@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from backend.database import init_db
 from backend.routers import tasks, settings
+from backend.websocket_manager import manager
 
 
 @asynccontextmanager
@@ -24,3 +25,13 @@ app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
 @app.get("/")
 async def root():
     return FileResponse("frontend/index.html")
+
+
+@app.websocket("/ws/logs/{task_id}")
+async def websocket_endpoint(websocket: WebSocket, task_id: str):
+    await manager.connect(websocket, task_id)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, task_id)

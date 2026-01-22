@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from datetime import datetime
 import re
+import asyncio
 from backend.models import (
     Task, TaskCreate, TaskUpdate, TaskStatus, PhaseConfigUpdate,
     Phase, PhaseConfig, PhaseStatus
@@ -10,6 +11,9 @@ from backend.database import (
     update_task, delete_task as db_delete_task
 )
 from backend.config import settings
+from backend.services.worktree_manager import WorktreeManager
+from backend.services.phase_executor import execute_all_phases
+from backend.websocket_manager import manager
 
 router = APIRouter()
 
@@ -114,16 +118,66 @@ async def delete_task_endpoint(task_id: str):
     return {"message": "Task deleted successfully"}
 
 
+async def execute_task_background(task_id: str, project_path: str):
+    """Background task to execute all phases of a task"""
+    task = await get_task(task_id)
+    if not task:
+        return
+
+    worktree_mgr = WorktreeManager(project_path)
+
+    async def log_handler(message: str):
+        await manager.send_log(task_id, message)
+
+    try:
+        await log_handler(f"Starting task execution: {task.title}")
+
+        branch_name = f"task/{task.id}"
+        await log_handler(f"Creating worktree for branch: {branch_name}")
+
+        worktree_path = worktree_mgr.create(task.id, branch_name)
+        task.worktree_path = str(worktree_path)
+        task.branch_name = branch_name
+        await update_task(task)
+
+        await log_handler(f"Worktree created at: {worktree_path}")
+
+        result = await execute_all_phases(task, str(worktree_path), log_handler)
+
+        if result["success"]:
+            task.status = TaskStatus.AI_REVIEW
+            await log_handler("\n=== All phases completed successfully ===")
+        else:
+            task.status = TaskStatus.IN_PROGRESS
+            await log_handler("\n=== Execution stopped due to errors ===")
+
+        task.updated_at = datetime.now()
+        await update_task(task)
+
+        await log_handler(f"\nTask status updated to: {task.status.value}")
+
+    except Exception as e:
+        await log_handler(f"\nERROR: {str(e)}")
+        task.status = TaskStatus.BACKLOG
+        task.updated_at = datetime.now()
+        await update_task(task)
+
+
 @router.post("/tasks/{task_id}/start")
-async def start_task(task_id: str):
+async def start_task(task_id: str, background_tasks: BackgroundTasks):
     """Start task execution"""
     task = await get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    if task.status == TaskStatus.IN_PROGRESS:
+        raise HTTPException(status_code=400, detail="Task is already running")
+
     task.status = TaskStatus.IN_PROGRESS
     task.updated_at = datetime.now()
     await update_task(task)
+
+    background_tasks.add_task(execute_task_background, task_id, settings.project_path)
 
     return {"message": "Task started", "task": task}
 
