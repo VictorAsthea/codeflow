@@ -1,0 +1,636 @@
+/* ==========================================
+   PRO LOGS VIEWER - STYLES
+   ========================================== */
+
+/* Variables CSS pour les couleurs de type */
+:root {
+  --log-info: #58a6ff;
+  --log-tool: #d29922;
+  --log-read: #3fb950;
+  --log-write: #a371f7;
+  --log-bash: #f85149;
+  --log-error: #ff6b6b;
+  --log-bg-dark: #1a1a2e;
+  --log-bg-entry: #16213e;
+  --log-bg-hover: #1f2d4a;
+  --log-border: #2d3748;
+  --log-text: #e2e8f0;
+  --log-text-muted: #94a3b8;
+}
+
+/* Container principal */
+.log-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--log-bg-dark);
+  color: var(--log-text);
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+/* ==========================================
+   HEADER - Filtres, Recherche, Contrôles
+   ========================================== */
+
+.log-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--log-bg-entry);
+  border-bottom: 1px solid var(--log-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.log-filter-pill {
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--log-border);
+  background: var(--log-bg-dark);
+  color: var(--log-text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.log-filter-pill:hover {
+  background: var(--log-bg-hover);
+  transform: translateY(-1px);
+}
+
+.log-filter-pill.active {
+  background: var(--log-info);
+  color: #000;
+  border-color: var(--log-info);
+}
+
+.log-filter-pill[data-type="info"].active {
+  background: var(--log-info);
+}
+
+.log-filter-pill[data-type="tool"].active {
+  background: var(--log-tool);
+}
+
+.log-filter-pill[data-type="read"].active {
+  background: var(--log-read);
+}
+
+.log-filter-pill[data-type="write"].active {
+  background: var(--log-write);
+}
+
+.log-filter-pill[data-type="bash"].active {
+  background: var(--log-bash);
+}
+
+.log-filter-pill[data-type="error"].active {
+  background: var(--log-error);
+}
+
+.log-search {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--log-bg-dark);
+  border: 1px solid var(--log-border);
+  border-radius: 6px;
+  color: var(--log-text);
+  font-family: inherit;
+  font-size: 13px;
+  transition: border-color 0.2s ease;
+}
+
+.log-search:focus {
+  outline: none;
+  border-color: var(--log-info);
+}
+
+.log-search::placeholder {
+  color: var(--log-text-muted);
+}
+
+.log-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.log-controls button {
+  padding: 8px 16px;
+  background: var(--log-bg-dark);
+  border: 1px solid var(--log-border);
+  border-radius: 6px;
+  color: var(--log-text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.log-controls button:hover {
+  background: var(--log-bg-hover);
+  border-color: var(--log-info);
+}
+
+.log-controls button:active {
+  transform: scale(0.98);
+}
+
+.log-counter {
+  margin-left: auto;
+  color: var(--log-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.log-auto-scroll-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--log-bg-dark);
+  border: 1px solid var(--log-border);
+  border-radius: 6px;
+  color: var(--log-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.log-auto-scroll-toggle.active {
+  color: var(--log-info);
+  border-color: var(--log-info);
+}
+
+.log-auto-scroll-toggle:hover {
+  background: var(--log-bg-hover);
+}
+
+/* ==========================================
+   LOG ENTRIES CONTAINER
+   ========================================== */
+
+.log-entries-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  scroll-behavior: smooth;
+}
+
+.log-entries-container::-webkit-scrollbar {
+  width: 10px;
+}
+
+.log-entries-container::-webkit-scrollbar-track {
+  background: var(--log-bg-dark);
+}
+
+.log-entries-container::-webkit-scrollbar-thumb {
+  background: var(--log-border);
+  border-radius: 5px;
+}
+
+.log-entries-container::-webkit-scrollbar-thumb:hover {
+  background: #3d4a5e;
+}
+
+/* ==========================================
+   LOG ENTRY - Structure
+   ========================================== */
+
+.log-entry {
+  margin-bottom: 12px;
+  border-left: 3px solid transparent;
+  border-radius: 6px;
+  background: var(--log-bg-entry);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.log-entry:hover {
+  background: var(--log-bg-hover);
+}
+
+.log-entry.log-info {
+  border-left-color: var(--log-info);
+}
+
+.log-entry.log-tool {
+  border-left-color: var(--log-tool);
+}
+
+.log-entry.log-read {
+  border-left-color: var(--log-read);
+}
+
+.log-entry.log-write {
+  border-left-color: var(--log-write);
+}
+
+.log-entry.log-bash {
+  border-left-color: var(--log-bash);
+}
+
+.log-entry.log-error {
+  border-left-color: var(--log-error);
+}
+
+.log-entry.hidden {
+  display: none;
+}
+
+/* ==========================================
+   LOG ENTRY HEADER - Cliquable
+   ========================================== */
+
+.log-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease;
+}
+
+.log-entry-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.log-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.log-timestamp {
+  color: var(--log-text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.log-badge {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  color: #000;
+}
+
+.log-badge-info {
+  background: var(--log-info);
+}
+
+.log-badge-tool {
+  background: var(--log-tool);
+}
+
+.log-badge-read {
+  background: var(--log-read);
+}
+
+.log-badge-write {
+  background: var(--log-write);
+}
+
+.log-badge-bash {
+  background: var(--log-bash);
+}
+
+.log-badge-error {
+  background: var(--log-error);
+}
+
+.log-summary {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--log-text);
+}
+
+.log-toggle {
+  color: var(--log-text-muted);
+  font-size: 12px;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.log-entry:not(.collapsed) .log-toggle {
+  transform: rotate(-180deg);
+}
+
+/* ==========================================
+   LOG ENTRY BODY - Collapsible
+   ========================================== */
+
+.log-entry-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.log-entry:not(.collapsed) .log-entry-body {
+  max-height: 2000px;
+}
+
+.log-entry-body pre {
+  margin: 0;
+  padding: 16px;
+  overflow-x: auto;
+  background: transparent;
+  color: var(--log-text);
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.log-entry-body pre::-webkit-scrollbar {
+  height: 8px;
+}
+
+.log-entry-body pre::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.log-entry-body pre::-webkit-scrollbar-thumb {
+  background: var(--log-border);
+  border-radius: 4px;
+}
+
+.log-entry-body code {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* ==========================================
+   SYNTAX HIGHLIGHTING - GitHub Dark Theme
+   ========================================== */
+
+.hljs {
+  background: transparent !important;
+  color: var(--log-text) !important;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #8b949e;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-type {
+  color: #ff7b72;
+}
+
+.hljs-string,
+.hljs-attr,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+  color: #a5d6ff;
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-name {
+  color: #d2a8ff;
+}
+
+.hljs-variable,
+.hljs-template-variable {
+  color: #79c0ff;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-built_in {
+  color: #79c0ff;
+}
+
+.hljs-function,
+.hljs-attribute {
+  color: #d2a8ff;
+}
+
+.hljs-regexp,
+.hljs-link {
+  color: #a5d6ff;
+}
+
+.hljs-meta {
+  color: #8b949e;
+}
+
+.hljs-deletion {
+  color: #ff7b72;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
+
+/* ==========================================
+   EMPTY STATE
+   ========================================== */
+
+.log-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--log-text-muted);
+  text-align: center;
+  padding: 40px;
+}
+
+.log-empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.log-empty-state-text {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.log-empty-state-subtext {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* ==========================================
+   RESPONSIVE - Mobile & Tablet
+   ========================================== */
+
+@media (max-width: 768px) {
+  .log-header {
+    padding: 12px;
+  }
+
+  .log-filters {
+    gap: 6px;
+  }
+
+  .log-filter-pill {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  .log-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .log-controls button {
+    width: 100%;
+  }
+
+  .log-counter {
+    margin-left: 0;
+    text-align: center;
+  }
+
+  .log-entries-container {
+    padding: 12px;
+  }
+
+  .log-entry-header {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+
+  .log-timestamp {
+    min-width: auto;
+  }
+
+  .log-summary {
+    flex-basis: 100%;
+    order: 10;
+    white-space: normal;
+    margin-top: 4px;
+  }
+}
+
+/* ==========================================
+   ANIMATIONS - Smooth Transitions
+   ========================================== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.log-entry {
+  animation: fadeIn 0.3s ease;
+}
+
+/* Highlight animation pour les résultats de recherche */
+.log-entry.search-highlight {
+  animation: searchPulse 0.5s ease;
+}
+
+@keyframes searchPulse {
+  0%, 100% {
+    background: var(--log-bg-entry);
+  }
+  50% {
+    background: rgba(88, 166, 255, 0.2);
+  }
+}
+
+/* ==========================================
+   SCROLL TO BOTTOM BUTTON
+   ========================================== */
+
+.log-scroll-to-bottom {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 16px;
+  background: var(--log-info);
+  color: #000;
+  border: none;
+  border-radius: 24px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.log-scroll-to-bottom:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.log-scroll-to-bottom:active {
+  transform: translateY(0);
+}
+
+.log-scroll-to-bottom.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+}
+
+/* ==========================================
+   LOADING STATE
+   ========================================== */
+
+.log-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: var(--log-text-muted);
+  font-size: 13px;
+}
+
+.log-loading::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  border: 2px solid var(--log-border);
+  border-top-color: var(--log-info);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
