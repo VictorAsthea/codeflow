@@ -159,16 +159,23 @@ body {
   opacity: 0.5;
 }
 
+.task-card {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .task-card h3 {
-  font-size: 0.9rem;
+  font-size: 14px;
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0;
 }
 
 .task-card p {
   font-size: 0.8rem;
   color: var(--text-secondary);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -177,30 +184,33 @@ body {
   max-height: 2.8em;
 }
 
+.task-card:hover {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
 .task-phases {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  margin-bottom: 0.5rem;
 }
 
 .phase-bar {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.75rem;
 }
 
 .phase-bar .phase-name {
   width: 70px;
-  color: var(--text-secondary);
+  color: #888;
+  font-size: 11px;
 }
 
 .phase-bar .progress-bar {
   flex: 1;
-  height: 4px;
+  height: 6px;
   background-color: var(--bg-secondary);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
 }
 
@@ -218,17 +228,12 @@ body {
   background-color: var(--accent-red);
 }
 
-.phase-bar .phase-status {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-}
-
 .task-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
+  font-size: 10px;
+  color: #666;
 }
 
 .modal {
@@ -428,6 +433,39 @@ body {
   margin-right: 0.5rem;
 }
 
+.logs-filters {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.log-filter {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.log-filter.active {
+  background-color: var(--accent-blue);
+  color: white;
+}
+
+.log-count {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 0 0.5rem;
+  margin-left: 0.5rem;
+  font-size: 0.7rem;
+}
+
 .logs-container {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border);
@@ -439,6 +477,33 @@ body {
   overflow-y: auto;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+.log-entry {
+  margin-bottom: 0.5rem;
+  padding: 0.25rem;
+  border-radius: 4px;
+}
+
+.log-entry.log-info {
+  background-color: rgba(88, 166, 255, 0.1);
+  color: var(--accent-blue);
+}
+
+.log-entry.log-tool {
+  background-color: rgba(63, 185, 80, 0.1);
+  color: var(--accent-green);
+}
+
+.log-entry.log-bash {
+  background-color: rgba(248, 81, 73, 0.1);
+  color: var(--accent-red);
+}
+
+.log-entry.log-error {
+  background-color: rgba(248, 81, 73, 0.2);
+  color: var(--accent-red);
+  font-weight: bold;
 }
 
 .hidden {
