@@ -47,37 +47,36 @@ async def run_claude(
         claude_cmd,
         "--print",
         "--model", model,
-        "--maxTurns", str(max_turns),
-        "--permission-mode", "bypassPermissions",
-        "--output-format", "stream-json"
+        "--max-turns", str(max_turns),
+        "--permission-mode", "bypassPermissions"
     ]
 
     if allowed_tools:
         for tool in allowed_tools:
             cmd.extend(["--allowedTools", tool])
 
-    # Prompt must be the LAST argument (positional)
-    cmd.append(prompt)
-
     print(f"[DEBUG] ========== CLAUDE COMMAND ==========")
     print(f"[DEBUG] Command as list (each element is a separate arg):")
     for i, arg in enumerate(cmd):
-        if i == len(cmd) - 1:  # The prompt is the LAST argument
-            print(f"[DEBUG]   [{i}] (PROMPT): {arg[:100]}..." if len(arg) > 100 else f"[DEBUG]   [{i}] (PROMPT): {arg}")
-        else:
-            print(f"[DEBUG]   [{i}] {arg}")
+        print(f"[DEBUG]   [{i}] {arg}")
+    print(f"[DEBUG] Prompt will be sent via STDIN: {prompt[:100]}...")
     print(f"[DEBUG] Working directory: {working_dir}")
     print(f"[DEBUG] Allowed tools: {allowed_tools}")
-    print(f"[DEBUG] Using create_subprocess_exec (NOT shell)")
     print(f"[DEBUG] ======================================")
 
     try:
         process = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=working_dir,
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+
+        # Send prompt via stdin
+        process.stdin.write(prompt.encode('utf-8'))
+        await process.stdin.drain()
+        process.stdin.close()
 
         print(f"[DEBUG] Process started with PID: {process.pid}")
 
@@ -91,37 +90,17 @@ async def run_claude(
                 if not line:
                     print(f"[DEBUG] {stream_name} stream ended")
                     break
-                line_str = line.decode('utf-8', errors='ignore').strip()
+                line_str = line.decode('utf-8', errors='ignore')
                 if not line_str:
                     continue
 
                 line_count += 1
+                if line_count <= 3 or line_count % 10 == 0:
+                    print(f"[DEBUG] {stream_name} line {line_count}: {line_str[:100]}...")
 
-                # Parse JSON output from stream-json format
-                try:
-                    data = json.loads(line_str)
-                    # Extract text content from different message types
-                    if "type" in data:
-                        if data["type"] == "text" and "text" in data:
-                            text_content = data["text"]
-                            if line_count <= 3 or line_count % 10 == 0:
-                                print(f"[DEBUG] {stream_name} line {line_count}: {text_content[:100]}...")
-                            output_lines.append(text_content)
-                            if callback:
-                                await callback(text_content)
-                        elif data["type"] == "error" and "error" in data:
-                            error_content = f"ERROR: {data['error']}"
-                            print(f"[DEBUG] {stream_name} error: {error_content}")
-                            output_lines.append(error_content)
-                            if callback:
-                                await callback(error_content)
-                except json.JSONDecodeError:
-                    # Fallback to plain text if not JSON
-                    if line_count <= 3 or line_count % 10 == 0:
-                        print(f"[DEBUG] {stream_name} line {line_count} (plain): {line_str[:100]}...")
-                    output_lines.append(line_str + "\n")
-                    if callback:
-                        await callback(line_str + "\n")
+                output_lines.append(line_str)
+                if callback:
+                    await callback(line_str.rstrip())
 
         await asyncio.gather(
             read_stream(process.stdout, on_output, "STDOUT"),

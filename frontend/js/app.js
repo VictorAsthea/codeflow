@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     setupModals();
     setupSettings();
+    setupSyncButton();
 
     console.log('Ready');
 });
@@ -65,6 +66,31 @@ function setupSettings() {
         } catch (error) {
             console.error('Failed to save settings:', error);
             alert('Failed to save settings: ' + error.message);
+        }
+    });
+}
+
+function setupSyncButton() {
+    const syncBtn = document.getElementById('sync-btn');
+
+    syncBtn.addEventListener('click', async () => {
+        if (!confirm('Sync main with develop? This will merge all changes from develop into main.')) {
+            return;
+        }
+
+        syncBtn.disabled = true;
+        syncBtn.textContent = '🔄 Syncing...';
+
+        try {
+            const result = await API.git.syncMain();
+            alert('Main synced successfully with develop!');
+            console.log('Sync result:', result);
+        } catch (error) {
+            console.error('Failed to sync main:', error);
+            alert('Failed to sync main: ' + error.message);
+        } finally {
+            syncBtn.disabled = false;
+            syncBtn.textContent = '🔄 Sync Main';
         }
     });
 }

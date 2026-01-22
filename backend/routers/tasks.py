@@ -35,22 +35,25 @@ def create_default_phases() -> dict[str, Phase]:
         "planning": Phase(
             name="planning",
             config=PhaseConfig(
-                model=settings.default_model,
-                intensity=settings.default_intensity
+                model=settings.default_model,  # Sonnet 4.5 par défaut
+                intensity=settings.default_intensity,
+                max_turns=20
             )
         ),
         "coding": Phase(
             name="coding",
             config=PhaseConfig(
-                model=settings.default_model,
-                intensity=settings.default_intensity
+                model=settings.default_model,  # Sonnet 4.5 par défaut
+                intensity=settings.default_intensity,
+                max_turns=30
             )
         ),
         "validation": Phase(
             name="validation",
             config=PhaseConfig(
-                model=settings.default_model,
-                intensity=settings.default_intensity
+                model=settings.default_model,  # Sonnet 4.5 par défaut
+                intensity=settings.default_intensity,
+                max_turns=20
             )
         )
     }
@@ -74,7 +77,8 @@ async def create_new_task(task_data: TaskCreate):
         title=task_data.title,
         description=task_data.description,
         status=TaskStatus.BACKLOG,
-        phases=create_default_phases()
+        phases=create_default_phases(),
+        skip_ai_review=task_data.skip_ai_review
     )
 
     await db_create_task(task)
@@ -103,6 +107,8 @@ async def update_task_detail(task_id: str, task_data: TaskUpdate):
         task.description = task_data.description
     if task_data.status is not None:
         task.status = task_data.status
+    if task_data.skip_ai_review is not None:
+        task.skip_ai_review = task_data.skip_ai_review
 
     task.updated_at = datetime.now()
     await update_task(task)
@@ -305,7 +311,7 @@ async def create_pull_request(task_id: str):
     # Check if there are commits on the branch
     try:
         check_commits = subprocess.run(
-            ["git", "log", "--oneline", f"main..{task.branch_name}"],
+            ["git", "log", "--oneline", f"develop..{task.branch_name}"],
             cwd=task.worktree_path,
             capture_output=True,
             text=True,
@@ -334,7 +340,7 @@ async def create_pull_request(task_id: str):
         result = subprocess.run(
             [
                 "gh", "pr", "create",
-                "--base", "main",
+                "--base", "develop",
                 "--head", task.branch_name,
                 "--title", task.title,
                 "--body", task.description

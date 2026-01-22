@@ -16,8 +16,9 @@ class WorktreeManager:
             raise ValueError(f"Worktree already exists for task {task_id}")
 
         try:
+            # Create worktree from develop branch
             subprocess.run(
-                ["git", "worktree", "add", "-b", branch_name, str(worktree_path), "HEAD"],
+                ["git", "worktree", "add", "-b", branch_name, str(worktree_path), "develop"],
                 cwd=self.project_path,
                 check=True,
                 capture_output=True,
