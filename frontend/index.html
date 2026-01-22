@@ -6,6 +6,8 @@
     <title>Codeflow</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/log-viewer.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 </head>
 <body>
     <div id="app">
@@ -75,14 +77,33 @@
                         <div id="tab-overview" class="tab-panel active"></div>
                         <div id="tab-phases" class="tab-panel hidden"></div>
                         <div id="tab-logs" class="tab-panel hidden">
-                            <div class="logs-filters">
-                                <button class="log-filter active" data-filter="all">All <span class="log-count" id="log-count-all">0</span></button>
-                                <button class="log-filter" data-filter="info">Info <span class="log-count" id="log-count-info">0</span></button>
-                                <button class="log-filter" data-filter="tool">Tool <span class="log-count" id="log-count-tool">0</span></button>
-                                <button class="log-filter" data-filter="bash">Bash <span class="log-count" id="log-count-bash">0</span></button>
-                                <button class="log-filter" data-filter="error">Error <span class="log-count" id="log-count-error">0</span></button>
+                            <div class="log-viewer">
+                                <div class="log-header">
+                                    <div class="log-filters">
+                                        <button class="log-filter-pill active" data-type="all">All</button>
+                                        <button class="log-filter-pill" data-type="info">💬 Info</button>
+                                        <button class="log-filter-pill" data-type="tool">🔧 Tool</button>
+                                        <button class="log-filter-pill" data-type="read">📖 Read</button>
+                                        <button class="log-filter-pill" data-type="write">✏️ Write</button>
+                                        <button class="log-filter-pill" data-type="bash">⚡ Bash</button>
+                                        <button class="log-filter-pill" data-type="error">❌ Error</button>
+                                    </div>
+                                    <input type="text" class="log-search" placeholder="Search logs...">
+                                    <div class="log-controls">
+                                        <button class="btn-expand-all">Expand All</button>
+                                        <button class="btn-collapse-all">Collapse All</button>
+                                        <div class="log-auto-scroll-toggle active" title="Auto-scroll">
+                                            <span>📍</span>
+                                            <span>Auto-scroll</span>
+                                        </div>
+                                        <span class="log-counter">0/0 entries</span>
+                                    </div>
+                                </div>
+                                <div class="log-entries-container" id="log-entries"></div>
+                                <button class="log-scroll-to-bottom hidden">
+                                    ↓ Scroll to Bottom
+                                </button>
                             </div>
-                            <div id="logs-container"></div>
                         </div>
                     </div>
                 </div>
@@ -168,6 +189,8 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="/js/log-viewer.js"></script>
     <script type="module" src="/js/api.js"></script>
     <script type="module" src="/js/websocket.js"></script>
     <script type="module" src="/js/kanban.js"></script>

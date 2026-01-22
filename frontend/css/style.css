@@ -9,6 +9,14 @@
   --accent-green: #3fb950;
   --accent-red: #f85149;
   --accent-blue: #58a6ff;
+
+  /* Log colors */
+  --log-info: #58a6ff;
+  --log-tool: #d29922;
+  --log-read: #3fb950;
+  --log-write: #a371f7;
+  --log-bash: #f85149;
+  --log-error: #ff6b6b;
 }
 
 * {
@@ -177,8 +185,11 @@ body {
   color: var(--text-secondary);
   margin-bottom: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.4;
+  max-height: 2.8em;
 }
 
 .task-card:hover {
