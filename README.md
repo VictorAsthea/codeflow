@@ -41,7 +41,7 @@ Codeflow est une alternative légère à Auto-Claude. Une application web locale
 
 ```bash
 # Cloner le repo
-git clone https://github.com/YOUR_USER/codeflow.git
+git clone https://github.com/VictorAsthea/codeflow.git
 cd codeflow
 
 # Installer les dépendances
@@ -133,7 +133,7 @@ codeflow/
 
 ```bash
 # Fork et clone
-git clone https://github.com/YOUR_USER/codeflow.git
+git clone https://github.com/VictorAsthea/codeflow.git
 cd codeflow
 
 # Créer une branche
@@ -151,10 +151,11 @@ Voir [GIT_STRATEGY.md](GIT_STRATEGY.md) pour les conventions.
 ## 📝 Roadmap
 
 - [x] MVP Kanban + Claude Code
-- [ ] Streaming logs temps réel
+- [x] Streaming logs temps réel (WebSocket)
+- [x] Auto-refresh des tâches en cours
 - [ ] Subtasks
 - [ ] Intégration GitHub Issues
-- [ ] Thème clair/sombre
+- [ ] Thème clair
 - [ ] Statistiques d'utilisation
 - [ ] Export/Import de tâches
 

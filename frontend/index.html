@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codeflow</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <h1>Codeflow</h1>
+            <button id="settings-btn" class="btn-icon">⚙️ Settings</button>
+        </header>
+
+        <main class="kanban-board">
+            <div class="column" data-status="backlog">
+                <div class="column-header">
+                    <h2>Backlog</h2>
+                    <span class="count" id="count-backlog">0</span>
+                </div>
+                <div class="column-body" id="column-backlog">
+                    <button class="btn-new-task">+ New Task</button>
+                </div>
+            </div>
+
+            <div class="column" data-status="in_progress">
+                <div class="column-header">
+                    <h2>In Progress</h2>
+                    <span class="count" id="count-in_progress">0</span>
+                </div>
+                <div class="column-body" id="column-in_progress"></div>
+            </div>
+
+            <div class="column" data-status="ai_review">
+                <div class="column-header">
+                    <h2>AI Review</h2>
+                    <span class="count" id="count-ai_review">0</span>
+                </div>
+                <div class="column-body" id="column-ai_review"></div>
+            </div>
+
+            <div class="column" data-status="human_review">
+                <div class="column-header">
+                    <h2>Human Review</h2>
+                    <span class="count" id="count-human_review">0</span>
+                </div>
+                <div class="column-body" id="column-human_review"></div>
+            </div>
+
+            <div class="column" data-status="done">
+                <div class="column-header">
+                    <h2>Done</h2>
+                    <span class="count" id="count-done">0</span>
+                </div>
+                <div class="column-body" id="column-done"></div>
+            </div>
+        </main>
+
+        <!-- Task Modal -->
+        <div id="task-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modal-title">Task Details</h2>
+                    <button class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="tabs">
+                        <button class="tab active" data-tab="overview">Overview</button>
+                        <button class="tab" data-tab="phases">Phases</button>
+                        <button class="tab" data-tab="logs">Logs</button>
+                    </div>
+                    <div class="tab-content">
+                        <div id="tab-overview" class="tab-panel active"></div>
+                        <div id="tab-phases" class="tab-panel hidden"></div>
+                        <div id="tab-logs" class="tab-panel hidden"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btn-delete-task" class="btn btn-danger">Delete Task</button>
+                    <div class="modal-actions">
+                        <button id="btn-view-diff" class="btn btn-info hidden">View Diff</button>
+                        <button id="btn-create-pr" class="btn btn-success hidden">Create PR</button>
+                        <button id="btn-stop-task" class="btn btn-secondary hidden">Stop</button>
+                        <button id="btn-start-task" class="btn btn-primary">Start</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- New Task Modal -->
+        <div id="new-task-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>New Task</h2>
+                    <button class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="new-task-form">
+                        <div class="form-group">
+                            <label for="task-title">Title</label>
+                            <input type="text" id="task-title" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="task-description">Description</label>
+                            <textarea id="task-description" rows="6" required></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary btn-close">Cancel</button>
+                    <button id="btn-create-task" class="btn btn-primary">Create Task</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Settings</h2>
+                    <button class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="settings-form">
+                        <div class="form-group">
+                            <label for="default-model">Default Model</label>
+                            <select id="default-model">
+                                <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                                <option value="claude-opus-4-20250514">Claude Opus 4</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="default-intensity">Default Intensity</label>
+                            <select id="default-intensity">
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="project-path">Project Path</label>
+                            <input type="text" id="project-path" required>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="auto-review">
+                                Auto Review
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary btn-close">Cancel</button>
+                    <button id="btn-save-settings" class="btn btn-primary">Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/js/api.js"></script>
+    <script type="module" src="/js/websocket.js"></script>
+    <script type="module" src="/js/kanban.js"></script>
+    <script type="module" src="/js/task-modal.js"></script>
+    <script type="module" src="/js/app.js"></script>
+
+    <footer class="main-footer">
+        <p>&copy; 2025 Codeflow</p>
+    </footer>
+</body>
+</html>
