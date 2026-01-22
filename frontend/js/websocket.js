@@ -68,7 +68,12 @@ function appendLog(taskId, message) {
 }
 
 window.addEventListener('open-task-modal', (e) => {
-    const taskId = e.detail.taskId;
+    const taskId = e.detail?.taskId;
+
+    if (!taskId || taskId.length < 3) {
+        console.log('Invalid task ID, skipping WebSocket connection');
+        return;
+    }
 
     setTimeout(() => {
         connectToTaskLogs(taskId);
