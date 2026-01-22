@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException
 from datetime import datetime
 import re
 import asyncio
@@ -120,13 +120,18 @@ async def delete_task_endpoint(task_id: str):
 
 async def execute_task_background(task_id: str, project_path: str):
     """Background task to execute all phases of a task"""
+    print(f"[DEBUG] Background task started for task {task_id}")
+
     task = await get_task(task_id)
     if not task:
+        print(f"[DEBUG] Task {task_id} not found")
         return
 
+    print(f"[DEBUG] Task loaded: {task.title}")
     worktree_mgr = WorktreeManager(project_path)
 
     async def log_handler(message: str):
+        print(f"[LOG] {message}")
         await manager.send_log(task_id, message)
 
     try:
@@ -164,7 +169,7 @@ async def execute_task_background(task_id: str, project_path: str):
 
 
 @router.post("/tasks/{task_id}/start")
-async def start_task(task_id: str, background_tasks: BackgroundTasks):
+async def start_task(task_id: str):
     """Start task execution"""
     task = await get_task(task_id)
     if not task:
@@ -177,7 +182,7 @@ async def start_task(task_id: str, background_tasks: BackgroundTasks):
     task.updated_at = datetime.now()
     await update_task(task)
 
-    background_tasks.add_task(execute_task_background, task_id, settings.project_path)
+    asyncio.create_task(execute_task_background(task_id, settings.project_path))
 
     return {"message": "Task started", "task": task}
 
