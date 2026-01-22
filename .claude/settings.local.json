@@ -10,7 +10,9 @@
       "Bash(git checkout:*)",
       "Bash(tree:*)",
       "Bash(timeout 5 python:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(curl:*)"
     ]
   }
 }
