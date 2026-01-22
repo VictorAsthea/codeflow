@@ -1,10 +1,12 @@
 import { API } from './api.js';
 
 let currentTask = null;
+let refreshInterval = null;
 
 export function initTaskModal() {
     setupTabs();
     setupActions();
+    setupModalObserver();
 
     window.addEventListener('open-task-modal', async (e) => {
         await openModal(e.detail.taskId);
@@ -16,9 +18,56 @@ async function openModal(taskId) {
         currentTask = await API.tasks.get(taskId);
         renderModal();
         document.getElementById('task-modal').classList.remove('hidden');
+        startAutoRefresh();
     } catch (error) {
         console.error('Failed to load task:', error);
         alert('Failed to load task: ' + error.message);
+    }
+}
+
+function startAutoRefresh() {
+    stopAutoRefresh();
+
+    if (currentTask && currentTask.status === 'in_progress') {
+        refreshInterval = setInterval(async () => {
+            try {
+                const updated = await API.tasks.get(currentTask.id);
+                currentTask = updated;
+                renderModal();
+
+                if (updated.status !== 'in_progress') {
+                    stopAutoRefresh();
+                    window.dispatchEvent(new Event('task-updated'));
+                }
+            } catch (error) {
+                console.error('Failed to refresh task:', error);
+            }
+        }, 3000);
+    }
+}
+
+function stopAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+    }
+}
+
+function setupModalObserver() {
+    const taskModal = document.getElementById('task-modal');
+    if (taskModal) {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class') {
+                    const isHidden = taskModal.classList.contains('hidden');
+                    if (isHidden) {
+                        stopAutoRefresh();
+                    }
+                }
+            });
+        });
+
+        observer.observe(taskModal, { attributes: true });
     }
 }
 
