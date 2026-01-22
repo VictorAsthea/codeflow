@@ -15,7 +15,8 @@
       "Bash(curl:*)",
       "Bash(git config:*)",
       "Bash(git worktree:*)",
-      "Bash(where:*)"
+      "Bash(where:*)",
+      "Bash(ls:*)"
     ]
   }
 }

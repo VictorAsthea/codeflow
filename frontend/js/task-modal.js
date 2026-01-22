@@ -117,6 +117,17 @@ function renderOverviewTab() {
         </div>
         ` : ''}
 
+        ${currentTask.pr_url ? `
+        <div style="margin-bottom: 1.5rem;">
+            <h3 style="margin-bottom: 0.5rem;">Pull Request</h3>
+            <p>
+                <a href="${currentTask.pr_url}" target="_blank" style="color: var(--accent-blue); text-decoration: none;">
+                    🔗 ${currentTask.pr_url}
+                </a>
+            </p>
+        </div>
+        ` : ''}
+
         <div style="margin-bottom: 1.5rem;">
             <h3 style="margin-bottom: 0.5rem;">Timestamps</h3>
             <p style="font-size: 0.9rem; color: var(--text-secondary);">
@@ -260,6 +271,37 @@ function setupActions() {
             alert('Failed to delete task: ' + error.message);
         }
     });
+
+    const viewDiffBtn = document.getElementById('btn-view-diff');
+    const createPRBtn = document.getElementById('btn-create-pr');
+
+    viewDiffBtn.addEventListener('click', () => {
+        if (!currentTask || !currentTask.branch_name) return;
+
+        const repoUrl = 'https://github.com/anthropics/codeflow';
+        const diffUrl = `${repoUrl}/compare/main...${currentTask.branch_name}`;
+        window.open(diffUrl, '_blank');
+    });
+
+    createPRBtn.addEventListener('click', async () => {
+        if (!currentTask) return;
+
+        createPRBtn.disabled = true;
+        createPRBtn.textContent = 'Creating PR...';
+
+        try {
+            const result = await API.tasks.createPR(currentTask.id);
+            alert(`PR created successfully!\n${result.pr_url}`);
+            window.dispatchEvent(new Event('task-updated'));
+            await openModal(currentTask.id);
+        } catch (error) {
+            console.error('Failed to create PR:', error);
+            alert('Failed to create PR: ' + error.message);
+        } finally {
+            createPRBtn.disabled = false;
+            createPRBtn.textContent = 'Create PR';
+        }
+    });
 }
 
 function setupPhaseConfigListeners() {
@@ -305,6 +347,8 @@ function setupPhaseConfigListeners() {
 function updateActionButtons() {
     const startBtn = document.getElementById('btn-start-task');
     const stopBtn = document.getElementById('btn-stop-task');
+    const viewDiffBtn = document.getElementById('btn-view-diff');
+    const createPRBtn = document.getElementById('btn-create-pr');
 
     if (currentTask.status === 'in_progress') {
         startBtn.classList.add('hidden');
@@ -312,6 +356,14 @@ function updateActionButtons() {
     } else {
         startBtn.classList.remove('hidden');
         stopBtn.classList.add('hidden');
+    }
+
+    if (currentTask.status === 'human_review') {
+        viewDiffBtn.classList.remove('hidden');
+        createPRBtn.classList.remove('hidden');
+    } else {
+        viewDiffBtn.classList.add('hidden');
+        createPRBtn.classList.add('hidden');
     }
 }
 

@@ -63,7 +63,7 @@ body {
 .kanban-board {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 1rem;
   padding: 2rem;
   overflow-x: auto;
@@ -88,6 +88,10 @@ body {
 
 .column[data-status="human_review"] {
   border-left: 3px solid var(--accent-green);
+}
+
+.column[data-status="done"] {
+  border-left: 3px solid #3fb950;
 }
 
 .column-header {
@@ -367,6 +371,24 @@ body {
 
 .btn-danger:hover {
   background-color: #d13d35;
+}
+
+.btn-success {
+  background-color: #238636;
+  color: white;
+}
+
+.btn-success:hover {
+  background-color: #2ea043;
+}
+
+.btn-info {
+  background-color: #1f6feb;
+  color: white;
+}
+
+.btn-info:hover {
+  background-color: #388bfd;
 }
 
 .form-group {

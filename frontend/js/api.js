@@ -62,6 +62,10 @@ export const API = {
         retryPhase: (id, phaseName) => fetchJSON(`${API_BASE}/tasks/${id}/phases/${phaseName}/retry`, {
             method: 'POST',
         }),
+
+        createPR: (id) => fetchJSON(`${API_BASE}/tasks/${id}/create-pr`, {
+            method: 'POST',
+        }),
     },
 
     settings: {

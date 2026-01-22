@@ -41,17 +41,35 @@ async def run_claude(
         dict with exit_code and output
     """
     claude_cmd = find_claude_cli()
+    print(f"[DEBUG] Claude CLI path: {claude_cmd}")
 
     cmd = [
         claude_cmd,
-        "-p", prompt,
+        "--print",
         "--model", model,
-        "--maxTurns", str(max_turns)
+        "--maxTurns", str(max_turns),
+        "--permission-mode", "bypassPermissions",
+        "--output-format", "stream-json"
     ]
 
     if allowed_tools:
         for tool in allowed_tools:
             cmd.extend(["--allowedTools", tool])
+
+    # Prompt must be the LAST argument (positional)
+    cmd.append(prompt)
+
+    print(f"[DEBUG] ========== CLAUDE COMMAND ==========")
+    print(f"[DEBUG] Command as list (each element is a separate arg):")
+    for i, arg in enumerate(cmd):
+        if i == len(cmd) - 1:  # The prompt is the LAST argument
+            print(f"[DEBUG]   [{i}] (PROMPT): {arg[:100]}..." if len(arg) > 100 else f"[DEBUG]   [{i}] (PROMPT): {arg}")
+        else:
+            print(f"[DEBUG]   [{i}] {arg}")
+    print(f"[DEBUG] Working directory: {working_dir}")
+    print(f"[DEBUG] Allowed tools: {allowed_tools}")
+    print(f"[DEBUG] Using create_subprocess_exec (NOT shell)")
+    print(f"[DEBUG] ======================================")
 
     try:
         process = await asyncio.create_subprocess_exec(
@@ -61,33 +79,70 @@ async def run_claude(
             stderr=asyncio.subprocess.PIPE
         )
 
-        output_lines = []
+        print(f"[DEBUG] Process started with PID: {process.pid}")
 
-        async def read_stream(stream, callback):
+        output_lines = []
+        line_count = 0
+
+        async def read_stream(stream, callback, stream_name):
+            nonlocal line_count
             while True:
                 line = await stream.readline()
                 if not line:
+                    print(f"[DEBUG] {stream_name} stream ended")
                     break
-                line_str = line.decode('utf-8', errors='ignore')
-                output_lines.append(line_str)
-                if callback:
-                    await callback(line_str)
+                line_str = line.decode('utf-8', errors='ignore').strip()
+                if not line_str:
+                    continue
+
+                line_count += 1
+
+                # Parse JSON output from stream-json format
+                try:
+                    data = json.loads(line_str)
+                    # Extract text content from different message types
+                    if "type" in data:
+                        if data["type"] == "text" and "text" in data:
+                            text_content = data["text"]
+                            if line_count <= 3 or line_count % 10 == 0:
+                                print(f"[DEBUG] {stream_name} line {line_count}: {text_content[:100]}...")
+                            output_lines.append(text_content)
+                            if callback:
+                                await callback(text_content)
+                        elif data["type"] == "error" and "error" in data:
+                            error_content = f"ERROR: {data['error']}"
+                            print(f"[DEBUG] {stream_name} error: {error_content}")
+                            output_lines.append(error_content)
+                            if callback:
+                                await callback(error_content)
+                except json.JSONDecodeError:
+                    # Fallback to plain text if not JSON
+                    if line_count <= 3 or line_count % 10 == 0:
+                        print(f"[DEBUG] {stream_name} line {line_count} (plain): {line_str[:100]}...")
+                    output_lines.append(line_str + "\n")
+                    if callback:
+                        await callback(line_str + "\n")
 
         await asyncio.gather(
-            read_stream(process.stdout, on_output),
-            read_stream(process.stderr, on_output)
+            read_stream(process.stdout, on_output, "STDOUT"),
+            read_stream(process.stderr, on_output, "STDERR")
         )
 
         await process.wait()
+
+        print(f"[DEBUG] Process finished with exit code: {process.returncode}")
+        print(f"[DEBUG] Total lines captured: {line_count}")
 
         return {
             "exit_code": process.returncode,
             "output": "".join(output_lines)
         }
 
-    except FileNotFoundError:
+    except FileNotFoundError as e:
+        print(f"[DEBUG] FileNotFoundError: {e}")
         raise RuntimeError("Claude CLI not found. Make sure 'claude' is installed and in PATH")
     except Exception as e:
+        print(f"[DEBUG] Exception: {e}")
         raise RuntimeError(f"Failed to run Claude: {str(e)}")
 
 
@@ -105,11 +160,19 @@ async def run_claude_with_streaming(
     This is a convenience wrapper around run_claude that handles
     log formatting and streaming
     """
+    print(f"[DEBUG] run_claude_with_streaming called with callback: {log_callback is not None}")
+
+    callback_count = 0
+
     async def output_handler(line: str):
+        nonlocal callback_count
+        callback_count += 1
+        if callback_count <= 3 or callback_count % 10 == 0:
+            print(f"[DEBUG] output_handler called (count: {callback_count}): {line[:50]}...")
         if log_callback:
             await log_callback(line.rstrip())
 
-    return await run_claude(
+    result = await run_claude(
         prompt=prompt,
         working_dir=working_dir,
         model=model,
@@ -117,3 +180,6 @@ async def run_claude_with_streaming(
         max_turns=max_turns,
         on_output=output_handler
     )
+
+    print(f"[DEBUG] run_claude_with_streaming finished, callback called {callback_count} times")
+    return result

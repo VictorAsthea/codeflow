@@ -48,6 +48,14 @@
                 </div>
                 <div class="column-body" id="column-human_review"></div>
             </div>
+
+            <div class="column" data-status="done">
+                <div class="column-header">
+                    <h2>Done</h2>
+                    <span class="count" id="count-done">0</span>
+                </div>
+                <div class="column-body" id="column-done"></div>
+            </div>
         </main>
 
         <!-- Task Modal -->
@@ -72,6 +80,8 @@
                 <div class="modal-footer">
                     <button id="btn-delete-task" class="btn btn-danger">Delete Task</button>
                     <div class="modal-actions">
+                        <button id="btn-view-diff" class="btn btn-info hidden">View Diff</button>
+                        <button id="btn-create-pr" class="btn btn-success hidden">Create PR</button>
                         <button id="btn-stop-task" class="btn btn-secondary hidden">Stop</button>
                         <button id="btn-start-task" class="btn btn-primary">Start</button>
                     </div>

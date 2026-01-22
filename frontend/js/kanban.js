@@ -25,6 +25,7 @@ function renderAllTasks() {
         in_progress: document.getElementById('column-in_progress'),
         ai_review: document.getElementById('column-ai_review'),
         human_review: document.getElementById('column-human_review'),
+        done: document.getElementById('column-done'),
     };
 
     Object.values(columns).forEach(col => {
@@ -122,6 +123,7 @@ function updateCounts() {
         in_progress: 0,
         ai_review: 0,
         human_review: 0,
+        done: 0,
     };
 
     tasks.forEach(task => {

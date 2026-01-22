@@ -3,6 +3,7 @@ from datetime import datetime
 import re
 import asyncio
 import threading
+import subprocess
 from backend.models import (
     Task, TaskCreate, TaskUpdate, TaskStatus, PhaseConfigUpdate,
     Phase, PhaseConfig, PhaseStatus
@@ -131,8 +132,12 @@ async def execute_task_background(task_id: str, project_path: str):
     print(f"[DEBUG] Task loaded: {task.title}")
     worktree_mgr = WorktreeManager(project_path)
 
+    log_handler_count = 0
+
     async def log_handler(message: str):
-        print(f"[LOG] {message}")
+        nonlocal log_handler_count
+        log_handler_count += 1
+        print(f"[LOG] (count: {log_handler_count}) {message}")
         await manager.send_log(task_id, message)
 
     try:
@@ -279,3 +284,77 @@ async def retry_phase(task_id: str, phase_name: str):
     task.updated_at = datetime.now()
     await update_task(task)
     return {"message": "Phase reset for retry", "phase": phase}
+
+
+@router.post("/tasks/{task_id}/create-pr")
+async def create_pull_request(task_id: str):
+    """Create a pull request for the task"""
+    task = await get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status != TaskStatus.HUMAN_REVIEW:
+        raise HTTPException(status_code=400, detail="Task must be in human_review status")
+
+    if not task.branch_name:
+        raise HTTPException(status_code=400, detail="Task has no branch")
+
+    if not task.worktree_path:
+        raise HTTPException(status_code=400, detail="Task has no worktree")
+
+    # Check if there are commits on the branch
+    try:
+        check_commits = subprocess.run(
+            ["git", "log", "--oneline", f"main..{task.branch_name}"],
+            cwd=task.worktree_path,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        if not check_commits.stdout.strip():
+            raise HTTPException(status_code=400, detail="No commits found on branch. Cannot create PR without changes.")
+    except subprocess.CalledProcessError:
+        raise HTTPException(status_code=500, detail="Failed to check commits on branch")
+
+    # Push the branch to remote
+    try:
+        subprocess.run(
+            ["git", "push", "-u", "origin", task.branch_name],
+            cwd=task.worktree_path,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.strip() if e.stderr else str(e)
+        raise HTTPException(status_code=500, detail=f"Failed to push branch: {error_msg}")
+
+    try:
+        result = subprocess.run(
+            [
+                "gh", "pr", "create",
+                "--base", "main",
+                "--head", task.branch_name,
+                "--title", task.title,
+                "--body", task.description
+            ],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        pr_url = result.stdout.strip()
+
+        task.pr_url = pr_url
+        task.status = TaskStatus.DONE
+        task.updated_at = datetime.now()
+        await update_task(task)
+
+        return {"message": "PR created", "pr_url": pr_url, "task": task}
+
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail="GitHub CLI (gh) is not installed")
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.strip() if e.stderr else str(e)
+        raise HTTPException(status_code=500, detail=f"Failed to create PR: {error_msg}")

@@ -41,6 +41,7 @@ class Task(BaseModel):
     phases: dict[str, Phase]
     worktree_path: str | None = None
     branch_name: str | None = None
+    pr_url: str | None = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 

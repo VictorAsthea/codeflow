@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Callable, Any
+import subprocess
 from backend.models import Task, Phase, PhaseStatus
 from backend.services.claude_runner import run_claude_with_streaming
 from backend.database import update_task
@@ -10,28 +11,32 @@ PHASE_PROMPTS = {
 
 TÂCHE: {task_description}
 
-Produis:
+Produis un plan détaillé avec:
 1. Liste des fichiers à créer/modifier
 2. Étapes d'implémentation ordonnées
 3. Tests à écrire
 4. Risques potentiels
 
+IMPORTANT: Ne pose AUCUNE question. Prends des décisions basées sur la description de la tâche.
 Format: Markdown structuré.""",
 
-    "coding": """Tu es un développeur senior. Implémente cette tâche selon le plan.
+    "coding": """Tu es un développeur senior. Implémente cette tâche MAINTENANT.
 
 TÂCHE: {task_description}
 
 PLAN:
 {planning_output}
 
-Règles:
+IMPLÉMENTE DIRECTEMENT sans attendre de réponse:
+- Crée/modifie les fichiers nécessaires
 - Code propre et documenté
-- Gestion d'erreurs
+- Gestion d'erreurs appropriée
 - Pas de TODO ou FIXME
-- Commits atomiques avec messages clairs""",
+- Commits atomiques avec messages clairs
 
-    "validation": """Tu es un QA engineer. Valide l'implémentation.
+IMPORTANT: N'attends AUCUNE réponse utilisateur. Implémente directement selon la description.""",
+
+    "validation": """Tu es un QA engineer. Valide l'implémentation MAINTENANT.
 
 TÂCHE: {task_description}
 
@@ -42,7 +47,9 @@ Vérifie:
 4. Code review (style, sécurité, performance)
 
 Si problème trouvé, liste les corrections nécessaires.
-Sinon, confirme que la tâche est prête pour review humaine."""
+Sinon, confirme que la tâche est prête pour review humaine.
+
+IMPORTANT: Ne pose AUCUNE question. Exécute les vérifications directement."""
 }
 
 
@@ -93,12 +100,26 @@ async def execute_phase(
         planning_output=planning_output
     )
 
+    print(f"[DEBUG] execute_phase: {phase_name}, callback: {log_callback is not None}")
+
+    if phase_name == "coding":
+        print(f"[DEBUG] ========== CODING PHASE PROMPT ==========")
+        print(f"[DEBUG] {prompt}")
+        print(f"[DEBUG] ===========================================")
+
+    log_count = 0
+
     async def phase_log_handler(line: str):
+        nonlocal log_count
+        log_count += 1
+        if log_count <= 3 or log_count % 10 == 0:
+            print(f"[DEBUG] phase_log_handler called (count: {log_count}): {line[:50]}...")
         phase.logs.append(line)
         if log_callback:
             await log_callback(line)
 
     try:
+        print(f"[DEBUG] Calling run_claude_with_streaming for phase {phase_name}")
         result = await run_claude_with_streaming(
             prompt=prompt,
             working_dir=working_dir,
@@ -107,6 +128,7 @@ async def execute_phase(
             max_turns=phase.config.max_turns,
             log_callback=phase_log_handler
         )
+        print(f"[DEBUG] run_claude_with_streaming returned, phase_log_handler called {log_count} times")
 
         if result["exit_code"] == 0:
             phase.status = PhaseStatus.DONE
@@ -131,6 +153,78 @@ async def execute_phase(
             "success": False,
             "output": str(e)
         }
+
+
+async def commit_changes(
+    task: Task,
+    working_dir: str,
+    log_callback: Callable[[str], Any] = None
+) -> bool:
+    """
+    Commit changes in the worktree
+
+    Args:
+        task: The task to commit changes for
+        working_dir: Working directory (worktree path)
+        log_callback: Optional callback for streaming logs
+
+    Returns:
+        bool indicating if commit was successful
+    """
+    try:
+        if log_callback:
+            await log_callback("\n=== Committing changes ===\n")
+
+        # Check if there are changes
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=working_dir,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        if not status_result.stdout.strip():
+            if log_callback:
+                await log_callback("No changes to commit\n")
+            return True
+
+        # Add all changes
+        subprocess.run(
+            ["git", "add", "."],
+            cwd=working_dir,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        if log_callback:
+            await log_callback("Changes staged for commit\n")
+
+        # Commit with task title
+        commit_message = f"feat: {task.title}"
+        subprocess.run(
+            ["git", "commit", "-m", commit_message],
+            cwd=working_dir,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        if log_callback:
+            await log_callback(f"Committed changes: {commit_message}\n")
+
+        return True
+
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.strip() if e.stderr else str(e)
+        if log_callback:
+            await log_callback(f"Failed to commit: {error_msg}\n")
+        return False
+    except Exception as e:
+        if log_callback:
+            await log_callback(f"Failed to commit: {str(e)}\n")
+        return False
 
 
 async def execute_all_phases(
@@ -163,6 +257,13 @@ async def execute_all_phases(
             if log_callback:
                 await log_callback(f"\n=== Phase {phase_name} failed, stopping execution ===\n")
             break
+
+        # Commit changes after coding phase
+        if phase_name == "coding" and result["success"]:
+            commit_success = await commit_changes(task, working_dir, log_callback)
+            if not commit_success:
+                if log_callback:
+                    await log_callback("\n=== Warning: Failed to commit changes ===\n")
 
     all_success = all(r["success"] for r in results.values())
 
