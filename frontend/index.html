@@ -74,7 +74,16 @@
                     <div class="tab-content">
                         <div id="tab-overview" class="tab-panel active"></div>
                         <div id="tab-phases" class="tab-panel hidden"></div>
-                        <div id="tab-logs" class="tab-panel hidden"></div>
+                        <div id="tab-logs" class="tab-panel hidden">
+                            <div class="logs-filters">
+                                <button class="log-filter active" data-filter="all">All <span class="log-count" id="log-count-all">0</span></button>
+                                <button class="log-filter" data-filter="info">Info <span class="log-count" id="log-count-info">0</span></button>
+                                <button class="log-filter" data-filter="tool">Tool <span class="log-count" id="log-count-tool">0</span></button>
+                                <button class="log-filter" data-filter="bash">Bash <span class="log-count" id="log-count-bash">0</span></button>
+                                <button class="log-filter" data-filter="error">Error <span class="log-count" id="log-count-error">0</span></button>
+                            </div>
+                            <div id="logs-container"></div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -163,6 +172,7 @@
     <script type="module" src="/js/websocket.js"></script>
     <script type="module" src="/js/kanban.js"></script>
     <script type="module" src="/js/task-modal.js"></script>
+    <script type="module" src="/js/log-filters.js"></script>
     <script type="module" src="/js/app.js"></script>
 
     <footer class="main-footer">

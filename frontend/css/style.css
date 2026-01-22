@@ -425,6 +425,39 @@ body {
   margin-right: 0.5rem;
 }
 
+.logs-filters {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.log-filter {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.log-filter.active {
+  background-color: var(--accent-blue);
+  color: white;
+}
+
+.log-count {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 0 0.5rem;
+  margin-left: 0.5rem;
+  font-size: 0.7rem;
+}
+
 .logs-container {
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border);
@@ -436,6 +469,33 @@ body {
   overflow-y: auto;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+.log-entry {
+  margin-bottom: 0.5rem;
+  padding: 0.25rem;
+  border-radius: 4px;
+}
+
+.log-entry.log-info {
+  background-color: rgba(88, 166, 255, 0.1);
+  color: var(--accent-blue);
+}
+
+.log-entry.log-tool {
+  background-color: rgba(63, 185, 80, 0.1);
+  color: var(--accent-green);
+}
+
+.log-entry.log-bash {
+  background-color: rgba(248, 81, 73, 0.1);
+  color: var(--accent-red);
+}
+
+.log-entry.log-error {
+  background-color: rgba(248, 81, 73, 0.2);
+  color: var(--accent-red);
+  font-weight: bold;
 }
 
 .hidden {
