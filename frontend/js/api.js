@@ -76,4 +76,10 @@ export const API = {
             body: JSON.stringify(data),
         }),
     },
+
+    git: {
+        syncMain: () => fetchJSON(`${API_BASE}/sync-main`, {
+            method: 'POST',
+        }),
+    },
 };

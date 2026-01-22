@@ -278,8 +278,8 @@ function setupActions() {
     viewDiffBtn.addEventListener('click', () => {
         if (!currentTask || !currentTask.branch_name) return;
 
-        const repoUrl = 'https://github.com/anthropics/codeflow';
-        const diffUrl = `${repoUrl}/compare/main...${currentTask.branch_name}`;
+        const repoUrl = 'https://github.com/VictorAsthea/codeflow';
+        const diffUrl = `${repoUrl}/compare/develop...${currentTask.branch_name}`;
         window.open(diffUrl, '_blank');
     });
 

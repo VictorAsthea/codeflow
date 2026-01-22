@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8765
     project_path: str = str(Path.cwd())
-    default_model: str = "claude-sonnet-4-20250514"
+    default_model: str = "claude-sonnet-4-5-20250929"
     default_intensity: str = "medium"
     auto_review: bool = True
 

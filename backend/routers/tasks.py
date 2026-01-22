@@ -35,22 +35,25 @@ def create_default_phases() -> dict[str, Phase]:
         "planning": Phase(
             name="planning",
             config=PhaseConfig(
-                model=settings.default_model,
-                intensity=settings.default_intensity
+                model=settings.default_model,  # Sonnet 4.5 par défaut
+                intensity=settings.default_intensity,
+                max_turns=20
             )
         ),
         "coding": Phase(
             name="coding",
             config=PhaseConfig(
-                model=settings.default_model,
-                intensity=settings.default_intensity
+                model=settings.default_model,  # Sonnet 4.5 par défaut
+                intensity=settings.default_intensity,
+                max_turns=30
             )
         ),
         "validation": Phase(
             name="validation",
             config=PhaseConfig(
-                model=settings.default_model,
-                intensity=settings.default_intensity
+                model=settings.default_model,  # Sonnet 4.5 par défaut
+                intensity=settings.default_intensity,
+                max_turns=20
             )
         )
     }
@@ -305,7 +308,7 @@ async def create_pull_request(task_id: str):
     # Check if there are commits on the branch
     try:
         check_commits = subprocess.run(
-            ["git", "log", "--oneline", f"main..{task.branch_name}"],
+            ["git", "log", "--oneline", f"develop..{task.branch_name}"],
             cwd=task.worktree_path,
             capture_output=True,
             text=True,
@@ -334,7 +337,7 @@ async def create_pull_request(task_id: str):
         result = subprocess.run(
             [
                 "gh", "pr", "create",
-                "--base", "main",
+                "--base", "develop",
                 "--head", task.branch_name,
                 "--title", task.title,
                 "--body", task.description
