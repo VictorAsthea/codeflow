@@ -15,6 +15,7 @@ from backend.database import (
 from backend.config import settings
 from backend.services.worktree_manager import WorktreeManager
 from backend.services.phase_executor import execute_all_phases
+from backend.services.task_queue import task_queue
 from backend.websocket_manager import manager
 
 router = APIRouter()
@@ -29,59 +30,6 @@ def generate_task_id(title: str, existing_tasks: list[Task]) -> str:
     return f"{next_num:03d}-{slug}"
 
 
-def create_default_phases(agent_profile: str = "balanced") -> dict[str, Phase]:
-    """Create default phases for a new task based on agent profile"""
-    profile_configs = {
-        "quick": {
-            "model": "claude-sonnet-4-20250514",
-            "planning_turns": 10,
-            "coding_turns": 15,
-            "validation_turns": 10
-        },
-        "balanced": {
-            "model": "claude-sonnet-4-20250514",
-            "planning_turns": 20,
-            "coding_turns": 30,
-            "validation_turns": 20
-        },
-        "thorough": {
-            "model": "claude-opus-4-20250514",
-            "planning_turns": 30,
-            "coding_turns": 50,
-            "validation_turns": 30
-        }
-    }
-
-    config = profile_configs.get(agent_profile, profile_configs["balanced"])
-
-    return {
-        "planning": Phase(
-            name="planning",
-            config=PhaseConfig(
-                model=config["model"],
-                intensity=settings.default_intensity,
-                max_turns=config["planning_turns"]
-            )
-        ),
-        "coding": Phase(
-            name="coding",
-            config=PhaseConfig(
-                model=config["model"],
-                intensity=settings.default_intensity,
-                max_turns=config["coding_turns"]
-            )
-        ),
-        "validation": Phase(
-            name="validation",
-            config=PhaseConfig(
-                model=config["model"],
-                intensity=settings.default_intensity,
-                max_turns=config["validation_turns"]
-            )
-        )
-    }
-
-
 @router.get("/tasks")
 async def list_tasks():
     """List all tasks"""
@@ -92,25 +40,51 @@ async def list_tasks():
 @router.post("/tasks")
 async def create_new_task(task_data: TaskCreate):
     """Create a new task"""
-    existing_tasks = await get_all_tasks()
+    from backend.config import AGENT_PROFILES
+    from backend.services.title_generator import generate_title
 
     title = task_data.title
     if not title:
-        title = f"Task: {task_data.description[:50]}..."
+        title = await generate_title(task_data.description)
 
+    existing_tasks = await get_all_tasks()
     task_id = generate_task_id(title, existing_tasks)
 
-    phases = create_default_phases(task_data.agent_profile)
+    if task_data.planning_config:
+        planning_config = task_data.planning_config
+    else:
+        planning_config = AGENT_PROFILES[task_data.agent_profile.value]["planning"]
 
-    if task_data.phase_config:
-        for phase_name, phase_update in task_data.phase_config.items():
-            if phase_name in phases:
-                if phase_update.model is not None:
-                    phases[phase_name].config.model = phase_update.model
-                if phase_update.intensity is not None:
-                    phases[phase_name].config.intensity = phase_update.intensity
-                if phase_update.max_turns is not None:
-                    phases[phase_name].config.max_turns = phase_update.max_turns
+    if task_data.coding_config:
+        coding_config = task_data.coding_config
+    else:
+        coding_config = AGENT_PROFILES[task_data.agent_profile.value]["coding"]
+
+    if task_data.validation_config:
+        validation_config = task_data.validation_config
+    else:
+        validation_config = AGENT_PROFILES[task_data.agent_profile.value]["validation"]
+
+    phases = {
+        "planning": Phase(
+            name="planning",
+            config=planning_config
+        ),
+        "coding": Phase(
+            name="coding",
+            config=coding_config
+        ),
+        "validation": Phase(
+            name="validation",
+            config=validation_config
+        )
+    }
+
+    branch_name = None
+    if task_data.git_options and task_data.git_options.branch_name:
+        branch_name = task_data.git_options.branch_name
+    else:
+        branch_name = f"task/{task_id}"
 
     task = Task(
         id=task_id,
@@ -118,7 +92,12 @@ async def create_new_task(task_data: TaskCreate):
         description=task_data.description,
         status=TaskStatus.BACKLOG,
         phases=phases,
-        skip_ai_review=task_data.skip_ai_review
+        branch_name=branch_name,
+        skip_ai_review=task_data.skip_ai_review,
+        agent_profile=task_data.agent_profile,
+        require_human_review_before_coding=task_data.require_human_review_before_coding,
+        file_references=task_data.file_references,
+        screenshots=task_data.screenshots
     )
 
     await db_create_task(task)
@@ -189,7 +168,7 @@ async def execute_task_background(task_id: str, project_path: str):
     try:
         await log_handler(f"Starting task execution: {task.title}")
 
-        branch_name = f"task/{task.id}"
+        branch_name = task.branch_name or f"task/{task.id}"
         await log_handler(f"Creating worktree for branch: {branch_name}")
 
         worktree_path = worktree_mgr.create(task.id, branch_name)
@@ -226,7 +205,7 @@ async def execute_task_background(task_id: str, project_path: str):
 
 @router.post("/tasks/{task_id}/start")
 async def start_task(task_id: str):
-    """Start task execution"""
+    """Start task execution immediately (bypasses queue)"""
     task = await get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -241,6 +220,53 @@ async def start_task(task_id: str):
     asyncio.create_task(execute_task_background(task_id, settings.project_path))
 
     return {"message": "Task started", "task": task}
+
+
+@router.post("/tasks/{task_id}/queue")
+async def queue_task(task_id: str):
+    """Add task to the execution queue"""
+    task = await get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status == TaskStatus.IN_PROGRESS:
+        raise HTTPException(status_code=400, detail="Task is already running")
+
+    if task.status == TaskStatus.QUEUED:
+        raise HTTPException(status_code=400, detail="Task is already queued")
+
+    success = await task_queue.queue_task(task_id, settings.project_path)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to queue task")
+
+    # Refresh task
+    task = await get_task(task_id)
+    return {"message": "Task queued", "task": task, "queue_status": task_queue.get_status()}
+
+
+@router.delete("/tasks/{task_id}/queue")
+async def unqueue_task(task_id: str):
+    """Remove task from the queue"""
+    task = await get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status != TaskStatus.QUEUED:
+        raise HTTPException(status_code=400, detail="Task is not queued")
+
+    success = await task_queue.remove_from_queue(task_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Task not found in queue or already running")
+
+    # Refresh task
+    task = await get_task(task_id)
+    return {"message": "Task removed from queue", "task": task}
+
+
+@router.get("/queue/status")
+async def get_queue_status():
+    """Get current queue status"""
+    return task_queue.get_status()
 
 
 @router.post("/tasks/{task_id}/stop")

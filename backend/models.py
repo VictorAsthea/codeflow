@@ -1,11 +1,11 @@
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Any, List
 from pydantic import BaseModel, Field
 
 
 class TaskStatus(str, Enum):
     BACKLOG = "backlog"
+    QUEUED = "queued"
     IN_PROGRESS = "in_progress"
     AI_REVIEW = "ai_review"
     HUMAN_REVIEW = "human_review"
@@ -17,6 +17,12 @@ class PhaseStatus(str, Enum):
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
+
+
+class AgentProfile(str, Enum):
+    QUICK = "quick"
+    BALANCED = "balanced"
+    THOROUGH = "thorough"
 
 
 class PhaseConfig(BaseModel):
@@ -34,6 +40,17 @@ class Phase(BaseModel):
     completed_at: datetime | None = None
 
 
+class GitOptions(BaseModel):
+    branch_name: str | None = None
+    target_branch: str = "develop"
+
+
+class FileReference(BaseModel):
+    path: str
+    line_start: int | None = None
+    line_end: int | None = None
+
+
 class Task(BaseModel):
     id: str
     title: str
@@ -44,6 +61,10 @@ class Task(BaseModel):
     branch_name: str | None = None
     pr_url: str | None = None
     skip_ai_review: bool = False
+    agent_profile: AgentProfile = AgentProfile.BALANCED
+    require_human_review_before_coding: bool = False
+    file_references: list[FileReference] = Field(default_factory=list)
+    screenshots: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
@@ -58,13 +79,15 @@ class GlobalConfig(BaseModel):
 class TaskCreate(BaseModel):
     title: str | None = None
     description: str
-    skip_ai_review: bool = False
-    agent_profile: str = "balanced"
-    phase_config: Dict[str, PhaseConfigUpdate] | None = None
+    agent_profile: AgentProfile = AgentProfile.BALANCED
+    planning_config: PhaseConfig | None = None
+    coding_config: PhaseConfig | None = None
+    validation_config: PhaseConfig | None = None
     require_human_review_before_coding: bool = False
-    git_options: Dict[str, str] | None = None
-    file_references: List[str] = Field(default_factory=list)
-    screenshots: List[str] = Field(default_factory=list)
+    skip_ai_review: bool = False
+    git_options: GitOptions | None = None
+    file_references: list[FileReference] = Field(default_factory=list)
+    screenshots: list[str] = Field(default_factory=list)
 
 
 class TaskUpdate(BaseModel):

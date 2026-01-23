@@ -11,6 +11,14 @@ class Settings(BaseSettings):
     default_intensity: str = "medium"
     auto_review: bool = True
 
+    # Auto-resume settings for max_turns limit
+    auto_resume_enabled: bool = True
+    auto_resume_max_retries: int = 3
+    auto_resume_delay_seconds: int = 2
+
+    # Parallel task execution
+    max_parallel_tasks: int = 3
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

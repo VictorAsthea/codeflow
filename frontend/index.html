@@ -6,6 +6,7 @@
     <title>Codeflow</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/sidebar.css">
     <link rel="stylesheet" href="/css/log-viewer.css">
     <link rel="stylesheet" href="/css/rich-form.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
@@ -14,13 +15,86 @@
     <div id="app">
         <header class="header">
             <h1>Codeflow</h1>
+            <div class="header-center">
+                <div id="queue-status" class="queue-status">
+                    <span class="queue-icon">🤖</span>
+                    <span id="queue-running">0</span>/<span id="queue-max">3</span> agents running
+                    <span id="queue-queued-container" class="hidden">
+                        (<span id="queue-queued">0</span> queued)
+                    </span>
+                </div>
+            </div>
             <div class="header-actions">
                 <button id="sync-btn" class="btn-icon">🔄 Sync Main</button>
                 <button id="settings-btn" class="btn-icon">⚙️ Settings</button>
             </div>
         </header>
 
-        <main class="kanban-board">
+        <div class="app-body">
+            <aside id="sidebar" class="sidebar">
+                <nav class="sidebar-nav">
+                    <a href="#kanban" class="nav-item active" data-shortcut="K">
+                        <span class="nav-icon">🏠</span>
+                        <span class="nav-label">Tableau Kanban</span>
+                        <kbd class="nav-kbd">K</kbd>
+                    </a>
+
+                    <a href="#terminals" class="nav-item disabled" data-shortcut="T">
+                        <span class="nav-icon">🖥️</span>
+                        <span class="nav-label">Terminaux Agent</span>
+                        <span class="coming-soon">Coming soon</span>
+                    </a>
+
+                    <a href="#insights" class="nav-item disabled">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-label">Insights</span>
+                        <span class="coming-soon">Coming soon</span>
+                    </a>
+
+                    <a href="#roadmap" class="nav-item disabled">
+                        <span class="nav-icon">🗺️</span>
+                        <span class="nav-label">Roadmap</span>
+                        <span class="coming-soon">Coming soon</span>
+                    </a>
+
+                    <a href="#ideation" class="nav-item disabled">
+                        <span class="nav-icon">💡</span>
+                        <span class="nav-label">Idéation</span>
+                        <span class="coming-soon">Coming soon</span>
+                    </a>
+
+                    <a href="#changelog" class="nav-item disabled">
+                        <span class="nav-icon">📝</span>
+                        <span class="nav-label">Changelog</span>
+                        <span class="coming-soon">Coming soon</span>
+                    </a>
+
+                    <div class="nav-divider"></div>
+
+                    <div class="nav-section">
+                        <div class="nav-section-header">
+                            <span class="nav-icon">🌳</span>
+                            <span class="nav-label">Worktrees</span>
+                            <kbd class="nav-kbd">W</kbd>
+                        </div>
+                        <div id="worktrees-list" class="worktrees-list"></div>
+                    </div>
+
+                    <div class="nav-divider"></div>
+
+                    <a href="#settings" class="nav-item" data-shortcut="S">
+                        <span class="nav-icon">⚙️</span>
+                        <span class="nav-label">Settings</span>
+                        <kbd class="nav-kbd">S</kbd>
+                    </a>
+                </nav>
+                <button class="sidebar-toggle" aria-label="Toggle sidebar">
+                    <span class="toggle-icon">◀</span>
+                </button>
+            </aside>
+
+            <main class="main-content">
+                <div class="kanban-board">
             <div class="column" data-status="backlog">
                 <div class="column-header">
                     <h2>Backlog</h2>
@@ -29,6 +103,14 @@
                 <div class="column-body" id="column-backlog">
                     <button class="btn-new-task">+ New Task</button>
                 </div>
+            </div>
+
+            <div class="column" data-status="queued">
+                <div class="column-header">
+                    <h2>Queued</h2>
+                    <span class="count" id="count-queued">0</span>
+                </div>
+                <div class="column-body" id="column-queued"></div>
             </div>
 
             <div class="column" data-status="in_progress">
@@ -62,7 +144,9 @@
                 </div>
                 <div class="column-body" id="column-done"></div>
             </div>
-        </main>
+                </div>
+            </main>
+        </div>
 
         <!-- Task Modal -->
         <div id="task-modal" class="modal hidden">
@@ -123,163 +207,172 @@
             </div>
         </div>
 
-        <!-- New Task Modal -->
+        <!-- Rich Task Creation Modal -->
         <div id="new-task-modal" class="modal hidden">
-            <div class="modal-content">
+            <div class="modal-content rich-form-modal">
                 <div class="modal-header">
                     <h2>New Task</h2>
                     <button class="btn-close">&times;</button>
                 </div>
                 <div class="modal-body">
                     <form id="new-task-form">
-                        <div class="form-group">
-                            <label for="task-title">Title (optional - auto-generated if empty)</label>
-                            <input type="text" id="task-title" placeholder="Leave empty for auto-generation">
-                        </div>
-                        <div class="form-group">
-                            <label for="task-description">Description *</label>
-                            <textarea id="task-description" rows="6" required placeholder="Describe the task... Use @ to reference files"></textarea>
-                            <div id="file-references-list" class="file-references-container"></div>
-                            <div id="screenshots-preview" class="screenshots-container"></div>
+                        <!-- Section: Description -->
+                        <div class="form-section">
+                            <label for="task-description" class="required">Description</label>
+                            <textarea
+                                id="task-description"
+                                name="description"
+                                rows="8"
+                                required
+                                placeholder="Describe your task in detail...
+
+💡 Tips:
+- Use @ to reference files (e.g., @src/app.js)
+- Paste screenshots with Ctrl+V
+- Be as specific as possible for better results"
+                            ></textarea>
+                            <div id="file-references-list" class="file-references"></div>
+                            <div id="screenshots-preview" class="screenshots-preview"></div>
                         </div>
 
-                        <div class="collapsible">
-                            <div class="collapsible-trigger">
-                                <span class="collapse-icon">▶</span>
-                                <strong>Agent Profile</strong>
-                            </div>
-                            <div class="collapsible-content hidden">
-                                <div class="form-group">
-                                    <label for="agent-profile">Profile</label>
-                                    <select id="agent-profile">
-                                        <option value="quick">Quick (Sonnet 4.5, fewer turns)</option>
-                                        <option value="balanced" selected>Balanced (Sonnet 4.5, standard)</option>
-                                        <option value="thorough">Thorough (Opus 4.5, more turns)</option>
-                                    </select>
-                                </div>
-                            </div>
+                        <!-- Section: Title (optional) -->
+                        <div class="form-section">
+                            <label for="task-title">Title (optional)</label>
+                            <input
+                                type="text"
+                                id="task-title"
+                                name="title"
+                                class="input"
+                                placeholder="Leave empty for auto-generation"
+                                maxlength="60"
+                            >
+                            <small>Automatically generated by Claude if left empty</small>
                         </div>
 
-                        <div class="collapsible">
-                            <div class="collapsible-trigger">
+                        <!-- Section: Agent Profile -->
+                        <div class="form-section">
+                            <label for="agent-profile">Agent Profile</label>
+                            <select id="agent-profile" name="agent_profile" class="input">
+                                <option value="quick">Quick - Fast and efficient (Sonnet, ~10-20 turns/phase)</option>
+                                <option value="balanced" selected>Balanced - Best of both worlds (Sonnet, ~20-30 turns/phase)</option>
+                                <option value="thorough">Thorough - Deep analysis (Opus, ~30-50 turns/phase)</option>
+                            </select>
+                        </div>
+
+                        <!-- Section: Advanced Configuration (collapsible) -->
+                        <div class="form-section collapsible">
+                            <button type="button" class="collapsible-trigger">
                                 <span class="collapse-icon">▶</span>
-                                <strong>Phase Configuration</strong>
-                            </div>
-                            <div class="collapsible-content hidden">
-                                <div class="phase-config-section">
+                                Advanced Configuration per Phase
+                            </button>
+                            <div class="collapsible-content">
+                                <!-- Planning Phase -->
+                                <div class="phase-config">
                                     <h4>Planning Phase</h4>
                                     <div class="form-row">
-                                        <div class="form-group">
+                                        <div class="form-col">
                                             <label for="planning-model">Model</label>
-                                            <select id="planning-model">
-                                                <option value="">Default</option>
-                                                <option value="claude-sonnet-4-20250514">Sonnet 4.5</option>
-                                                <option value="claude-opus-4-20250514">Opus 4.5</option>
+                                            <select id="planning-model" class="input">
+                                                <option value="claude-sonnet-4-5-20250929" selected>Sonnet 4.5</option>
+                                                <option value="claude-opus-4-5-20251101">Opus 4.5</option>
                                             </select>
                                         </div>
-                                        <div class="form-group">
-                                            <label for="planning-max-turns">Max Turns</label>
-                                            <input type="number" id="planning-max-turns" placeholder="Default: 20" min="1" max="100">
+                                        <div class="form-col">
+                                            <label for="planning-max-turns">Max turns</label>
+                                            <input type="number" id="planning-max-turns" class="input" min="1" max="100" value="20">
                                         </div>
                                     </div>
                                 </div>
 
-                                <div class="phase-config-section">
+                                <!-- Coding Phase -->
+                                <div class="phase-config">
                                     <h4>Coding Phase</h4>
                                     <div class="form-row">
-                                        <div class="form-group">
+                                        <div class="form-col">
                                             <label for="coding-model">Model</label>
-                                            <select id="coding-model">
-                                                <option value="">Default</option>
-                                                <option value="claude-sonnet-4-20250514">Sonnet 4.5</option>
-                                                <option value="claude-opus-4-20250514">Opus 4.5</option>
+                                            <select id="coding-model" class="input">
+                                                <option value="claude-sonnet-4-5-20250929" selected>Sonnet 4.5</option>
+                                                <option value="claude-opus-4-5-20251101">Opus 4.5</option>
                                             </select>
                                         </div>
-                                        <div class="form-group">
-                                            <label for="coding-max-turns">Max Turns</label>
-                                            <input type="number" id="coding-max-turns" placeholder="Default: 30" min="1" max="100">
+                                        <div class="form-col">
+                                            <label for="coding-max-turns">Max turns</label>
+                                            <input type="number" id="coding-max-turns" class="input" min="1" max="100" value="30">
                                         </div>
                                     </div>
                                 </div>
 
-                                <div class="phase-config-section">
+                                <!-- Validation Phase -->
+                                <div class="phase-config">
                                     <h4>Validation Phase</h4>
                                     <div class="form-row">
-                                        <div class="form-group">
+                                        <div class="form-col">
                                             <label for="validation-model">Model</label>
-                                            <select id="validation-model">
-                                                <option value="">Default</option>
-                                                <option value="claude-sonnet-4-20250514">Sonnet 4.5</option>
-                                                <option value="claude-opus-4-20250514">Opus 4.5</option>
+                                            <select id="validation-model" class="input">
+                                                <option value="claude-sonnet-4-5-20250929" selected>Sonnet 4.5</option>
+                                                <option value="claude-opus-4-5-20251101">Opus 4.5</option>
                                             </select>
                                         </div>
-                                        <div class="form-group">
-                                            <label for="validation-max-turns">Max Turns</label>
-                                            <input type="number" id="validation-max-turns" placeholder="Default: 20" min="1" max="100">
+                                        <div class="form-col">
+                                            <label for="validation-max-turns">Max turns</label>
+                                            <input type="number" id="validation-max-turns" class="input" min="1" max="100" value="20">
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="collapsible">
-                            <div class="collapsible-trigger">
+                        <!-- Section: Workflow Options -->
+                        <div class="form-section">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="require-review-before-coding" name="require_human_review_before_coding">
+                                <span>Require human review before coding phase</span>
+                            </label>
+
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="skip-ai-review" name="skip_ai_review">
+                                <span>Skip automatic AI review phase</span>
+                            </label>
+                        </div>
+
+                        <!-- Section: Git Options (collapsible) -->
+                        <div class="form-section collapsible">
+                            <button type="button" class="collapsible-trigger">
                                 <span class="collapse-icon">▶</span>
-                                <strong>Workflow Options</strong>
-                            </div>
-                            <div class="collapsible-content hidden">
-                                <div class="form-group">
-                                    <label>
-                                        <input type="checkbox" id="require-review-before-coding">
-                                        Require human review before coding phase
-                                    </label>
-                                </div>
-                                <div class="form-group">
-                                    <label>
-                                        <input type="checkbox" id="skip-ai-review">
-                                        ⏭️ Skip AI Review (go directly to Human Review)
-                                    </label>
+                                Git Options
+                            </button>
+                            <div class="collapsible-content">
+                                <div class="form-row">
+                                    <div class="form-col">
+                                        <label for="git-branch-name">Branch name (optional)</label>
+                                        <input
+                                            type="text"
+                                            id="git-branch-name"
+                                            class="input"
+                                            placeholder="task/{id} by default"
+                                        >
+                                    </div>
+                                    <div class="form-col">
+                                        <label for="git-target-branch">Target branch</label>
+                                        <select id="git-target-branch" class="input">
+                                            <option value="develop" selected>develop</option>
+                                            <option value="main">main</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="collapsible">
-                            <div class="collapsible-trigger">
-                                <span class="collapse-icon">▶</span>
-                                <strong>Git Options</strong>
-                            </div>
-                            <div class="collapsible-content hidden">
-                                <div class="form-group">
-                                    <label for="git-branch-name">Custom Branch Name</label>
-                                    <input type="text" id="git-branch-name" placeholder="Leave empty for auto-generation">
-                                </div>
-                                <div class="form-group">
-                                    <label for="git-target-branch">Target Branch</label>
-                                    <select id="git-target-branch">
-                                        <option value="develop">develop</option>
-                                        <option value="main">main</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="collapsible">
-                            <div class="collapsible-trigger">
-                                <span class="collapse-icon">▶</span>
-                                <strong>File References</strong>
-                            </div>
-                            <div class="collapsible-content hidden">
-                                <div class="form-group">
-                                    <button type="button" id="browse-files-btn" class="btn btn-secondary">📁 Browse Files</button>
-                                    <p class="help-text">Or type @ in the description to reference files</p>
-                                </div>
-                            </div>
+                        <!-- Actions -->
+                        <div class="form-actions">
+                            <button type="button" id="browse-files-btn" class="btn btn-secondary">
+                                📁 Browse Files
+                            </button>
+                            <div class="spacer"></div>
+                            <button type="button" class="btn btn-secondary btn-close">Cancel</button>
+                            <button type="submit" id="btn-create-task" class="btn btn-primary">Create Task</button>
                         </div>
                     </form>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary btn-close">Cancel</button>
-                    <button id="btn-create-task" class="btn btn-primary">Create Task</button>
                 </div>
             </div>
         </div>
@@ -335,6 +428,8 @@
     <script type="module" src="/js/kanban.js"></script>
     <script type="module" src="/js/task-modal.js"></script>
     <script type="module" src="/js/log-filters.js"></script>
+    <script type="module" src="/js/sidebar.js"></script>
+    <script type="module" src="/js/keyboard.js"></script>
     <script type="module" src="/js/app.js"></script>
 
     <footer class="main-footer">

@@ -1,187 +1,169 @@
 export class MentionAutocomplete {
     constructor(textarea, options = {}) {
         this.textarea = textarea;
-        this.options = {
-            onSelect: options.onSelect || (() => {}),
-            apiEndpoint: options.apiEndpoint || '/api/files/search',
-            trigger: options.trigger || '@'
-        };
-
+        this.onSelect = options.onSelect || (() => {});
         this.dropdown = null;
-        this.suggestions = [];
-        this.selectedIndex = -1;
+        this.currentSearch = '';
         this.mentionStart = -1;
+        this.selectedIndex = -1;
+        this.items = [];
 
         this.init();
     }
 
     init() {
-        this.textarea.addEventListener('input', (e) => this.handleInput(e));
-        this.textarea.addEventListener('keydown', (e) => this.handleKeydown(e));
-        document.addEventListener('click', (e) => this.handleClickOutside(e));
+        this.textarea.addEventListener('input', this.handleInput.bind(this));
+        this.textarea.addEventListener('keydown', this.handleKeydown.bind(this));
+        document.addEventListener('click', (e) => {
+            if (this.dropdown && !this.dropdown.contains(e.target) && e.target !== this.textarea) {
+                this.hideDropdown();
+            }
+        });
     }
 
     async handleInput(e) {
         const cursorPos = this.textarea.selectionStart;
         const text = this.textarea.value.substring(0, cursorPos);
-        const lastAtIndex = text.lastIndexOf(this.options.trigger);
 
-        if (lastAtIndex === -1 || (lastAtIndex > 0 && /\S/.test(text[lastAtIndex - 1]))) {
+        const match = text.match(/@([^\s]*)$/);
+
+        if (match) {
+            this.mentionStart = cursorPos - match[0].length;
+            this.currentSearch = match[1];
+            await this.showDropdown(match[1]);
+        } else {
             this.hideDropdown();
-            return;
         }
-
-        const searchTerm = text.substring(lastAtIndex + 1);
-
-        if (searchTerm.includes(' ') || searchTerm.includes('\n')) {
-            this.hideDropdown();
-            return;
-        }
-
-        this.mentionStart = lastAtIndex;
-        await this.searchFiles(searchTerm);
     }
 
-    async searchFiles(query) {
+    async showDropdown(query) {
+        if (query.length < 1) {
+            this.hideDropdown();
+            return;
+        }
+
         try {
-            const response = await fetch(`${this.options.apiEndpoint}?q=${encodeURIComponent(query)}`);
-            if (!response.ok) throw new Error('Failed to search files');
+            const response = await fetch(`/api/files/search?q=${encodeURIComponent(query)}`);
+            const files = await response.json();
 
-            const data = await response.json();
-            this.suggestions = data.files || [];
-
-            if (this.suggestions.length > 0) {
-                this.showDropdown();
-            } else {
+            if (files.length === 0) {
                 this.hideDropdown();
+                return;
             }
+
+            this.items = files;
+            this.selectedIndex = -1;
+
+            if (!this.dropdown) {
+                this.dropdown = document.createElement('div');
+                this.dropdown.className = 'mention-dropdown';
+                document.body.appendChild(this.dropdown);
+            }
+
+            const rect = this.textarea.getBoundingClientRect();
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+
+            this.dropdown.style.top = `${rect.bottom + scrollTop + 5}px`;
+            this.dropdown.style.left = `${rect.left + scrollLeft}px`;
+            this.dropdown.style.minWidth = `${rect.width}px`;
+
+            this.dropdown.innerHTML = files.map((file, idx) =>
+                `<div class="mention-item ${idx === this.selectedIndex ? 'selected' : ''}" data-index="${idx}" data-path="${file.path}">
+                    <span class="mention-icon">📄</span>
+                    <span class="mention-path">${file.path}</span>
+                </div>`
+            ).join('');
+
+            this.dropdown.querySelectorAll('.mention-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    this.selectFile(item.dataset.path);
+                });
+                item.addEventListener('mouseenter', () => {
+                    this.selectedIndex = parseInt(item.dataset.index);
+                    this.updateSelection();
+                });
+            });
+
+            this.dropdown.classList.add('show');
         } catch (error) {
-            console.error('File search error:', error);
-            this.suggestions = [];
+            console.error('Failed to fetch files:', error);
             this.hideDropdown();
         }
-    }
-
-    showDropdown() {
-        if (!this.dropdown) {
-            this.dropdown = document.createElement('div');
-            this.dropdown.className = 'mention-autocomplete-dropdown';
-            document.body.appendChild(this.dropdown);
-        }
-
-        this.dropdown.innerHTML = this.suggestions
-            .map((file, index) => `
-                <div class="mention-item ${index === this.selectedIndex ? 'selected' : ''}" data-index="${index}">
-                    <span class="file-icon">📄</span>
-                    <span class="file-path">${file}</span>
-                </div>
-            `)
-            .join('');
-
-        this.positionDropdown();
-
-        this.dropdown.querySelectorAll('.mention-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const index = parseInt(item.dataset.index);
-                this.selectSuggestion(index);
-            });
-        });
-
-        this.dropdown.style.display = 'block';
-    }
-
-    positionDropdown() {
-        const textareaRect = this.textarea.getBoundingClientRect();
-        const lineHeight = parseInt(window.getComputedStyle(this.textarea).lineHeight) || 20;
-
-        const lines = this.textarea.value.substring(0, this.mentionStart).split('\n');
-        const currentLine = lines.length;
-
-        this.dropdown.style.left = `${textareaRect.left}px`;
-        this.dropdown.style.top = `${textareaRect.top + (currentLine * lineHeight)}px`;
-        this.dropdown.style.maxWidth = `${textareaRect.width}px`;
     }
 
     hideDropdown() {
         if (this.dropdown) {
-            this.dropdown.style.display = 'none';
-            this.dropdown.remove();
-            this.dropdown = null;
-        }
-        this.selectedIndex = -1;
-    }
-
-    handleKeydown(e) {
-        if (!this.dropdown || this.dropdown.style.display === 'none') {
-            return;
-        }
-
-        switch (e.key) {
-            case 'ArrowDown':
-                e.preventDefault();
-                this.selectedIndex = Math.min(this.selectedIndex + 1, this.suggestions.length - 1);
-                this.updateDropdownSelection();
-                break;
-
-            case 'ArrowUp':
-                e.preventDefault();
-                this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
-                this.updateDropdownSelection();
-                break;
-
-            case 'Enter':
-            case 'Tab':
-                if (this.selectedIndex >= 0) {
-                    e.preventDefault();
-                    this.selectSuggestion(this.selectedIndex);
-                }
-                break;
-
-            case 'Escape':
-                e.preventDefault();
-                this.hideDropdown();
-                break;
+            this.dropdown.classList.remove('show');
+            this.selectedIndex = -1;
+            this.items = [];
         }
     }
 
-    updateDropdownSelection() {
-        const items = this.dropdown.querySelectorAll('.mention-item');
-        items.forEach((item, index) => {
-            item.classList.toggle('selected', index === this.selectedIndex);
-        });
+    selectFile(path) {
+        const before = this.textarea.value.substring(0, this.mentionStart);
+        const after = this.textarea.value.substring(this.textarea.selectionStart);
 
-        if (this.selectedIndex >= 0 && items[this.selectedIndex]) {
-            items[this.selectedIndex].scrollIntoView({ block: 'nearest' });
-        }
-    }
+        this.textarea.value = `${before}@${path} ${after}`;
+        const newPos = this.mentionStart + path.length + 2;
+        this.textarea.setSelectionRange(newPos, newPos);
 
-    selectSuggestion(index) {
-        const file = this.suggestions[index];
-        if (!file) return;
-
-        const cursorPos = this.textarea.selectionStart;
-        const textBefore = this.textarea.value.substring(0, this.mentionStart);
-        const textAfter = this.textarea.value.substring(cursorPos);
-
-        this.textarea.value = textBefore + this.options.trigger + file + ' ' + textAfter;
-
-        const newCursorPos = textBefore.length + file.length + 2;
-        this.textarea.setSelectionRange(newCursorPos, newCursorPos);
-
-        this.options.onSelect(file);
         this.hideDropdown();
-
+        this.onSelect(path);
         this.textarea.focus();
     }
 
-    handleClickOutside(e) {
-        if (this.dropdown && !this.dropdown.contains(e.target) && e.target !== this.textarea) {
+    handleKeydown(e) {
+        if (!this.dropdown || !this.dropdown.classList.contains('show')) return;
+
+        if (e.key === 'Escape') {
             this.hideDropdown();
+            e.preventDefault();
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this.selectedIndex = Math.min(this.selectedIndex + 1, this.items.length - 1);
+            this.updateSelection();
+            return;
+        }
+
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
+            this.updateSelection();
+            return;
+        }
+
+        if (e.key === 'Enter' && this.selectedIndex >= 0) {
+            e.preventDefault();
+            const selectedFile = this.items[this.selectedIndex];
+            if (selectedFile) {
+                this.selectFile(selectedFile.path);
+            }
+            return;
         }
     }
 
+    updateSelection() {
+        if (!this.dropdown) return;
+
+        const items = this.dropdown.querySelectorAll('.mention-item');
+        items.forEach((item, idx) => {
+            if (idx === this.selectedIndex) {
+                item.classList.add('selected');
+                item.scrollIntoView({ block: 'nearest' });
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+    }
+
     destroy() {
-        this.hideDropdown();
-        document.removeEventListener('click', this.handleClickOutside);
+        if (this.dropdown) {
+            this.dropdown.remove();
+            this.dropdown = null;
+        }
     }
 }

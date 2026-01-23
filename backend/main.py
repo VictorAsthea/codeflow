@@ -4,13 +4,22 @@ from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from backend.database import init_db
 from backend.routers import tasks, settings, git
+from backend.services.task_queue import task_queue
 from backend.websocket_manager import manager
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+
+    # Setup task queue with executor and start workers
+    task_queue.set_executor(tasks.execute_task_background)
+    await task_queue.start_workers()
+
     yield
+
+    # Cleanup
+    await task_queue.stop_all()
 
 
 app = FastAPI(title="Codeflow", version="0.1.0", lifespan=lifespan)

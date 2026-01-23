@@ -14,6 +14,37 @@ export async function initKanban() {
     await loadTasks();
     setupNewTaskButton();
     setupDragAndDrop();
+    await updateQueueStatus();
+
+    // Poll queue status every 5 seconds
+    setInterval(updateQueueStatus, 5000);
+}
+
+export async function updateQueueStatus() {
+    try {
+        const status = await API.queue.status();
+
+        document.getElementById('queue-running').textContent = status.running;
+        document.getElementById('queue-max').textContent = status.max;
+        document.getElementById('queue-queued').textContent = status.queued;
+
+        const queuedContainer = document.getElementById('queue-queued-container');
+        const queueStatus = document.getElementById('queue-status');
+
+        if (status.queued > 0) {
+            queuedContainer.classList.remove('hidden');
+        } else {
+            queuedContainer.classList.add('hidden');
+        }
+
+        if (status.running > 0) {
+            queueStatus.classList.add('has-running');
+        } else {
+            queueStatus.classList.remove('has-running');
+        }
+    } catch (error) {
+        console.error('Failed to update queue status:', error);
+    }
 }
 
 export async function loadTasks() {
@@ -30,6 +61,7 @@ export async function loadTasks() {
 function renderAllTasks() {
     const columns = {
         backlog: document.getElementById('column-backlog'),
+        queued: document.getElementById('column-queued'),
         in_progress: document.getElementById('column-in_progress'),
         ai_review: document.getElementById('column-ai_review'),
         human_review: document.getElementById('column-human_review'),
@@ -98,17 +130,69 @@ function createTaskCard(task) {
     const timeAgo = getTimeAgo(new Date(task.updated_at));
     const skipBadge = task.skip_ai_review ? '<span class="badge-skip-ai">⏭️ Skip AI Review</span>' : '';
 
+    // Status badges
+    let statusBadge = '';
+    if (task.status === 'queued') {
+        statusBadge = '<span class="badge-queued">⏳ Queued</span>';
+    } else if (task.status === 'in_progress') {
+        statusBadge = '<span class="badge-running">▶️ Running</span>';
+    }
+
+    // Action buttons (only for backlog tasks)
+    let actionButtons = '';
+    if (task.status === 'backlog') {
+        actionButtons = `
+            <div class="task-card-actions">
+                <button class="btn-small btn-queue" data-action="queue" data-task-id="${task.id}">📋 Queue</button>
+                <button class="btn-small btn-start" data-action="start" data-task-id="${task.id}">▶️ Start</button>
+            </div>
+        `;
+    }
+
     card.innerHTML = `
-        <h3>${task.title} ${skipBadge}</h3>
+        <h3>${task.title} ${skipBadge} ${statusBadge}</h3>
         <p>${task.description}</p>
         <div class="task-phases">
             ${phaseBars}
         </div>
+        ${actionButtons}
         <div class="task-footer">
             <span>⏱️ ${timeAgo}</span>
             <span>${task.id}</span>
         </div>
     `;
+
+    // Action button handlers
+    const queueBtn = card.querySelector('[data-action="queue"]');
+    const startBtn = card.querySelector('[data-action="start"]');
+
+    if (queueBtn) {
+        queueBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                await API.tasks.queue(task.id);
+                await loadTasks();
+                updateQueueStatus();
+            } catch (error) {
+                console.error('Failed to queue task:', error);
+                alert('Failed to queue task: ' + error.message);
+            }
+        });
+    }
+
+    if (startBtn) {
+        startBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                await API.tasks.start(task.id);
+                await loadTasks();
+                updateQueueStatus();
+            } catch (error) {
+                console.error('Failed to start task:', error);
+                alert('Failed to start task: ' + error.message);
+            }
+        });
+    }
 
     card.addEventListener('click', () => {
         openTaskModal(task.id);
@@ -129,6 +213,7 @@ function getTimeAgo(date) {
 function updateCounts() {
     const counts = {
         backlog: 0,
+        queued: 0,
         in_progress: 0,
         ai_review: 0,
         human_review: 0,

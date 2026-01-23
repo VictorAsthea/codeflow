@@ -49,6 +49,14 @@ export const API = {
             method: 'POST',
         }),
 
+        queue: (id) => fetchJSON(`${API_BASE}/tasks/${id}/queue`, {
+            method: 'POST',
+        }),
+
+        unqueue: (id) => fetchJSON(`${API_BASE}/tasks/${id}/queue`, {
+            method: 'DELETE',
+        }),
+
         changeStatus: (id, status) => fetchJSON(`${API_BASE}/tasks/${id}/status`, {
             method: 'PATCH',
             body: JSON.stringify({ status }),
@@ -81,5 +89,9 @@ export const API = {
         syncMain: () => fetchJSON(`${API_BASE}/sync-main`, {
             method: 'POST',
         }),
+    },
+
+    queue: {
+        status: () => fetchJSON(`${API_BASE}/queue/status`),
     },
 };

@@ -1,4 +1,6 @@
 import { API } from './api.js';
+import { sidebar } from './sidebar.js';
+import { keyboard } from './keyboard.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Codeflow initialized');
@@ -19,14 +21,30 @@ function setupModals() {
         closeButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 modal.classList.add('hidden');
+                keyboard.enable();
             });
         });
 
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.classList.add('hidden');
+                keyboard.enable();
             }
         });
+
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class') {
+                    if (modal.classList.contains('hidden')) {
+                        keyboard.enable();
+                    } else {
+                        keyboard.disable();
+                    }
+                }
+            });
+        });
+
+        observer.observe(modal, { attributes: true });
     });
 }
 

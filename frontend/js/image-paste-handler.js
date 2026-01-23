@@ -1,111 +1,63 @@
 export class ImagePasteHandler {
     constructor(textarea, options = {}) {
         this.textarea = textarea;
-        this.options = {
-            onPaste: options.onPaste || (() => {}),
-            maxSizeMB: options.maxSizeMB || 1,
-            quality: options.quality || 0.8
-        };
+        this.onPaste = options.onPaste || (() => {});
+        this.maxSize = options.maxSize || 5 * 1024 * 1024;
 
         this.init();
     }
 
     init() {
-        this.textarea.addEventListener('paste', (e) => this.handlePaste(e));
+        this.textarea.addEventListener('paste', this.handlePaste.bind(this));
     }
 
     async handlePaste(e) {
         const items = e.clipboardData?.items;
         if (!items) return;
 
-        for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-
-            if (item.type.indexOf('image') !== -1) {
+        for (const item of items) {
+            if (item.type.startsWith('image/')) {
                 e.preventDefault();
 
-                const blob = item.getAsFile();
-                if (!blob) continue;
+                const file = item.getAsFile();
+                if (!file) continue;
 
-                const compressedDataUrl = await this.compressImage(blob);
+                if (file.size > this.maxSize) {
+                    alert(`Image too large (max ${Math.round(this.maxSize / 1024 / 1024)}MB)`);
+                    return;
+                }
 
-                if (compressedDataUrl) {
-                    this.options.onPaste(compressedDataUrl);
+                try {
+                    const base64 = await this.fileToBase64(file);
+                    this.onPaste(base64, file.name || 'pasted-image.png');
+
+                    const cursorPos = this.textarea.selectionStart;
+                    const before = this.textarea.value.substring(0, cursorPos);
+                    const after = this.textarea.value.substring(cursorPos);
+
+                    this.textarea.value = `${before}\n[📷 Screenshot: ${file.name || 'pasted-image.png'}]\n${after}`;
+
+                    const newPos = cursorPos + file.name.length + 20;
+                    this.textarea.setSelectionRange(newPos, newPos);
+                    this.textarea.focus();
+                } catch (error) {
+                    console.error('Failed to process image:', error);
+                    alert('Failed to process image');
                 }
             }
         }
     }
 
-    async compressImage(blob) {
+    fileToBase64(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
-
-            reader.onload = (e) => {
-                const img = new Image();
-
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-
-                    let { width, height } = img;
-                    const maxDimension = 1920;
-
-                    if (width > maxDimension || height > maxDimension) {
-                        if (width > height) {
-                            height = (height / width) * maxDimension;
-                            width = maxDimension;
-                        } else {
-                            width = (width / height) * maxDimension;
-                            height = maxDimension;
-                        }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    let quality = this.options.quality;
-                    let dataUrl = canvas.toDataURL('image/jpeg', quality);
-
-                    const maxSizeBytes = this.options.maxSizeMB * 1024 * 1024;
-                    let currentSize = this.getBase64Size(dataUrl);
-
-                    while (currentSize > maxSizeBytes && quality > 0.1) {
-                        quality -= 0.1;
-                        dataUrl = canvas.toDataURL('image/jpeg', quality);
-                        currentSize = this.getBase64Size(dataUrl);
-                    }
-
-                    if (currentSize > maxSizeBytes) {
-                        console.warn('Image still too large after compression');
-                    }
-
-                    resolve(dataUrl);
-                };
-
-                img.onerror = () => {
-                    reject(new Error('Failed to load image'));
-                };
-
-                img.src = e.target.result;
-            };
-
-            reader.onerror = () => {
-                reject(new Error('Failed to read file'));
-            };
-
-            reader.readAsDataURL(blob);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
         });
     }
 
-    getBase64Size(base64String) {
-        const base64Data = base64String.split(',')[1] || base64String;
-        const padding = (base64Data.match(/=/g) || []).length;
-        return (base64Data.length * 0.75) - padding;
-    }
-
     destroy() {
-        this.textarea.removeEventListener('paste', this.handlePaste);
+        this.textarea.removeEventListener('paste', this.handlePaste.bind(this));
     }
 }
