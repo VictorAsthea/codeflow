@@ -39,29 +39,23 @@ export async function initKanban() {
 }
 
 export async function updateQueueStatus() {
-    try {
-        const status = await API.queue.status();
+    // Count running tasks from loaded tasks array
+    const running = tasks.filter(t => t.status === 'in_progress').length;
+    const maxConcurrent = 3; // Could be fetched from settings
 
-        document.getElementById('queue-running').textContent = status.running;
-        document.getElementById('queue-max').textContent = status.max;
-        document.getElementById('queue-queued').textContent = status.queued;
+    document.getElementById('queue-running').textContent = running;
+    document.getElementById('queue-max').textContent = maxConcurrent;
 
-        const queuedContainer = document.getElementById('queue-queued-container');
-        const queueStatus = document.getElementById('queue-status');
+    const queuedContainer = document.getElementById('queue-queued-container');
+    const queueStatus = document.getElementById('queue-status');
 
-        if (status.queued > 0) {
-            queuedContainer.classList.remove('hidden');
-        } else {
-            queuedContainer.classList.add('hidden');
-        }
+    // Hide queued counter (no longer using queue)
+    queuedContainer?.classList.add('hidden');
 
-        if (status.running > 0) {
-            queueStatus.classList.add('has-running');
-        } else {
-            queueStatus.classList.remove('has-running');
-        }
-    } catch (error) {
-        console.error('Failed to update queue status:', error);
+    if (running > 0) {
+        queueStatus?.classList.add('has-running');
+    } else {
+        queueStatus?.classList.remove('has-running');
     }
 }
 
@@ -165,7 +159,6 @@ function createTaskCard(task) {
     if (task.status === 'backlog') {
         actionButtons = `
             <div class="task-card-actions">
-                <button class="btn-small btn-queue" data-action="queue" data-task-id="${task.id}">📋 Queue</button>
                 <button class="btn-small btn-start" data-action="start" data-task-id="${task.id}">▶️ Start</button>
             </div>
         `;
@@ -184,23 +177,8 @@ function createTaskCard(task) {
         </div>
     `;
 
-    // Action button handlers
-    const queueBtn = card.querySelector('[data-action="queue"]');
+    // Action button handler
     const startBtn = card.querySelector('[data-action="start"]');
-
-    if (queueBtn) {
-        queueBtn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            try {
-                await API.tasks.queue(task.id);
-                await loadTasks();
-                updateQueueStatus();
-            } catch (error) {
-                console.error('Failed to queue task:', error);
-                alert('Failed to queue task: ' + error.message);
-            }
-        });
-    }
 
     if (startBtn) {
         startBtn.addEventListener('click', async (e) => {

@@ -2,6 +2,23 @@ from pydantic_settings import BaseSettings
 from pathlib import Path
 
 
+# Agent profiles for different task execution strategies
+AGENT_PROFILES = {
+    "quick": {
+        "planning": {"model": "claude-haiku-4-20250514", "intensity": "low", "max_turns": 5},
+        "coding": {"model": "claude-sonnet-4-20250514", "intensity": "low", "max_turns": 5}
+    },
+    "balanced": {
+        "planning": {"model": "claude-sonnet-4-20250514", "intensity": "medium", "max_turns": 10},
+        "coding": {"model": "claude-sonnet-4-20250514", "intensity": "medium", "max_turns": 10}
+    },
+    "thorough": {
+        "planning": {"model": "claude-sonnet-4-20250514", "intensity": "high", "max_turns": 15},
+        "coding": {"model": "claude-opus-4-20250514", "intensity": "high", "max_turns": 15}
+    }
+}
+
+
 class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./data/codeflow.db"
     host: str = "127.0.0.1"
