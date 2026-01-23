@@ -29,31 +29,54 @@ def generate_task_id(title: str, existing_tasks: list[Task]) -> str:
     return f"{next_num:03d}-{slug}"
 
 
-def create_default_phases() -> dict[str, Phase]:
-    """Create default phases for a new task"""
+def create_default_phases(agent_profile: str = "balanced") -> dict[str, Phase]:
+    """Create default phases for a new task based on agent profile"""
+    profile_configs = {
+        "quick": {
+            "model": "claude-sonnet-4-20250514",
+            "planning_turns": 10,
+            "coding_turns": 15,
+            "validation_turns": 10
+        },
+        "balanced": {
+            "model": "claude-sonnet-4-20250514",
+            "planning_turns": 20,
+            "coding_turns": 30,
+            "validation_turns": 20
+        },
+        "thorough": {
+            "model": "claude-opus-4-20250514",
+            "planning_turns": 30,
+            "coding_turns": 50,
+            "validation_turns": 30
+        }
+    }
+
+    config = profile_configs.get(agent_profile, profile_configs["balanced"])
+
     return {
         "planning": Phase(
             name="planning",
             config=PhaseConfig(
-                model=settings.default_model,  # Sonnet 4.5 par défaut
+                model=config["model"],
                 intensity=settings.default_intensity,
-                max_turns=20
+                max_turns=config["planning_turns"]
             )
         ),
         "coding": Phase(
             name="coding",
             config=PhaseConfig(
-                model=settings.default_model,  # Sonnet 4.5 par défaut
+                model=config["model"],
                 intensity=settings.default_intensity,
-                max_turns=30
+                max_turns=config["coding_turns"]
             )
         ),
         "validation": Phase(
             name="validation",
             config=PhaseConfig(
-                model=settings.default_model,  # Sonnet 4.5 par défaut
+                model=config["model"],
                 intensity=settings.default_intensity,
-                max_turns=20
+                max_turns=config["validation_turns"]
             )
         )
     }
@@ -70,14 +93,31 @@ async def list_tasks():
 async def create_new_task(task_data: TaskCreate):
     """Create a new task"""
     existing_tasks = await get_all_tasks()
-    task_id = generate_task_id(task_data.title, existing_tasks)
+
+    title = task_data.title
+    if not title:
+        title = f"Task: {task_data.description[:50]}..."
+
+    task_id = generate_task_id(title, existing_tasks)
+
+    phases = create_default_phases(task_data.agent_profile)
+
+    if task_data.phase_config:
+        for phase_name, phase_update in task_data.phase_config.items():
+            if phase_name in phases:
+                if phase_update.model is not None:
+                    phases[phase_name].config.model = phase_update.model
+                if phase_update.intensity is not None:
+                    phases[phase_name].config.intensity = phase_update.intensity
+                if phase_update.max_turns is not None:
+                    phases[phase_name].config.max_turns = phase_update.max_turns
 
     task = Task(
         id=task_id,
-        title=task_data.title,
+        title=title,
         description=task_data.description,
         status=TaskStatus.BACKLOG,
-        phases=create_default_phases(),
+        phases=phases,
         skip_ai_review=task_data.skip_ai_review
     )
 

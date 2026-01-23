@@ -1,6 +1,14 @@
 import { API } from './api.js';
+import { MentionAutocomplete } from './mention-autocomplete.js';
+import { ImagePasteHandler } from './image-paste-handler.js';
+import { FilePicker } from './file-picker.js';
 
 let tasks = [];
+let mentionAutocomplete = null;
+let imagePasteHandler = null;
+let filePicker = null;
+const fileReferences = new Set();
+const screenshots = [];
 
 export async function initKanban() {
     await loadTasks();
@@ -186,31 +194,208 @@ function setupDragAndDrop() {
     });
 }
 
+function setupCollapsibleSections() {
+    const triggers = document.querySelectorAll('.collapsible-trigger');
+    triggers.forEach(trigger => {
+        trigger.addEventListener('click', () => {
+            const parent = trigger.closest('.collapsible');
+            const content = parent.querySelector('.collapsible-content');
+            const icon = trigger.querySelector('.collapse-icon');
+
+            parent.classList.toggle('expanded');
+            content.classList.toggle('hidden');
+            icon.textContent = parent.classList.contains('expanded') ? '▼' : '▶';
+        });
+    });
+}
+
+function initializeFormModules() {
+    const textarea = document.getElementById('task-description');
+    const browseBtn = document.getElementById('browse-files-btn');
+
+    if (!mentionAutocomplete) {
+        mentionAutocomplete = new MentionAutocomplete(textarea, {
+            onSelect: (file) => {
+                addFileReference(file);
+            }
+        });
+    }
+
+    if (!imagePasteHandler) {
+        imagePasteHandler = new ImagePasteHandler(textarea, {
+            onPaste: (imageData) => {
+                addScreenshot(imageData);
+            }
+        });
+    }
+
+    if (!filePicker && browseBtn) {
+        filePicker = new FilePicker(browseBtn, {
+            onSelect: (files) => {
+                files.forEach(file => addFileReference(file));
+            }
+        });
+    }
+}
+
+function addFileReference(filePath) {
+    fileReferences.add(filePath);
+    renderFileReferences();
+}
+
+function removeFileReference(filePath) {
+    fileReferences.delete(filePath);
+    renderFileReferences();
+}
+
+function renderFileReferences() {
+    const container = document.getElementById('file-references-list');
+    if (!container) return;
+
+    if (fileReferences.size === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="references-header">📎 Referenced files (${fileReferences.size})</div>
+        ${Array.from(fileReferences).map(file => `
+            <span class="file-ref-tag">
+                <span>📄 ${file}</span>
+                <button type="button" class="remove-ref" data-file="${file}">&times;</button>
+            </span>
+        `).join('')}
+    `;
+
+    container.querySelectorAll('.remove-ref').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const file = e.target.dataset.file;
+            removeFileReference(file);
+        });
+    });
+}
+
+function addScreenshot(imageDataUrl) {
+    screenshots.push(imageDataUrl);
+    renderScreenshots();
+}
+
+function removeScreenshot(index) {
+    screenshots.splice(index, 1);
+    renderScreenshots();
+}
+
+function renderScreenshots() {
+    const container = document.getElementById('screenshots-preview');
+    if (!container) return;
+
+    if (screenshots.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="screenshots-header">🖼️ Screenshots (${screenshots.length})</div>
+        <div class="screenshot-grid">
+            ${screenshots.map((img, idx) => `
+                <div class="screenshot-item">
+                    <img src="${img}" alt="Screenshot ${idx + 1}">
+                    <button type="button" class="remove-screenshot" data-index="${idx}">&times;</button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    container.querySelectorAll('.remove-screenshot').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const index = parseInt(e.target.dataset.index);
+            removeScreenshot(index);
+        });
+    });
+}
+
 function setupNewTaskButton() {
     const newTaskBtn = document.querySelector('.btn-new-task');
     const newTaskModal = document.getElementById('new-task-modal');
     const createTaskBtn = document.getElementById('btn-create-task');
     const form = document.getElementById('new-task-form');
 
+    setupCollapsibleSections();
+
     newTaskBtn.addEventListener('click', () => {
         form.reset();
+        fileReferences.clear();
+        screenshots.length = 0;
+        renderFileReferences();
+        renderScreenshots();
+        initializeFormModules();
         newTaskModal.classList.remove('hidden');
     });
 
     createTaskBtn.addEventListener('click', async () => {
-        const title = document.getElementById('task-title').value.trim();
+        const title = document.getElementById('task-title')?.value.trim() || null;
         const description = document.getElementById('task-description').value.trim();
-        const skipAiReview = document.getElementById('skip-ai-review').checked;
 
-        if (!title || !description) {
-            alert('Please fill in all fields');
+        if (!description) {
+            alert('Please provide a task description');
             return;
         }
 
+        const agentProfile = document.getElementById('agent-profile')?.value || 'balanced';
+
+        const phaseConfig = {};
+        const planningModel = document.getElementById('planning-model')?.value;
+        const planningMaxTurns = document.getElementById('planning-max-turns')?.value;
+        const codingModel = document.getElementById('coding-model')?.value;
+        const codingMaxTurns = document.getElementById('coding-max-turns')?.value;
+        const validationModel = document.getElementById('validation-model')?.value;
+        const validationMaxTurns = document.getElementById('validation-max-turns')?.value;
+
+        if (planningModel || planningMaxTurns) {
+            phaseConfig.planning = {};
+            if (planningModel) phaseConfig.planning.model = planningModel;
+            if (planningMaxTurns) phaseConfig.planning.max_turns = parseInt(planningMaxTurns);
+        }
+        if (codingModel || codingMaxTurns) {
+            phaseConfig.coding = {};
+            if (codingModel) phaseConfig.coding.model = codingModel;
+            if (codingMaxTurns) phaseConfig.coding.max_turns = parseInt(codingMaxTurns);
+        }
+        if (validationModel || validationMaxTurns) {
+            phaseConfig.validation = {};
+            if (validationModel) phaseConfig.validation.model = validationModel;
+            if (validationMaxTurns) phaseConfig.validation.max_turns = parseInt(validationMaxTurns);
+        }
+
+        const requireReview = document.getElementById('require-review-before-coding')?.checked || false;
+        const skipAiReview = document.getElementById('skip-ai-review')?.checked || false;
+
+        const gitOptions = {};
+        const branchName = document.getElementById('git-branch-name')?.value.trim();
+        const targetBranch = document.getElementById('git-target-branch')?.value;
+        if (branchName) gitOptions.branch_name = branchName;
+        if (targetBranch) gitOptions.target_branch = targetBranch;
+
+        const taskData = {
+            title,
+            description,
+            agent_profile: agentProfile,
+            phase_config: Object.keys(phaseConfig).length > 0 ? phaseConfig : null,
+            require_human_review_before_coding: requireReview,
+            skip_ai_review: skipAiReview,
+            git_options: Object.keys(gitOptions).length > 0 ? gitOptions : null,
+            file_references: Array.from(fileReferences),
+            screenshots: screenshots.slice()
+        };
+
         try {
-            await API.tasks.create({ title, description, skip_ai_review: skipAiReview });
+            await API.tasks.create(taskData);
             newTaskModal.classList.add('hidden');
             form.reset();
+            fileReferences.clear();
+            screenshots.length = 0;
+            renderFileReferences();
+            renderScreenshots();
             await loadTasks();
         } catch (error) {
             console.error('Failed to create task:', error);

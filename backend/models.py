@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+from typing import Dict, Any, List
 from pydantic import BaseModel, Field
 
 
@@ -55,9 +56,15 @@ class GlobalConfig(BaseModel):
 
 
 class TaskCreate(BaseModel):
-    title: str
+    title: str | None = None
     description: str
     skip_ai_review: bool = False
+    agent_profile: str = "balanced"
+    phase_config: Dict[str, PhaseConfigUpdate] | None = None
+    require_human_review_before_coding: bool = False
+    git_options: Dict[str, str] | None = None
+    file_references: List[str] = Field(default_factory=list)
+    screenshots: List[str] = Field(default_factory=list)
 
 
 class TaskUpdate(BaseModel):
