@@ -14,8 +14,8 @@ class TaskQueue:
 
     def __init__(self, max_concurrent: int = None):
         self.max_concurrent = max_concurrent or settings.max_parallel_tasks
-        self._semaphore = asyncio.Semaphore(self.max_concurrent)
-        self._queue: asyncio.Queue = asyncio.Queue()
+        self._semaphore = None  # Created in start_workers
+        self._queue = None  # Created in start_workers
         self._running_tasks: dict[str, asyncio.Task] = {}
         self._direct_running: set[str] = set()  # Track directly started tasks
         self._workers_started = False
@@ -40,6 +40,11 @@ class TaskQueue:
         """Start the worker loop that processes queued tasks"""
         if self._workers_started:
             return
+
+        # Create Queue and Semaphore in the event loop context
+        self._queue = asyncio.Queue()
+        self._semaphore = asyncio.Semaphore(self.max_concurrent)
+
         self._workers_started = True
         self._shutdown = False
         asyncio.create_task(self._worker_loop())
@@ -108,6 +113,11 @@ class TaskQueue:
         """
         from backend.main import storage
 
+        # Ensure queue is initialized
+        if not self._queue:
+            print("[TaskQueue] ERROR: Queue not initialized. Call start_workers first.")
+            return False
+
         task = storage.get_task(task_id)
         if not task:
             return False
@@ -125,6 +135,15 @@ class TaskQueue:
 
     def get_status(self) -> dict:
         """Get current queue status"""
+        # Handle case where queue/semaphore not yet initialized
+        if not self._semaphore or not self._queue:
+            return {
+                "running": len(self._direct_running),
+                "queued": 0,
+                "max": self.max_concurrent,
+                "running_task_ids": list(self._direct_running),
+            }
+
         # Calculate available slots
         # Semaphore._value gives us available permits
         queued_running = self.max_concurrent - self._semaphore._value
