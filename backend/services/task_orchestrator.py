@@ -62,6 +62,9 @@ async def handle_ai_review(
     print(f"[AI_REVIEW] review_result.error_message: {review_result.error_message}")
     print(f"[AI_REVIEW] issues count: {len(review_result.issues)}")
 
+    # Store the review output for display
+    task.review_output = review_result.raw_output
+
     if not review_result.success:
         # Review failed - fallback to human review
         if log_callback:

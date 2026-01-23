@@ -155,6 +155,7 @@ Then review each changed file."""
 
         print(f"[CODE_REVIEW] returncode: {process.returncode}")
         print(f"[CODE_REVIEW] stdout length: {len(raw_output)}")
+        print(f"[CODE_REVIEW] stdout content: {raw_output[:2000]}")
         print(f"[CODE_REVIEW] stderr: {error_output[:200] if error_output else '(empty)'}")
 
         if process.returncode != 0:
