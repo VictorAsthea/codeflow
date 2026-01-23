@@ -90,16 +90,11 @@ class Sidebar {
    */
   setupNavigation() {
     const navItems = this.sidebar.querySelectorAll('.nav-item:not(.disabled)');
-    console.log(`Setting up ${navItems.length} nav items`);
 
     navItems.forEach(item => {
-      const href = item.getAttribute('href');
-      console.log(`Nav item: ${href}`);
-
       item.addEventListener('click', (e) => {
         e.preventDefault();
         const view = item.getAttribute('href')?.substring(1);
-        console.log(`Nav click: ${view}`);
         if (view && view !== 'settings') {
           this.navigateTo(view);
         }
@@ -117,11 +112,7 @@ class Sidebar {
    * Navigate to view
    */
   navigateTo(view) {
-    console.log(`navigateTo: ${view}, currentView: ${this.currentView}`);
-    if (view === this.currentView) {
-      console.log('Same view, skipping');
-      return;
-    }
+    if (view === this.currentView) return;
 
     const navItems = this.sidebar.querySelectorAll('.nav-item');
     navItems.forEach(item => {
