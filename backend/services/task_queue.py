@@ -17,6 +17,7 @@ class TaskQueue:
         self._semaphore = asyncio.Semaphore(self.max_concurrent)
         self._queue: asyncio.Queue = asyncio.Queue()
         self._running_tasks: dict[str, asyncio.Task] = {}
+        self._direct_running: set[str] = set()  # Track directly started tasks
         self._workers_started = False
         self._shutdown = False
         self._executor: Callable[[str, str], Any] = None
@@ -24,6 +25,16 @@ class TaskQueue:
     def set_executor(self, executor: Callable[[str, str], Any]):
         """Set the task executor function (execute_task_background)"""
         self._executor = executor
+
+    def register_direct_task(self, task_id: str):
+        """Register a directly started task (not via queue)"""
+        self._direct_running.add(task_id)
+        print(f"[TaskQueue] Direct task registered: {task_id}")
+
+    def unregister_direct_task(self, task_id: str):
+        """Unregister a directly started task when it completes"""
+        self._direct_running.discard(task_id)
+        print(f"[TaskQueue] Direct task unregistered: {task_id}")
 
     async def start_workers(self):
         """Start the worker loop that processes queued tasks"""
@@ -100,14 +111,16 @@ class TaskQueue:
         """Get current queue status"""
         # Calculate available slots
         # Semaphore._value gives us available permits
-        running = self.max_concurrent - self._semaphore._value
+        queued_running = self.max_concurrent - self._semaphore._value
+        direct_running = len(self._direct_running)
+        total_running = queued_running + direct_running
         queued = self._queue.qsize()
 
         return {
-            "running": running,
+            "running": total_running,
             "queued": queued,
             "max": self.max_concurrent,
-            "running_task_ids": list(self._running_tasks.keys()),
+            "running_task_ids": list(self._running_tasks.keys()) + list(self._direct_running),
         }
 
     async def stop_all(self):

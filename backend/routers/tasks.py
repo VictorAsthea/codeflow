@@ -179,10 +179,12 @@ async def unarchive_task(task_id: str):
 async def execute_task_background(task_id: str, project_path: str):
     """Background task to execute all phases of a task"""
     print(f"[DEBUG] Background task started for task {task_id}")
+    task_queue.register_direct_task(task_id)
 
     task = get_storage().get_task(task_id)
     if not task:
         print(f"[DEBUG] Task {task_id} not found")
+        task_queue.unregister_direct_task(task_id)
         return
 
     print(f"[DEBUG] Task loaded: {task.title}")
@@ -239,6 +241,8 @@ async def execute_task_background(task_id: str, project_path: str):
         task.status = TaskStatus.BACKLOG
         task.updated_at = datetime.now()
         get_storage().update_task(task)
+    finally:
+        task_queue.unregister_direct_task(task_id)
 
 
 @router.post("/tasks/{task_id}/start")
