@@ -3,7 +3,6 @@ from datetime import datetime
 from typing import Callable, Any
 
 from backend.config import settings
-from backend.database import get_task, update_task
 from backend.models import TaskStatus
 
 
@@ -80,14 +79,16 @@ class TaskQueue:
         Add a task to the queue. Updates task status to 'queued'.
         Returns True if successfully queued.
         """
-        task = await get_task(task_id)
+        from backend.main import storage
+
+        task = storage.get_task(task_id)
         if not task:
             return False
 
         # Update status to queued
         task.status = TaskStatus.QUEUED
         task.updated_at = datetime.now()
-        await update_task(task)
+        storage.update_task(task)
 
         # Add to queue
         await self._queue.put((task_id, project_path))
@@ -111,6 +112,8 @@ class TaskQueue:
 
     async def stop_all(self):
         """Stop all running tasks and clear the queue"""
+        from backend.main import storage
+
         self._shutdown = True
 
         # Cancel all running tasks
@@ -123,11 +126,11 @@ class TaskQueue:
             try:
                 task_id, _ = self._queue.get_nowait()
                 # Reset task status to backlog
-                task = await get_task(task_id)
+                task = storage.get_task(task_id)
                 if task:
                     task.status = TaskStatus.BACKLOG
                     task.updated_at = datetime.now()
-                    await update_task(task)
+                    storage.update_task(task)
             except asyncio.QueueEmpty:
                 break
 
@@ -137,6 +140,8 @@ class TaskQueue:
 
     async def remove_from_queue(self, task_id: str) -> bool:
         """Remove a specific task from the queue (if not yet running)"""
+        from backend.main import storage
+
         if task_id in self._running_tasks:
             return False  # Can't remove running task this way
 
@@ -150,11 +155,11 @@ class TaskQueue:
                 if item[0] == task_id:
                     found = True
                     # Reset status
-                    task = await get_task(task_id)
+                    task = storage.get_task(task_id)
                     if task:
                         task.status = TaskStatus.BACKLOG
                         task.updated_at = datetime.now()
-                        await update_task(task)
+                        storage.update_task(task)
                 else:
                     temp_items.append(item)
             except asyncio.QueueEmpty:

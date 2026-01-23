@@ -8,10 +8,7 @@ from backend.models import (
     Task, TaskCreate, TaskUpdate, TaskStatus, PhaseConfigUpdate,
     Phase, PhaseConfig, PhaseStatus
 )
-from backend.database import (
-    get_all_tasks, get_task, create_task as db_create_task,
-    update_task, delete_task as db_delete_task
-)
+from backend.main import storage
 from backend.config import settings
 from backend.services.worktree_manager import WorktreeManager
 from backend.services.phase_executor import execute_all_phases
@@ -33,7 +30,7 @@ def generate_task_id(title: str, existing_tasks: list[Task]) -> str:
 @router.get("/tasks")
 async def list_tasks():
     """List all tasks"""
-    tasks = await get_all_tasks()
+    tasks = storage.load_tasks()
     return {"tasks": tasks}
 
 
@@ -47,7 +44,7 @@ async def create_new_task(task_data: TaskCreate):
     if not title:
         title = await generate_title(task_data.description)
 
-    existing_tasks = await get_all_tasks()
+    existing_tasks = storage.load_tasks()
     task_id = generate_task_id(title, existing_tasks)
 
     if task_data.planning_config:
@@ -100,14 +97,14 @@ async def create_new_task(task_data: TaskCreate):
         screenshots=task_data.screenshots
     )
 
-    await db_create_task(task)
+    storage.create_task(task)
     return task
 
 
 @router.get("/tasks/{task_id}")
 async def get_task_detail(task_id: str):
     """Get task detail"""
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
@@ -116,7 +113,7 @@ async def get_task_detail(task_id: str):
 @router.patch("/tasks/{task_id}")
 async def update_task_detail(task_id: str, task_data: TaskUpdate):
     """Update task"""
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -130,18 +127,18 @@ async def update_task_detail(task_id: str, task_data: TaskUpdate):
         task.skip_ai_review = task_data.skip_ai_review
 
     task.updated_at = datetime.now()
-    await update_task(task)
+    storage.update_task(task)
     return task
 
 
 @router.delete("/tasks/{task_id}")
 async def delete_task_endpoint(task_id: str):
     """Delete a task"""
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    await db_delete_task(task_id)
+    storage.delete_task(task_id)
     return {"message": "Task deleted successfully"}
 
 
@@ -149,7 +146,7 @@ async def execute_task_background(task_id: str, project_path: str):
     """Background task to execute all phases of a task"""
     print(f"[DEBUG] Background task started for task {task_id}")
 
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     if not task:
         print(f"[DEBUG] Task {task_id} not found")
         return
@@ -174,7 +171,7 @@ async def execute_task_background(task_id: str, project_path: str):
         worktree_path = worktree_mgr.create(task.id, branch_name)
         task.worktree_path = str(worktree_path)
         task.branch_name = branch_name
-        await update_task(task)
+        storage.update_task(task)
 
         await log_handler(f"Worktree created at: {worktree_path}")
 
@@ -192,7 +189,7 @@ async def execute_task_background(task_id: str, project_path: str):
             await log_handler("\n=== Execution stopped due to errors ===")
 
         task.updated_at = datetime.now()
-        await update_task(task)
+        storage.update_task(task)
 
         await log_handler(f"\nTask status updated to: {task.status.value}")
 
@@ -200,13 +197,13 @@ async def execute_task_background(task_id: str, project_path: str):
         await log_handler(f"\nERROR: {str(e)}")
         task.status = TaskStatus.BACKLOG
         task.updated_at = datetime.now()
-        await update_task(task)
+        storage.update_task(task)
 
 
 @router.post("/tasks/{task_id}/start")
 async def start_task(task_id: str):
     """Start task execution immediately (bypasses queue)"""
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -215,7 +212,7 @@ async def start_task(task_id: str):
 
     task.status = TaskStatus.IN_PROGRESS
     task.updated_at = datetime.now()
-    await update_task(task)
+    storage.update_task(task)
 
     asyncio.create_task(execute_task_background(task_id, settings.project_path))
 
@@ -225,7 +222,7 @@ async def start_task(task_id: str):
 @router.post("/tasks/{task_id}/queue")
 async def queue_task(task_id: str):
     """Add task to the execution queue"""
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -240,14 +237,14 @@ async def queue_task(task_id: str):
         raise HTTPException(status_code=500, detail="Failed to queue task")
 
     # Refresh task
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     return {"message": "Task queued", "task": task, "queue_status": task_queue.get_status()}
 
 
 @router.delete("/tasks/{task_id}/queue")
 async def unqueue_task(task_id: str):
     """Remove task from the queue"""
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -259,7 +256,7 @@ async def unqueue_task(task_id: str):
         raise HTTPException(status_code=400, detail="Task not found in queue or already running")
 
     # Refresh task
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     return {"message": "Task removed from queue", "task": task}
 
 
@@ -272,13 +269,13 @@ async def get_queue_status():
 @router.post("/tasks/{task_id}/stop")
 async def stop_task(task_id: str):
     """Stop task execution"""
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
     task.status = TaskStatus.BACKLOG
     task.updated_at = datetime.now()
-    await update_task(task)
+    storage.update_task(task)
 
     return {"message": "Task stopped", "task": task}
 
@@ -286,13 +283,13 @@ async def stop_task(task_id: str):
 @router.post("/tasks/{task_id}/resume")
 async def resume_task(task_id: str):
     """Resume a task"""
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
     task.status = TaskStatus.IN_PROGRESS
     task.updated_at = datetime.now()
-    await update_task(task)
+    storage.update_task(task)
 
     return {"message": "Task resumed", "task": task}
 
@@ -300,7 +297,7 @@ async def resume_task(task_id: str):
 @router.patch("/tasks/{task_id}/status")
 async def change_task_status(task_id: str, status_data: dict):
     """Change task status (for drag & drop)"""
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -311,7 +308,7 @@ async def change_task_status(task_id: str, status_data: dict):
     try:
         task.status = TaskStatus(new_status)
         task.updated_at = datetime.now()
-        await update_task(task)
+        storage.update_task(task)
         return task
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid status")
@@ -320,7 +317,7 @@ async def change_task_status(task_id: str, status_data: dict):
 @router.patch("/tasks/{task_id}/phases/{phase_name}")
 async def update_phase_config(task_id: str, phase_name: str, config_data: PhaseConfigUpdate):
     """Update phase configuration"""
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -337,14 +334,14 @@ async def update_phase_config(task_id: str, phase_name: str, config_data: PhaseC
         phase.config.max_turns = config_data.max_turns
 
     task.updated_at = datetime.now()
-    await update_task(task)
+    storage.update_task(task)
     return {"message": "Phase config updated", "phase": phase}
 
 
 @router.post("/tasks/{task_id}/phases/{phase_name}/retry")
 async def retry_phase(task_id: str, phase_name: str):
     """Retry a failed phase"""
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -358,14 +355,14 @@ async def retry_phase(task_id: str, phase_name: str):
     phase.completed_at = None
 
     task.updated_at = datetime.now()
-    await update_task(task)
+    storage.update_task(task)
     return {"message": "Phase reset for retry", "phase": phase}
 
 
 @router.post("/tasks/{task_id}/create-pr")
 async def create_pull_request(task_id: str):
     """Create a pull request for the task"""
-    task = await get_task(task_id)
+    task = storage.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -432,7 +429,7 @@ async def create_pull_request(task_id: str):
 
         task.status = TaskStatus.DONE
         task.updated_at = datetime.now()
-        await update_task(task)
+        storage.update_task(task)
 
         return {"message": "PR created", "pr_url": pr_url, "task": task}
 

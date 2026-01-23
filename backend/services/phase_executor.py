@@ -4,7 +4,6 @@ import subprocess
 import re
 from backend.models import Task, Phase, PhaseStatus
 from backend.services.claude_runner import run_claude_with_streaming
-from backend.database import update_task
 
 
 PHASE_PROMPTS = {
@@ -110,6 +109,8 @@ async def execute_phase(
     if phase_name not in task.phases:
         raise ValueError(f"Unknown phase: {phase_name}")
 
+    from backend.main import storage
+
     phase = task.phases[phase_name]
     phase.status = PhaseStatus.RUNNING
     phase.started_at = datetime.now()
@@ -121,7 +122,7 @@ async def execute_phase(
     phase.metrics.progress_percentage = 0
     phase.metrics.last_log_preview = ""
 
-    await update_task(task)
+    storage.update_task(task)
 
     last_broadcast_time = None
     BROADCAST_THROTTLE = timedelta(milliseconds=500)
@@ -208,7 +209,7 @@ async def execute_phase(
             phase.status = PhaseStatus.FAILED
 
         phase.completed_at = datetime.now()
-        await update_task(task)
+        storage.update_task(task)
 
         return {
             "success": result["exit_code"] == 0,
@@ -219,7 +220,7 @@ async def execute_phase(
         phase.status = PhaseStatus.FAILED
         phase.completed_at = datetime.now()
         phase.logs.append(f"ERROR: {str(e)}")
-        await update_task(task)
+        storage.update_task(task)
 
         return {
             "success": False,
