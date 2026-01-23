@@ -312,6 +312,17 @@ async def change_task_status(task_id: str, status_data: dict):
         task.status = TaskStatus(new_status)
         task.updated_at = datetime.now()
         get_storage().update_task(task)
+
+        # Trigger AI review when dropped into ai_review column
+        if new_status == "ai_review" and task.worktree_path:
+            async def run_ai_review():
+                from backend.services.task_orchestrator import handle_ai_review
+                async def log_handler(message: str):
+                    await manager.send_log(task_id, message)
+                await handle_ai_review(task, log_handler)
+
+            asyncio.create_task(run_ai_review())
+
         return task
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid status")
