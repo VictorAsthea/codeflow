@@ -2,15 +2,31 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
-from backend.database import init_db
+from pathlib import Path
+import logging
+
+from backend.services.json_storage import JSONStorage
+from backend.services.migration import run_migration_if_needed
 from backend.routers import tasks, settings, git
 from backend.services.task_queue import task_queue
 from backend.websocket_manager import manager
 
+logger = logging.getLogger(__name__)
+
+# Global storage instance
+storage = JSONStorage()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_db()
+    # Run migration if needed
+    db_path = Path("./data/codeflow.db")
+    migration_result = await run_migration_if_needed(db_path, storage)
+
+    if migration_result.get("migrated"):
+        logger.info(
+            f"Migrated {migration_result.get('tasks_count', 0)} tasks from SQLite to JSON"
+        )
 
     # Setup task queue with executor and start workers
     task_queue.set_executor(tasks.execute_task_background)

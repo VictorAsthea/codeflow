@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 import json
 from backend.models import GlobalConfig
-from backend.database import get_config, set_config
+from backend.main import storage
 from backend.config import settings as app_settings
 
 router = APIRouter()
@@ -10,10 +10,9 @@ router = APIRouter()
 @router.get("/settings")
 async def get_settings():
     """Get global configuration"""
-    config_str = await get_config("global")
+    config_data = storage.get_config("global")
 
-    if config_str:
-        config_data = json.loads(config_str)
+    if config_data:
         return GlobalConfig(**config_data)
 
     default_config = GlobalConfig(
@@ -22,12 +21,12 @@ async def get_settings():
         project_path=app_settings.project_path,
         auto_review=app_settings.auto_review
     )
-    await set_config("global", json.dumps(default_config.model_dump()))
+    storage.set_config("global", default_config.model_dump())
     return default_config
 
 
 @router.patch("/settings")
 async def update_settings(config: GlobalConfig):
     """Update global configuration"""
-    await set_config("global", json.dumps(config.model_dump()))
+    storage.set_config("global", config.model_dump())
     return config
