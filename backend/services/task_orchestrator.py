@@ -58,6 +58,10 @@ async def handle_ai_review(
         timeout=settings.code_review_timeout
     )
 
+    print(f"[AI_REVIEW] review_result.success: {review_result.success}")
+    print(f"[AI_REVIEW] review_result.error_message: {review_result.error_message}")
+    print(f"[AI_REVIEW] issues count: {len(review_result.issues)}")
+
     if not review_result.success:
         # Review failed - fallback to human review
         if log_callback:

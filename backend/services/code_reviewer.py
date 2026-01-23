@@ -9,6 +9,8 @@ from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
 
+from backend.services.claude_runner import find_claude_cli
+
 
 class ReviewSeverity(str, Enum):
     ERROR = "error"
@@ -102,9 +104,13 @@ async def run_code_review(
         )
 
     try:
+        # Find Claude CLI executable
+        claude_cli = find_claude_cli()
+        print(f"[CODE_REVIEW] Using Claude CLI: {claude_cli}")
+
         # Execute claude --print "/code-review" --output-format json
         process = await asyncio.create_subprocess_exec(
-            "claude",
+            claude_cli,
             "--print",
             "/code-review",
             "--output-format", "json",
@@ -131,16 +137,21 @@ async def run_code_review(
         raw_output = stdout.decode('utf-8') if stdout else ""
         error_output = stderr.decode('utf-8') if stderr else ""
 
+        print(f"[CODE_REVIEW] returncode: {process.returncode}")
+        print(f"[CODE_REVIEW] stdout: {raw_output[:500] if raw_output else '(empty)'}")
+        print(f"[CODE_REVIEW] stderr: {error_output[:500] if error_output else '(empty)'}")
+
         if process.returncode != 0:
             return CodeReviewResult(
                 success=False,
                 issues=[],
                 raw_output=raw_output,
-                error_message=f"Claude command failed: {error_output}"
+                error_message=f"Claude command failed (code {process.returncode}): {error_output}"
             )
 
         # Parse the JSON output
         issues = parse_review_output(raw_output)
+        print(f"[CODE_REVIEW] parsed {len(issues)} issues")
 
         return CodeReviewResult(
             success=True,
