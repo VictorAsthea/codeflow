@@ -4,11 +4,47 @@ import { ImagePasteHandler } from './image-paste-handler.js';
 import { FilePicker } from './file-picker.js';
 
 let tasks = [];
+let mentionAutocomplete = null;
+let imagePasteHandler = null;
+let filePicker = null;
+const fileReferences = new Set();
+const screenshots = [];
 
 export async function initKanban() {
     await loadTasks();
     setupNewTaskButton();
     setupDragAndDrop();
+    await updateQueueStatus();
+
+    // Poll queue status every 5 seconds
+    setInterval(updateQueueStatus, 5000);
+}
+
+export async function updateQueueStatus() {
+    try {
+        const status = await API.queue.status();
+
+        document.getElementById('queue-running').textContent = status.running;
+        document.getElementById('queue-max').textContent = status.max;
+        document.getElementById('queue-queued').textContent = status.queued;
+
+        const queuedContainer = document.getElementById('queue-queued-container');
+        const queueStatus = document.getElementById('queue-status');
+
+        if (status.queued > 0) {
+            queuedContainer.classList.remove('hidden');
+        } else {
+            queuedContainer.classList.add('hidden');
+        }
+
+        if (status.running > 0) {
+            queueStatus.classList.add('has-running');
+        } else {
+            queueStatus.classList.remove('has-running');
+        }
+    } catch (error) {
+        console.error('Failed to update queue status:', error);
+    }
 }
 
 export async function loadTasks() {
@@ -25,6 +61,7 @@ export async function loadTasks() {
 function renderAllTasks() {
     const columns = {
         backlog: document.getElementById('column-backlog'),
+        queued: document.getElementById('column-queued'),
         in_progress: document.getElementById('column-in_progress'),
         ai_review: document.getElementById('column-ai_review'),
         human_review: document.getElementById('column-human_review'),
@@ -93,17 +130,69 @@ function createTaskCard(task) {
     const timeAgo = getTimeAgo(new Date(task.updated_at));
     const skipBadge = task.skip_ai_review ? '<span class="badge-skip-ai">⏭️ Skip AI Review</span>' : '';
 
+    // Status badges
+    let statusBadge = '';
+    if (task.status === 'queued') {
+        statusBadge = '<span class="badge-queued">⏳ Queued</span>';
+    } else if (task.status === 'in_progress') {
+        statusBadge = '<span class="badge-running">▶️ Running</span>';
+    }
+
+    // Action buttons (only for backlog tasks)
+    let actionButtons = '';
+    if (task.status === 'backlog') {
+        actionButtons = `
+            <div class="task-card-actions">
+                <button class="btn-small btn-queue" data-action="queue" data-task-id="${task.id}">📋 Queue</button>
+                <button class="btn-small btn-start" data-action="start" data-task-id="${task.id}">▶️ Start</button>
+            </div>
+        `;
+    }
+
     card.innerHTML = `
-        <h3>${task.title} ${skipBadge}</h3>
+        <h3>${task.title} ${skipBadge} ${statusBadge}</h3>
         <p>${task.description}</p>
         <div class="task-phases">
             ${phaseBars}
         </div>
+        ${actionButtons}
         <div class="task-footer">
             <span>⏱️ ${timeAgo}</span>
             <span>${task.id}</span>
         </div>
     `;
+
+    // Action button handlers
+    const queueBtn = card.querySelector('[data-action="queue"]');
+    const startBtn = card.querySelector('[data-action="start"]');
+
+    if (queueBtn) {
+        queueBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                await API.tasks.queue(task.id);
+                await loadTasks();
+                updateQueueStatus();
+            } catch (error) {
+                console.error('Failed to queue task:', error);
+                alert('Failed to queue task: ' + error.message);
+            }
+        });
+    }
+
+    if (startBtn) {
+        startBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                await API.tasks.start(task.id);
+                await loadTasks();
+                updateQueueStatus();
+            } catch (error) {
+                console.error('Failed to start task:', error);
+                alert('Failed to start task: ' + error.message);
+            }
+        });
+    }
 
     card.addEventListener('click', () => {
         openTaskModal(task.id);
@@ -124,6 +213,7 @@ function getTimeAgo(date) {
 function updateCounts() {
     const counts = {
         backlog: 0,
+        queued: 0,
         in_progress: 0,
         ai_review: 0,
         human_review: 0,
@@ -189,31 +279,208 @@ function setupDragAndDrop() {
     });
 }
 
+function setupCollapsibleSections() {
+    const triggers = document.querySelectorAll('.collapsible-trigger');
+    triggers.forEach(trigger => {
+        trigger.addEventListener('click', () => {
+            const parent = trigger.closest('.collapsible');
+            const content = parent.querySelector('.collapsible-content');
+            const icon = trigger.querySelector('.collapse-icon');
+
+            parent.classList.toggle('expanded');
+            content.classList.toggle('hidden');
+            icon.textContent = parent.classList.contains('expanded') ? '▼' : '▶';
+        });
+    });
+}
+
+function initializeFormModules() {
+    const textarea = document.getElementById('task-description');
+    const browseBtn = document.getElementById('browse-files-btn');
+
+    if (!mentionAutocomplete) {
+        mentionAutocomplete = new MentionAutocomplete(textarea, {
+            onSelect: (file) => {
+                addFileReference(file);
+            }
+        });
+    }
+
+    if (!imagePasteHandler) {
+        imagePasteHandler = new ImagePasteHandler(textarea, {
+            onPaste: (imageData) => {
+                addScreenshot(imageData);
+            }
+        });
+    }
+
+    if (!filePicker && browseBtn) {
+        filePicker = new FilePicker(browseBtn, {
+            onSelect: (files) => {
+                files.forEach(file => addFileReference(file));
+            }
+        });
+    }
+}
+
+function addFileReference(filePath) {
+    fileReferences.add(filePath);
+    renderFileReferences();
+}
+
+function removeFileReference(filePath) {
+    fileReferences.delete(filePath);
+    renderFileReferences();
+}
+
+function renderFileReferences() {
+    const container = document.getElementById('file-references-list');
+    if (!container) return;
+
+    if (fileReferences.size === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="references-header">📎 Referenced files (${fileReferences.size})</div>
+        ${Array.from(fileReferences).map(file => `
+            <span class="file-ref-tag">
+                <span>📄 ${file}</span>
+                <button type="button" class="remove-ref" data-file="${file}">&times;</button>
+            </span>
+        `).join('')}
+    `;
+
+    container.querySelectorAll('.remove-ref').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const file = e.target.dataset.file;
+            removeFileReference(file);
+        });
+    });
+}
+
+function addScreenshot(imageDataUrl) {
+    screenshots.push(imageDataUrl);
+    renderScreenshots();
+}
+
+function removeScreenshot(index) {
+    screenshots.splice(index, 1);
+    renderScreenshots();
+}
+
+function renderScreenshots() {
+    const container = document.getElementById('screenshots-preview');
+    if (!container) return;
+
+    if (screenshots.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="screenshots-header">🖼️ Screenshots (${screenshots.length})</div>
+        <div class="screenshot-grid">
+            ${screenshots.map((img, idx) => `
+                <div class="screenshot-item">
+                    <img src="${img}" alt="Screenshot ${idx + 1}">
+                    <button type="button" class="remove-screenshot" data-index="${idx}">&times;</button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    container.querySelectorAll('.remove-screenshot').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const index = parseInt(e.target.dataset.index);
+            removeScreenshot(index);
+        });
+    });
+}
+
 function setupNewTaskButton() {
     const newTaskBtn = document.querySelector('.btn-new-task');
     const newTaskModal = document.getElementById('new-task-modal');
     const createTaskBtn = document.getElementById('btn-create-task');
     const form = document.getElementById('new-task-form');
 
+    setupCollapsibleSections();
+
     newTaskBtn.addEventListener('click', () => {
         form.reset();
+        fileReferences.clear();
+        screenshots.length = 0;
+        renderFileReferences();
+        renderScreenshots();
+        initializeFormModules();
         newTaskModal.classList.remove('hidden');
     });
 
     createTaskBtn.addEventListener('click', async () => {
-        const title = document.getElementById('task-title').value.trim();
+        const title = document.getElementById('task-title')?.value.trim() || null;
         const description = document.getElementById('task-description').value.trim();
-        const skipAiReview = document.getElementById('skip-ai-review').checked;
 
-        if (!title || !description) {
-            alert('Please fill in all fields');
+        if (!description) {
+            alert('Please provide a task description');
             return;
         }
 
+        const agentProfile = document.getElementById('agent-profile')?.value || 'balanced';
+
+        const phaseConfig = {};
+        const planningModel = document.getElementById('planning-model')?.value;
+        const planningMaxTurns = document.getElementById('planning-max-turns')?.value;
+        const codingModel = document.getElementById('coding-model')?.value;
+        const codingMaxTurns = document.getElementById('coding-max-turns')?.value;
+        const validationModel = document.getElementById('validation-model')?.value;
+        const validationMaxTurns = document.getElementById('validation-max-turns')?.value;
+
+        if (planningModel || planningMaxTurns) {
+            phaseConfig.planning = {};
+            if (planningModel) phaseConfig.planning.model = planningModel;
+            if (planningMaxTurns) phaseConfig.planning.max_turns = parseInt(planningMaxTurns);
+        }
+        if (codingModel || codingMaxTurns) {
+            phaseConfig.coding = {};
+            if (codingModel) phaseConfig.coding.model = codingModel;
+            if (codingMaxTurns) phaseConfig.coding.max_turns = parseInt(codingMaxTurns);
+        }
+        if (validationModel || validationMaxTurns) {
+            phaseConfig.validation = {};
+            if (validationModel) phaseConfig.validation.model = validationModel;
+            if (validationMaxTurns) phaseConfig.validation.max_turns = parseInt(validationMaxTurns);
+        }
+
+        const requireReview = document.getElementById('require-review-before-coding')?.checked || false;
+        const skipAiReview = document.getElementById('skip-ai-review')?.checked || false;
+
+        const gitOptions = {};
+        const branchName = document.getElementById('git-branch-name')?.value.trim();
+        const targetBranch = document.getElementById('git-target-branch')?.value;
+        if (branchName) gitOptions.branch_name = branchName;
+        if (targetBranch) gitOptions.target_branch = targetBranch;
+
+        const taskData = {
+            title,
+            description,
+            agent_profile: agentProfile,
+            phase_config: Object.keys(phaseConfig).length > 0 ? phaseConfig : null,
+            require_human_review_before_coding: requireReview,
+            skip_ai_review: skipAiReview,
+            git_options: Object.keys(gitOptions).length > 0 ? gitOptions : null,
+            file_references: Array.from(fileReferences),
+            screenshots: screenshots.slice()
+        };
+
         try {
-            await API.tasks.create({ title, description, skip_ai_review: skipAiReview });
+            await API.tasks.create(taskData);
             newTaskModal.classList.add('hidden');
             form.reset();
+            fileReferences.clear();
+            screenshots.length = 0;
+            renderFileReferences();
+            renderScreenshots();
             await loadTasks();
         } catch (error) {
             console.error('Failed to create task:', error);

@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings
 from pathlib import Path
-from backend.models import PhaseConfig
 
 
 class Settings(BaseSettings):
@@ -12,28 +11,17 @@ class Settings(BaseSettings):
     default_intensity: str = "medium"
     auto_review: bool = True
 
+    # Auto-resume settings for max_turns limit
+    auto_resume_enabled: bool = True
+    auto_resume_max_retries: int = 3
+    auto_resume_delay_seconds: int = 2
+
+    # Parallel task execution
+    max_parallel_tasks: int = 3
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
 
 
 settings = Settings()
-
-
-AGENT_PROFILES = {
-    "quick": {
-        "planning": PhaseConfig(model="claude-sonnet-4-5-20250929", intensity="medium", max_turns=10),
-        "coding": PhaseConfig(model="claude-sonnet-4-5-20250929", intensity="medium", max_turns=20),
-        "validation": PhaseConfig(model="claude-sonnet-4-5-20250929", intensity="medium", max_turns=10)
-    },
-    "balanced": {
-        "planning": PhaseConfig(model="claude-sonnet-4-5-20250929", intensity="medium", max_turns=20),
-        "coding": PhaseConfig(model="claude-sonnet-4-5-20250929", intensity="medium", max_turns=30),
-        "validation": PhaseConfig(model="claude-sonnet-4-5-20250929", intensity="medium", max_turns=20)
-    },
-    "thorough": {
-        "planning": PhaseConfig(model="claude-opus-4-5-20251101", intensity="high", max_turns=30),
-        "coding": PhaseConfig(model="claude-opus-4-5-20251101", intensity="high", max_turns=50),
-        "validation": PhaseConfig(model="claude-opus-4-5-20251101", intensity="high", max_turns=30)
-    }
-}

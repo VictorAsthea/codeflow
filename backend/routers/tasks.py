@@ -15,6 +15,7 @@ from backend.database import (
 from backend.config import settings
 from backend.services.worktree_manager import WorktreeManager
 from backend.services.phase_executor import execute_all_phases
+from backend.services.task_queue import task_queue
 from backend.websocket_manager import manager
 
 router = APIRouter()
@@ -27,36 +28,6 @@ def generate_task_id(title: str, existing_tasks: list[Task]) -> str:
 
     slug = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:30]
     return f"{next_num:03d}-{slug}"
-
-
-def create_default_phases() -> dict[str, Phase]:
-    """Create default phases for a new task"""
-    return {
-        "planning": Phase(
-            name="planning",
-            config=PhaseConfig(
-                model=settings.default_model,  # Sonnet 4.5 par défaut
-                intensity=settings.default_intensity,
-                max_turns=20
-            )
-        ),
-        "coding": Phase(
-            name="coding",
-            config=PhaseConfig(
-                model=settings.default_model,  # Sonnet 4.5 par défaut
-                intensity=settings.default_intensity,
-                max_turns=30
-            )
-        ),
-        "validation": Phase(
-            name="validation",
-            config=PhaseConfig(
-                model=settings.default_model,  # Sonnet 4.5 par défaut
-                intensity=settings.default_intensity,
-                max_turns=20
-            )
-        )
-    }
 
 
 @router.get("/tasks")
@@ -197,7 +168,7 @@ async def execute_task_background(task_id: str, project_path: str):
     try:
         await log_handler(f"Starting task execution: {task.title}")
 
-        branch_name = f"task/{task.id}"
+        branch_name = task.branch_name or f"task/{task.id}"
         await log_handler(f"Creating worktree for branch: {branch_name}")
 
         worktree_path = worktree_mgr.create(task.id, branch_name)
@@ -234,7 +205,7 @@ async def execute_task_background(task_id: str, project_path: str):
 
 @router.post("/tasks/{task_id}/start")
 async def start_task(task_id: str):
-    """Start task execution"""
+    """Start task execution immediately (bypasses queue)"""
     task = await get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -249,6 +220,53 @@ async def start_task(task_id: str):
     asyncio.create_task(execute_task_background(task_id, settings.project_path))
 
     return {"message": "Task started", "task": task}
+
+
+@router.post("/tasks/{task_id}/queue")
+async def queue_task(task_id: str):
+    """Add task to the execution queue"""
+    task = await get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status == TaskStatus.IN_PROGRESS:
+        raise HTTPException(status_code=400, detail="Task is already running")
+
+    if task.status == TaskStatus.QUEUED:
+        raise HTTPException(status_code=400, detail="Task is already queued")
+
+    success = await task_queue.queue_task(task_id, settings.project_path)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to queue task")
+
+    # Refresh task
+    task = await get_task(task_id)
+    return {"message": "Task queued", "task": task, "queue_status": task_queue.get_status()}
+
+
+@router.delete("/tasks/{task_id}/queue")
+async def unqueue_task(task_id: str):
+    """Remove task from the queue"""
+    task = await get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status != TaskStatus.QUEUED:
+        raise HTTPException(status_code=400, detail="Task is not queued")
+
+    success = await task_queue.remove_from_queue(task_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Task not found in queue or already running")
+
+    # Refresh task
+    task = await get_task(task_id)
+    return {"message": "Task removed from queue", "task": task}
+
+
+@router.get("/queue/status")
+async def get_queue_status():
+    """Get current queue status"""
+    return task_queue.get_status()
 
 
 @router.post("/tasks/{task_id}/stop")

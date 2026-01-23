@@ -15,6 +15,15 @@
     <div id="app">
         <header class="header">
             <h1>Codeflow</h1>
+            <div class="header-center">
+                <div id="queue-status" class="queue-status">
+                    <span class="queue-icon">🤖</span>
+                    <span id="queue-running">0</span>/<span id="queue-max">3</span> agents running
+                    <span id="queue-queued-container" class="hidden">
+                        (<span id="queue-queued">0</span> queued)
+                    </span>
+                </div>
+            </div>
             <div class="header-actions">
                 <button id="sync-btn" class="btn-icon">🔄 Sync Main</button>
                 <button id="settings-btn" class="btn-icon">⚙️ Settings</button>
@@ -94,6 +103,14 @@
                 <div class="column-body" id="column-backlog">
                     <button class="btn-new-task">+ New Task</button>
                 </div>
+            </div>
+
+            <div class="column" data-status="queued">
+                <div class="column-header">
+                    <h2>Queued</h2>
+                    <span class="count" id="count-queued">0</span>
+                </div>
+                <div class="column-body" id="column-queued"></div>
             </div>
 
             <div class="column" data-status="in_progress">

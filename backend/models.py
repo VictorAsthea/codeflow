@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 class TaskStatus(str, Enum):
     BACKLOG = "backlog"
+    QUEUED = "queued"
     IN_PROGRESS = "in_progress"
     AI_REVIEW = "ai_review"
     HUMAN_REVIEW = "human_review"
