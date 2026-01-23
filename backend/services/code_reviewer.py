@@ -344,9 +344,10 @@ def _extract_issues_from_markdown(text: str) -> list[ReviewIssue]:
                 if file_match2 and not file_path:
                     file_path = file_match2.group(1)
 
+            # Use 85% confidence for markdown - Claude explicitly identified these
             issue = ReviewIssue(
                 severity=current_severity,
-                confidence=75.0,  # Default confidence for markdown-parsed issues
+                confidence=85.0,
                 message=issue_title,
                 file_path=file_path,
                 line_number=line_number
