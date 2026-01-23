@@ -2,10 +2,15 @@ import { API } from './api.js';
 
 let currentTask = null;
 let refreshInterval = null;
+let prReviewPollingInterval = null;
+let selectedCommentIds = new Set();
+let prReviewData = null;
+let conflictData = null;
 
 export function initTaskModal() {
     setupTabs();
     setupActions();
+    setupPRReviewActions();
     setupModalObserver();
 
     window.addEventListener('open-task-modal', async (e) => {
@@ -62,6 +67,7 @@ function setupModalObserver() {
                     const isHidden = taskModal.classList.contains('hidden');
                     if (isHidden) {
                         stopAutoRefresh();
+                        stopPRReviewPolling();
                     }
                 }
             });
@@ -80,6 +86,7 @@ function renderModal() {
     renderPhasesTab();
     renderLogsTab();
     updateActionButtons();
+    updatePRReviewTabVisibility();
 }
 
 function renderOverviewTab() {
@@ -405,6 +412,245 @@ function getDuration(phase) {
     if (seconds < 60) return `${seconds}s`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
     return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+}
+
+// PR Review Tab Functions
+
+function updatePRReviewTabVisibility() {
+    const tabBtn = document.getElementById('tab-btn-pr-review');
+    if (!tabBtn) return;
+
+    if (currentTask && currentTask.pr_url) {
+        tabBtn.style.display = 'block';
+        startPRReviewPolling();
+    } else {
+        tabBtn.style.display = 'none';
+        stopPRReviewPolling();
+    }
+}
+
+function startPRReviewPolling() {
+    stopPRReviewPolling();
+
+    if (currentTask && currentTask.pr_number) {
+        loadPRReviewData();
+
+        prReviewPollingInterval = setInterval(() => {
+            loadPRReviewData();
+        }, 30000);
+    }
+}
+
+function stopPRReviewPolling() {
+    if (prReviewPollingInterval) {
+        clearInterval(prReviewPollingInterval);
+        prReviewPollingInterval = null;
+    }
+}
+
+async function loadPRReviewData() {
+    if (!currentTask || !currentTask.pr_number) return;
+
+    try {
+        const [reviews, conflicts] = await Promise.all([
+            API.tasks.getPRReviews(currentTask.id),
+            API.tasks.checkConflicts(currentTask.id)
+        ]);
+
+        prReviewData = reviews;
+        conflictData = conflicts;
+        renderPRReviewTab();
+    } catch (error) {
+        console.error('Failed to load PR review data:', error);
+    }
+}
+
+function renderPRReviewTab() {
+    const container = document.getElementById('pr-comments-container');
+    const mergeableBadge = document.getElementById('pr-mergeable-badge');
+    const conflictsBadge = document.getElementById('pr-conflicts-badge');
+    const resolveBtn = document.getElementById('btn-resolve-conflicts');
+
+    if (!container || !prReviewData) return;
+
+    // Update status badges
+    const prStatus = prReviewData.pr_status || {};
+    if (prStatus.mergeable === 'MERGEABLE') {
+        mergeableBadge.textContent = 'Mergeable';
+        mergeableBadge.className = 'badge badge-mergeable';
+    } else if (prStatus.mergeable === 'CONFLICTING') {
+        mergeableBadge.textContent = 'Conflicting';
+        mergeableBadge.className = 'badge badge-conflicting';
+    } else {
+        mergeableBadge.textContent = prStatus.mergeable || 'Unknown';
+        mergeableBadge.className = 'badge';
+    }
+
+    // Update conflicts badge and resolve button
+    if (conflictData && conflictData.has_conflicts) {
+        conflictsBadge.textContent = `${conflictData.conflicting_files?.length || 0} conflicts`;
+        conflictsBadge.classList.remove('hidden');
+        resolveBtn.classList.remove('hidden');
+    } else {
+        conflictsBadge.classList.add('hidden');
+        resolveBtn.classList.add('hidden');
+    }
+
+    // Render comments grouped by file
+    const groupedByFile = prReviewData.grouped_by_file || {};
+    const files = Object.keys(groupedByFile);
+
+    if (files.length === 0) {
+        container.innerHTML = '<p class="no-comments">No review comments yet.</p>';
+        return;
+    }
+
+    let html = '';
+    for (const filePath of files) {
+        const comments = groupedByFile[filePath];
+        html += `
+            <div class="pr-file-group">
+                <div class="pr-file-header">
+                    <span class="pr-file-path">${escapeHtml(filePath)}</span>
+                    <span class="pr-file-count">${comments.length} comment(s)</span>
+                </div>
+                <div class="pr-file-comments">
+                    ${comments.map(comment => renderComment(comment)).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = html;
+
+    // Re-attach checkbox listeners
+    container.querySelectorAll('.pr-comment-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', handleCommentCheckboxChange);
+    });
+}
+
+function renderComment(comment) {
+    const isSelected = selectedCommentIds.has(comment.id);
+    const isBot = ['coderabbitai[bot]', 'gemini-code-review[bot]', 'github-actions[bot]'].includes(comment.author);
+
+    return `
+        <div class="pr-comment ${isBot ? 'pr-comment-bot' : ''}">
+            <div class="pr-comment-header">
+                <label class="pr-comment-checkbox-label">
+                    <input type="checkbox" class="pr-comment-checkbox" data-comment-id="${comment.id}" ${isSelected ? 'checked' : ''}>
+                    <span class="pr-comment-author">${escapeHtml(comment.author)}</span>
+                </label>
+                ${comment.line ? `<span class="pr-comment-line">Line ${comment.line}</span>` : ''}
+            </div>
+            <div class="pr-comment-body">${escapeHtml(comment.body)}</div>
+            ${comment.diff_hunk ? `
+                <details class="pr-comment-diff">
+                    <summary>View diff context</summary>
+                    <pre><code>${escapeHtml(comment.diff_hunk)}</code></pre>
+                </details>
+            ` : ''}
+        </div>
+    `;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function handleCommentCheckboxChange(event) {
+    const commentId = parseInt(event.target.dataset.commentId, 10);
+
+    if (event.target.checked) {
+        selectedCommentIds.add(commentId);
+    } else {
+        selectedCommentIds.delete(commentId);
+    }
+
+    updateFixSelectedButton();
+}
+
+function updateFixSelectedButton() {
+    const btn = document.getElementById('btn-fix-selected');
+    if (!btn) return;
+
+    const count = selectedCommentIds.size;
+    btn.textContent = `Fix Selected (${count})`;
+    btn.disabled = count === 0;
+}
+
+function setupPRReviewActions() {
+    const refreshBtn = document.getElementById('btn-refresh-pr');
+    const fixBtn = document.getElementById('btn-fix-selected');
+    const resolveBtn = document.getElementById('btn-resolve-conflicts');
+
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = 'Refreshing...';
+            try {
+                await loadPRReviewData();
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = 'Refresh';
+            }
+        });
+    }
+
+    if (fixBtn) {
+        fixBtn.addEventListener('click', async () => {
+            if (selectedCommentIds.size === 0) return;
+
+            fixBtn.disabled = true;
+            fixBtn.textContent = 'Fixing...';
+
+            try {
+                const result = await API.tasks.fixComments(currentTask.id, Array.from(selectedCommentIds));
+                if (result.success) {
+                    alert(`Fixed ${result.fixed_count} comment(s). Commit: ${result.commit_sha?.slice(0, 8) || 'N/A'}`);
+                    selectedCommentIds.clear();
+                    updateFixSelectedButton();
+                    await loadPRReviewData();
+                } else {
+                    alert('Failed to fix comments: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to fix comments:', error);
+                alert('Failed to fix comments: ' + error.message);
+            } finally {
+                fixBtn.disabled = false;
+                updateFixSelectedButton();
+            }
+        });
+    }
+
+    if (resolveBtn) {
+        resolveBtn.addEventListener('click', async () => {
+            if (!confirm('This will attempt to merge develop and resolve conflicts using Claude. Continue?')) {
+                return;
+            }
+
+            resolveBtn.disabled = true;
+            resolveBtn.textContent = 'Resolving...';
+
+            try {
+                const result = await API.tasks.resolveConflicts(currentTask.id);
+                if (result.success) {
+                    alert(`Resolved ${result.conflict_count} conflict(s) in ${result.resolved_files?.length || 0} file(s).`);
+                    await loadPRReviewData();
+                } else {
+                    alert('Failed to resolve conflicts: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to resolve conflicts:', error);
+                alert('Failed to resolve conflicts: ' + error.message);
+            } finally {
+                resolveBtn.disabled = false;
+                resolveBtn.textContent = 'Resolve Conflicts';
+            }
+        });
+    }
 }
 
 window.retryPhase = async function(phaseName) {

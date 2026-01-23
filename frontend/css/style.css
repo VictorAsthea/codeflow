@@ -650,3 +650,187 @@ body {
   color: var(--text-secondary);
   flex-shrink: 0;
 }
+
+/* PR Review Tab Styles */
+.pr-review-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pr-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.pr-status-badges {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.badge-mergeable {
+  background-color: var(--accent-green);
+  color: white;
+}
+
+.badge-conflicting {
+  background-color: var(--accent-red);
+  color: white;
+}
+
+.pr-comments-container {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.no-comments {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 2rem;
+}
+
+.loading-text {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 2rem;
+}
+
+.pr-file-group {
+  margin-bottom: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.pr-file-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+}
+
+.pr-file-path {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--accent-blue);
+}
+
+.pr-file-count {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.pr-file-comments {
+  padding: 0.5rem;
+}
+
+.pr-comment {
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  border-left: 3px solid var(--border);
+}
+
+.pr-comment:last-child {
+  margin-bottom: 0;
+}
+
+.pr-comment-bot {
+  border-left-color: var(--accent-blue);
+}
+
+.pr-comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.pr-comment-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.pr-comment-checkbox {
+  cursor: pointer;
+}
+
+.pr-comment-author {
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.pr-comment-line {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.pr-comment-body {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pr-comment-diff {
+  margin-top: 0.5rem;
+}
+
+.pr-comment-diff summary {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.pr-comment-diff pre {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.75rem;
+}
+
+.pr-comment-diff code {
+  font-family: monospace;
+}
+
+.pr-action-bar {
+  display: flex;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.btn-warning {
+  background-color: var(--accent-yellow);
+  color: black;
+}
+
+.btn-warning:hover {
+  background-color: #c48920;
+}
+
+.btn-small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+}

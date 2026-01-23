@@ -117,3 +117,7 @@ class PhaseConfigUpdate(BaseModel):
     model: str | None = None
     intensity: str | None = None
     max_turns: int | None = None
+
+
+class FixCommentsRequest(BaseModel):
+    comment_ids: list[int]

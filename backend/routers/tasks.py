@@ -6,7 +6,7 @@ import threading
 import subprocess
 from backend.models import (
     Task, TaskCreate, TaskUpdate, TaskStatus, PhaseConfigUpdate,
-    Phase, PhaseConfig, PhaseStatus
+    Phase, PhaseConfig, PhaseStatus, FixCommentsRequest
 )
 from backend.config import settings
 
@@ -514,3 +514,92 @@ async def create_pull_request(task_id: str):
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.strip() if e.stderr else str(e)
         raise HTTPException(status_code=500, detail=f"Failed to create PR: {error_msg}")
+
+
+@router.get("/tasks/{task_id}/check-conflicts")
+async def check_conflicts(task_id: str):
+    """Check if task branch has conflicts with develop"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if not task.worktree_path:
+        raise HTTPException(status_code=400, detail="Task has no worktree")
+
+    from backend.services.git_service import check_conflicts_with_develop
+
+    result = await check_conflicts_with_develop(task.worktree_path)
+    return result
+
+
+@router.get("/tasks/{task_id}/pr-reviews")
+async def get_pr_reviews(task_id: str):
+    """Get PR review comments for a task"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if not task.pr_number:
+        raise HTTPException(status_code=400, detail="Task has no PR")
+
+    from backend.services.github_service import get_all_pr_reviews
+
+    result = await get_all_pr_reviews(task.pr_number, settings.project_path)
+    return result
+
+
+@router.post("/tasks/{task_id}/fix-comments")
+async def fix_comments(task_id: str, request: FixCommentsRequest):
+    """Fix selected PR review comments using Claude"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if not task.pr_number:
+        raise HTTPException(status_code=400, detail="Task has no PR")
+
+    if not task.worktree_path:
+        raise HTTPException(status_code=400, detail="Task has no worktree")
+
+    if not request.comment_ids:
+        raise HTTPException(status_code=400, detail="No comment IDs provided")
+
+    from backend.services.pr_fixer import fix_pr_comments
+
+    async def log_handler(message: str):
+        await manager.send_log(task_id, message)
+
+    result = await fix_pr_comments(
+        task_id=task_id,
+        comment_ids=request.comment_ids,
+        pr_number=task.pr_number,
+        worktree_path=task.worktree_path,
+        project_path=settings.project_path,
+        log_callback=log_handler
+    )
+
+    return result
+
+
+@router.post("/tasks/{task_id}/resolve-conflicts")
+async def resolve_conflicts(task_id: str):
+    """Resolve merge conflicts with develop using Claude"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if not task.worktree_path:
+        raise HTTPException(status_code=400, detail="Task has no worktree")
+
+    from backend.services.conflict_resolver import resolve_conflicts as do_resolve_conflicts
+
+    async def log_handler(message: str):
+        await manager.send_log(task_id, message)
+
+    result = await do_resolve_conflicts(
+        task_id=task_id,
+        worktree_path=task.worktree_path,
+        log_callback=log_handler
+    )
+
+    return result

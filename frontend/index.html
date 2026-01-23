@@ -160,6 +160,7 @@
                         <button class="tab active" data-tab="overview">Overview</button>
                         <button class="tab" data-tab="phases">Phases</button>
                         <button class="tab" data-tab="logs">Logs</button>
+                        <button class="tab" data-tab="pr-review" id="tab-btn-pr-review" style="display:none">PR Review</button>
                     </div>
                     <div class="tab-content">
                         <div id="tab-overview" class="tab-panel active"></div>
@@ -191,6 +192,24 @@
                                 <button class="log-scroll-to-bottom hidden">
                                     ↓ Scroll to Bottom
                                 </button>
+                            </div>
+                        </div>
+                        <div id="tab-pr-review" class="tab-panel hidden">
+                            <div class="pr-review-container">
+                                <div class="pr-status-header">
+                                    <div class="pr-status-badges">
+                                        <span id="pr-mergeable-badge" class="badge"></span>
+                                        <span id="pr-conflicts-badge" class="badge hidden"></span>
+                                    </div>
+                                    <button id="btn-refresh-pr" class="btn btn-secondary btn-small">Refresh</button>
+                                </div>
+                                <div id="pr-comments-container" class="pr-comments-container">
+                                    <p class="loading-text">Loading PR review comments...</p>
+                                </div>
+                                <div class="pr-action-bar">
+                                    <button id="btn-fix-selected" class="btn btn-primary" disabled>Fix Selected (0)</button>
+                                    <button id="btn-resolve-conflicts" class="btn btn-warning hidden">Resolve Conflicts</button>
+                                </div>
                             </div>
                         </div>
                     </div>

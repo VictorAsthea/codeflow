@@ -74,6 +74,19 @@ export const API = {
         createPR: (id) => fetchJSON(`${API_BASE}/tasks/${id}/create-pr`, {
             method: 'POST',
         }),
+
+        checkConflicts: (id) => fetchJSON(`${API_BASE}/tasks/${id}/check-conflicts`),
+
+        getPRReviews: (id) => fetchJSON(`${API_BASE}/tasks/${id}/pr-reviews`),
+
+        fixComments: (id, commentIds) => fetchJSON(`${API_BASE}/tasks/${id}/fix-comments`, {
+            method: 'POST',
+            body: JSON.stringify({ comment_ids: commentIds }),
+        }),
+
+        resolveConflicts: (id) => fetchJSON(`${API_BASE}/tasks/${id}/resolve-conflicts`, {
+            method: 'POST',
+        }),
     },
 
     settings: {
