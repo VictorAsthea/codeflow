@@ -1,16 +1,29 @@
 """
 Task orchestrator for handling AI review workflow
 """
+import logging
 from datetime import datetime
 from typing import Callable, Any
 from backend.models import Task, TaskStatus
-from backend.database import update_task
 from backend.config import settings
 from backend.services.code_reviewer import (
     run_code_review,
     format_issues_for_context
 )
 from backend.services.phase_executor import execute_all_phases
+
+logger = logging.getLogger(__name__)
+
+
+def get_storage():
+    """Get storage instance (lazy import to avoid circular dependency)"""
+    from backend.main import storage
+    return storage
+
+
+async def update_task(task: Task):
+    """Update task in storage"""
+    get_storage().update_task(task)
 
 
 async def handle_ai_review(
