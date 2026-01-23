@@ -6,6 +6,7 @@
     <title>Codeflow</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/sidebar.css">
     <link rel="stylesheet" href="/css/log-viewer.css">
     <link rel="stylesheet" href="/css/rich-form.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
@@ -20,7 +21,71 @@
             </div>
         </header>
 
-        <main class="kanban-board">
+        <div class="app-body">
+            <aside id="sidebar" class="sidebar">
+                <nav class="sidebar-nav">
+                    <a href="#kanban" class="nav-item active" data-shortcut="K">
+                        <span class="nav-icon">🏠</span>
+                        <span class="nav-label">Tableau Kanban</span>
+                        <kbd class="nav-kbd">K</kbd>
+                    </a>
+
+                    <a href="#terminals" class="nav-item disabled" data-shortcut="T">
+                        <span class="nav-icon">🖥️</span>
+                        <span class="nav-label">Terminaux Agent</span>
+                        <span class="coming-soon">Coming soon</span>
+                    </a>
+
+                    <a href="#insights" class="nav-item disabled">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-label">Insights</span>
+                        <span class="coming-soon">Coming soon</span>
+                    </a>
+
+                    <a href="#roadmap" class="nav-item disabled">
+                        <span class="nav-icon">🗺️</span>
+                        <span class="nav-label">Roadmap</span>
+                        <span class="coming-soon">Coming soon</span>
+                    </a>
+
+                    <a href="#ideation" class="nav-item disabled">
+                        <span class="nav-icon">💡</span>
+                        <span class="nav-label">Idéation</span>
+                        <span class="coming-soon">Coming soon</span>
+                    </a>
+
+                    <a href="#changelog" class="nav-item disabled">
+                        <span class="nav-icon">📝</span>
+                        <span class="nav-label">Changelog</span>
+                        <span class="coming-soon">Coming soon</span>
+                    </a>
+
+                    <div class="nav-divider"></div>
+
+                    <div class="nav-section">
+                        <div class="nav-section-header">
+                            <span class="nav-icon">🌳</span>
+                            <span class="nav-label">Worktrees</span>
+                            <kbd class="nav-kbd">W</kbd>
+                        </div>
+                        <div id="worktrees-list" class="worktrees-list"></div>
+                    </div>
+
+                    <div class="nav-divider"></div>
+
+                    <a href="#settings" class="nav-item" data-shortcut="S">
+                        <span class="nav-icon">⚙️</span>
+                        <span class="nav-label">Settings</span>
+                        <kbd class="nav-kbd">S</kbd>
+                    </a>
+                </nav>
+                <button class="sidebar-toggle" aria-label="Toggle sidebar">
+                    <span class="toggle-icon">◀</span>
+                </button>
+            </aside>
+
+            <main class="main-content">
+                <div class="kanban-board">
             <div class="column" data-status="backlog">
                 <div class="column-header">
                     <h2>Backlog</h2>
@@ -62,7 +127,9 @@
                 </div>
                 <div class="column-body" id="column-done"></div>
             </div>
-        </main>
+                </div>
+            </main>
+        </div>
 
         <!-- Task Modal -->
         <div id="task-modal" class="modal hidden">
@@ -344,6 +411,8 @@
     <script type="module" src="/js/kanban.js"></script>
     <script type="module" src="/js/task-modal.js"></script>
     <script type="module" src="/js/log-filters.js"></script>
+    <script type="module" src="/js/sidebar.js"></script>
+    <script type="module" src="/js/keyboard.js"></script>
     <script type="module" src="/js/app.js"></script>
 
     <footer class="main-footer">
