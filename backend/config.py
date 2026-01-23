@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from pathlib import Path
+from backend.models import PhaseConfig
 
 
 class Settings(BaseSettings):
@@ -17,3 +18,22 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+AGENT_PROFILES = {
+    "quick": {
+        "planning": PhaseConfig(model="claude-sonnet-4-5-20250929", intensity="medium", max_turns=10),
+        "coding": PhaseConfig(model="claude-sonnet-4-5-20250929", intensity="medium", max_turns=20),
+        "validation": PhaseConfig(model="claude-sonnet-4-5-20250929", intensity="medium", max_turns=10)
+    },
+    "balanced": {
+        "planning": PhaseConfig(model="claude-sonnet-4-5-20250929", intensity="medium", max_turns=20),
+        "coding": PhaseConfig(model="claude-sonnet-4-5-20250929", intensity="medium", max_turns=30),
+        "validation": PhaseConfig(model="claude-sonnet-4-5-20250929", intensity="medium", max_turns=20)
+    },
+    "thorough": {
+        "planning": PhaseConfig(model="claude-opus-4-5-20251101", intensity="high", max_turns=30),
+        "coding": PhaseConfig(model="claude-opus-4-5-20251101", intensity="high", max_turns=50),
+        "validation": PhaseConfig(model="claude-opus-4-5-20251101", intensity="high", max_turns=30)
+    }
+}

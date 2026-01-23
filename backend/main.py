@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from backend.database import init_db
-from backend.routers import tasks, settings, git
+from backend.routers import tasks, settings, git, files
 from backend.websocket_manager import manager
 
 
@@ -18,6 +18,7 @@ app = FastAPI(title="Codeflow", version="0.1.0", lifespan=lifespan)
 app.include_router(tasks.router, prefix="/api", tags=["tasks"])
 app.include_router(settings.router, prefix="/api", tags=["settings"])
 app.include_router(git.router, prefix="/api", tags=["git"])
+app.include_router(files.router, prefix="/api", tags=["files"])
 
 app.mount("/css", StaticFiles(directory="frontend/css"), name="css")
 app.mount("/js", StaticFiles(directory="frontend/js"), name="js")

@@ -18,6 +18,12 @@ class PhaseStatus(str, Enum):
     FAILED = "failed"
 
 
+class AgentProfile(str, Enum):
+    QUICK = "quick"
+    BALANCED = "balanced"
+    THOROUGH = "thorough"
+
+
 class PhaseConfig(BaseModel):
     model: str = "claude-sonnet-4-20250514"
     intensity: str = "medium"
@@ -33,6 +39,17 @@ class Phase(BaseModel):
     completed_at: datetime | None = None
 
 
+class GitOptions(BaseModel):
+    branch_name: str | None = None
+    target_branch: str = "develop"
+
+
+class FileReference(BaseModel):
+    path: str
+    line_start: int | None = None
+    line_end: int | None = None
+
+
 class Task(BaseModel):
     id: str
     title: str
@@ -43,6 +60,10 @@ class Task(BaseModel):
     branch_name: str | None = None
     pr_url: str | None = None
     skip_ai_review: bool = False
+    agent_profile: AgentProfile = AgentProfile.BALANCED
+    require_human_review_before_coding: bool = False
+    file_references: list[FileReference] = Field(default_factory=list)
+    screenshots: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
@@ -55,9 +76,17 @@ class GlobalConfig(BaseModel):
 
 
 class TaskCreate(BaseModel):
-    title: str
+    title: str | None = None
     description: str
+    agent_profile: AgentProfile = AgentProfile.BALANCED
+    planning_config: PhaseConfig | None = None
+    coding_config: PhaseConfig | None = None
+    validation_config: PhaseConfig | None = None
+    require_human_review_before_coding: bool = False
     skip_ai_review: bool = False
+    git_options: GitOptions | None = None
+    file_references: list[FileReference] = Field(default_factory=list)
+    screenshots: list[str] = Field(default_factory=list)
 
 
 class TaskUpdate(BaseModel):
