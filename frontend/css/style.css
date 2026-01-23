@@ -9,6 +9,7 @@
   --accent-green: #3fb950;
   --accent-red: #f85149;
   --accent-blue: #58a6ff;
+  --accent-blue-bright: #79c0ff;
 
   /* Log colors */
   --log-info: #58a6ff;
@@ -17,6 +18,14 @@
   --log-write: #a371f7;
   --log-bash: #f85149;
   --log-error: #ff6b6b;
+
+  /* Phase colors */
+  --phase-planning-color: #58a6ff;
+  --phase-planning-bright: #79c0ff;
+  --phase-coding-color: #3fb950;
+  --phase-coding-bright: #56d364;
+  --phase-validation-color: #d29922;
+  --phase-validation-bright: #e3b341;
 }
 
 * {

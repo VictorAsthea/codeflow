@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Callable, Any
 import subprocess
+import re
 from backend.models import Task, Phase, PhaseStatus
 from backend.services.claude_runner import run_claude_with_streaming
 from backend.database import update_task
@@ -60,11 +61,38 @@ PHASE_TOOLS = {
 }
 
 
+def parse_turn_from_log(line: str) -> int | None:
+    """
+    Parse turn number from Claude log line
+
+    Supports formats like:
+    - "Turn 5/10"
+    - "Starting turn 3"
+    - "Claude turn: 7"
+
+    Returns:
+        Turn number if found, None otherwise
+    """
+    patterns = [
+        r'Turn\s+(\d+)(?:/\d+)?',
+        r'turn\s+(\d+)',
+        r'Claude\s+turn:\s*(\d+)'
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, line, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+
+    return None
+
+
 async def execute_phase(
     task: Task,
     phase_name: str,
     working_dir: str,
-    log_callback: Callable[[str], Any] = None
+    log_callback: Callable[[str], Any] = None,
+    websocket_manager = None
 ) -> dict:
     """
     Execute a single phase of a task
@@ -74,6 +102,7 @@ async def execute_phase(
         phase_name: Name of the phase (planning, coding, validation)
         working_dir: Working directory for execution
         log_callback: Optional callback for streaming logs
+        websocket_manager: WebSocket manager for broadcasting progress updates
 
     Returns:
         dict with success status and output
@@ -85,8 +114,17 @@ async def execute_phase(
     phase.status = PhaseStatus.RUNNING
     phase.started_at = datetime.now()
     phase.logs = []
+    phase.metrics.current_turn = 0
+    phase.metrics.estimated_turns = phase.config.max_turns
+    phase.metrics.elapsed_time = 0.0
+    phase.metrics.estimated_remaining = None
+    phase.metrics.progress_percentage = 0
+    phase.metrics.last_log_preview = ""
 
     await update_task(task)
+
+    last_broadcast_time = None
+    BROADCAST_THROTTLE = timedelta(milliseconds=500)
 
     prompt_template = PHASE_PROMPTS[phase_name]
     planning_output = ""
@@ -110,11 +148,45 @@ async def execute_phase(
     log_count = 0
 
     async def phase_log_handler(line: str):
-        nonlocal log_count
+        nonlocal log_count, last_broadcast_time
         log_count += 1
         if log_count <= 3 or log_count % 10 == 0:
             print(f"[DEBUG] phase_log_handler called (count: {log_count}): {line[:50]}...")
         phase.logs.append(line)
+
+        turn = parse_turn_from_log(line)
+        if turn is not None:
+            phase.metrics.current_turn = turn
+            phase.metrics.progress_percentage = min(
+                int((turn / phase.config.max_turns) * 100), 100
+            )
+
+            elapsed = (datetime.now() - phase.started_at).total_seconds()
+            phase.metrics.elapsed_time = elapsed
+
+            if turn > 0:
+                avg_per_turn = elapsed / turn
+                remaining_turns = max(phase.config.max_turns - turn, 0)
+                phase.metrics.estimated_remaining = avg_per_turn * remaining_turns
+
+        phase.metrics.last_log_preview = line[:100]
+
+        now = datetime.now()
+        if websocket_manager and (not last_broadcast_time or (now - last_broadcast_time) > BROADCAST_THROTTLE):
+            await websocket_manager.send_progress_update(
+                task.id,
+                phase_name,
+                {
+                    "current_turn": phase.metrics.current_turn,
+                    "estimated_turns": phase.metrics.estimated_turns,
+                    "elapsed_time": phase.metrics.elapsed_time,
+                    "estimated_remaining": phase.metrics.estimated_remaining,
+                    "progress_percentage": phase.metrics.progress_percentage,
+                    "last_log_preview": phase.metrics.last_log_preview
+                }
+            )
+            last_broadcast_time = now
+
         if log_callback:
             await log_callback(line)
 
@@ -230,7 +302,8 @@ async def commit_changes(
 async def execute_all_phases(
     task: Task,
     working_dir: str,
-    log_callback: Callable[[str], Any] = None
+    log_callback: Callable[[str], Any] = None,
+    websocket_manager = None
 ) -> dict:
     """
     Execute all phases of a task sequentially
@@ -239,6 +312,7 @@ async def execute_all_phases(
         task: The task to execute
         working_dir: Working directory for execution
         log_callback: Optional callback for streaming logs
+        websocket_manager: WebSocket manager for broadcasting progress updates
 
     Returns:
         dict with overall success status
@@ -250,7 +324,7 @@ async def execute_all_phases(
         if log_callback:
             await log_callback(f"\n=== Starting {phase_name} phase ===\n")
 
-        result = await execute_phase(task, phase_name, working_dir, log_callback)
+        result = await execute_phase(task, phase_name, working_dir, log_callback, websocket_manager)
         results[phase_name] = result
 
         if not result["success"]:

@@ -178,7 +178,7 @@ async def execute_task_background(task_id: str, project_path: str):
 
         await log_handler(f"Worktree created at: {worktree_path}")
 
-        result = await execute_all_phases(task, str(worktree_path), log_handler)
+        result = await execute_all_phases(task, str(worktree_path), log_handler, manager)
 
         if result["success"]:
             if task.skip_ai_review:

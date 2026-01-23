@@ -1,5 +1,6 @@
 from fastapi import WebSocket
 from typing import Dict, List
+import json
 
 
 class ConnectionManager:
@@ -38,6 +39,22 @@ class ConnectionManager:
 
     async def broadcast(self, task_id: str, message: str):
         await self.send_log(task_id, message)
+
+    async def send_progress_update(self, task_id: str, phase_name: str, metrics: dict):
+        """
+        Send progress update for a specific phase
+
+        Args:
+            task_id: Task identifier
+            phase_name: Name of the phase (planning, coding, validation)
+            metrics: Dictionary containing progress metrics
+        """
+        message = json.dumps({
+            "type": "progress_update",
+            "phase": phase_name,
+            "metrics": metrics
+        })
+        await self.broadcast(task_id, message)
 
 
 manager = ConnectionManager()
