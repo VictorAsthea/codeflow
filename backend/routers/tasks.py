@@ -33,9 +33,11 @@ def generate_task_id(title: str, existing_tasks: list[Task]) -> str:
 
 
 @router.get("/tasks")
-async def list_tasks():
+async def list_tasks(include_archived: bool = False):
     """List all tasks"""
     tasks = get_storage().load_tasks()
+    if not include_archived:
+        tasks = [task for task in tasks if not task.archived]
     return {"tasks": tasks}
 
 
@@ -136,6 +138,42 @@ async def delete_task_endpoint(task_id: str):
 
     get_storage().delete_task(task_id)
     return {"message": "Task deleted successfully"}
+
+
+@router.patch("/tasks/{task_id}/archive")
+async def archive_task(task_id: str):
+    """Archive a task"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.archived:
+        raise HTTPException(status_code=400, detail="Task is already archived")
+
+    task.archived = True
+    task.archived_at = datetime.now()
+    task.updated_at = datetime.now()
+    get_storage().update_task(task)
+
+    return {"message": "Task archived successfully", "task": task}
+
+
+@router.patch("/tasks/{task_id}/unarchive")
+async def unarchive_task(task_id: str):
+    """Unarchive a task"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if not task.archived:
+        raise HTTPException(status_code=400, detail="Task is not archived")
+
+    task.archived = False
+    task.archived_at = None
+    task.updated_at = datetime.now()
+    get_storage().update_task(task)
+
+    return {"message": "Task unarchived successfully", "task": task}
 
 
 async def execute_task_background(task_id: str, project_path: str):
