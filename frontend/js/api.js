@@ -107,4 +107,16 @@ export const API = {
     queue: {
         status: () => fetchJSON(`${API_BASE}/queue/status`),
     },
+
+    worktrees: {
+        list: () => fetchJSON(`${API_BASE}/worktrees`),
+
+        remove: (taskId) => fetchJSON(`${API_BASE}/worktrees/${taskId}`, {
+            method: 'DELETE',
+        }),
+
+        merge: (taskId, target = 'develop') => fetchJSON(`${API_BASE}/worktrees/${taskId}/merge?target=${target}`, {
+            method: 'POST',
+        }),
+    },
 };

@@ -122,11 +122,33 @@ class Sidebar {
 
     this.currentView = view;
 
+    // Handle view switching
+    this.switchView(view);
+
     window.dispatchEvent(new CustomEvent('sidebar-navigate', {
       detail: { view }
     }));
 
     console.log(`Navigated to: ${view}`);
+  }
+
+  /**
+   * Switch between views
+   */
+  switchView(viewName) {
+    // Hide all views
+    document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+
+    // Show selected view
+    const targetView = document.getElementById(`${viewName}-view`);
+    if (targetView) {
+      targetView.classList.remove('hidden');
+    }
+
+    // Dispatch event for view-specific initialization
+    window.dispatchEvent(new CustomEvent('view-changed', {
+      detail: { view: viewName }
+    }));
   }
 
   /**

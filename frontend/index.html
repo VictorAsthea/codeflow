@@ -33,7 +33,7 @@
         <div class="app-body">
             <aside id="sidebar" class="sidebar">
                 <nav class="sidebar-nav">
-                    <a href="#kanban" class="nav-item active" data-shortcut="K">
+                    <a href="#kanban" class="nav-item active" data-shortcut="K" data-view="kanban">
                         <span class="nav-icon">🏠</span>
                         <span class="nav-label">Tableau Kanban</span>
                         <kbd class="nav-kbd">K</kbd>
@@ -71,14 +71,11 @@
 
                     <div class="nav-divider"></div>
 
-                    <div class="nav-section">
-                        <div class="nav-section-header">
-                            <span class="nav-icon">🌳</span>
-                            <span class="nav-label">Worktrees</span>
-                            <kbd class="nav-kbd">W</kbd>
-                        </div>
-                        <div id="worktrees-list" class="worktrees-list"></div>
-                    </div>
+                    <a href="#worktrees" class="nav-item" data-shortcut="W" data-view="worktrees">
+                        <span class="nav-icon">🌳</span>
+                        <span class="nav-label">Worktrees</span>
+                        <kbd class="nav-kbd">W</kbd>
+                    </a>
 
                     <div class="nav-divider"></div>
 
@@ -94,6 +91,8 @@
             </aside>
 
             <main class="main-content">
+                <!-- Kanban View -->
+                <div id="kanban-view" class="view">
                 <div class="kanban-board">
             <div class="column" data-status="backlog">
                 <div class="column-header">
@@ -144,6 +143,27 @@
                 </div>
                 <div class="column-body" id="column-done"></div>
             </div>
+                </div>
+                </div>
+
+                <!-- Worktrees View -->
+                <div id="worktrees-view" class="view hidden">
+                    <div class="view-header">
+                        <div class="view-header-content">
+                            <h1>Worktrees</h1>
+                            <p>Manage isolated workspaces for your Codeflow tasks</p>
+                        </div>
+                        <div class="view-header-actions">
+                            <button id="refresh-worktrees" class="btn btn-secondary">Refresh</button>
+                        </div>
+                    </div>
+
+                    <div class="worktrees-section">
+                        <h3>Task Worktrees</h3>
+                        <div id="worktrees-cards" class="worktrees-cards">
+                            <p class="loading-text">Loading worktrees...</p>
+                        </div>
+                    </div>
                 </div>
             </main>
         </div>
@@ -449,6 +469,7 @@
     <script type="module" src="/js/log-filters.js"></script>
     <script type="module" src="/js/sidebar.js"></script>
     <script type="module" src="/js/keyboard.js"></script>
+    <script type="module" src="/js/worktrees.js"></script>
     <script type="module" src="/js/app.js"></script>
 
     <footer class="main-footer">
