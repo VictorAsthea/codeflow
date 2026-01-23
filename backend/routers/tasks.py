@@ -315,11 +315,16 @@ async def change_task_status(task_id: str, status_data: dict):
 
         # Trigger AI review when dropped into ai_review column
         if new_status == "ai_review" and task.worktree_path:
+            task.review_status = "in_progress"
+            get_storage().update_task(task)
+
             async def run_ai_review():
                 from backend.services.task_orchestrator import handle_ai_review
+                # Reload task to get fresh state
+                fresh_task = get_storage().get_task(task_id)
                 async def log_handler(message: str):
                     await manager.send_log(task_id, message)
-                await handle_ai_review(task, log_handler)
+                await handle_ai_review(fresh_task, log_handler)
 
             asyncio.create_task(run_ai_review())
 

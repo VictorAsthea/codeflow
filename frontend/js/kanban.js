@@ -155,6 +155,9 @@ function createTaskCard(task) {
         statusBadge = '<span class="badge-queued">⏳ Queued</span>';
     } else if (task.status === 'in_progress') {
         statusBadge = '<span class="badge-running">▶️ Running</span>';
+    } else if (task.status === 'ai_review') {
+        const reviewText = task.review_status === 'in_progress' ? '🔍 Reviewing...' : '🔍 AI Review';
+        statusBadge = `<span class="badge-reviewing">${reviewText}</span>`;
     }
 
     // Action buttons (only for backlog tasks)
