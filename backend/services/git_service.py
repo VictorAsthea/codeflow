@@ -25,6 +25,8 @@ async def check_conflicts_with_develop(worktree_path: str) -> dict:
             cwd=worktree_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
 
@@ -34,7 +36,9 @@ async def check_conflicts_with_develop(worktree_path: str) -> dict:
             ["git", "merge-base", "HEAD", "origin/develop"],
             cwd=worktree_path,
             capture_output=True,
-            text=True
+            text=True,
+            encoding='utf-8',
+            errors='replace'
         )
 
         if merge_base_result.returncode != 0:
@@ -49,7 +53,9 @@ async def check_conflicts_with_develop(worktree_path: str) -> dict:
             ["git", "rev-list", "--count", f"HEAD..origin/develop"],
             cwd=worktree_path,
             capture_output=True,
-            text=True
+            text=True,
+            encoding='utf-8',
+            errors='replace'
         )
 
         behind_commits = 0
@@ -64,7 +70,9 @@ async def check_conflicts_with_develop(worktree_path: str) -> dict:
             ["git", "merge-tree", merge_base, "HEAD", "origin/develop"],
             cwd=worktree_path,
             capture_output=True,
-            text=True
+            text=True,
+            encoding='utf-8',
+            errors='replace'
         )
 
         output = merge_tree_result.stdout
@@ -124,7 +132,9 @@ async def _get_conflict_files_from_dry_merge(worktree_path: str) -> list[str]:
             ["git", "merge", "origin/develop", "--no-commit", "--no-ff"],
             cwd=worktree_path,
             capture_output=True,
-            text=True
+            text=True,
+            encoding='utf-8',
+            errors='replace'
         )
 
         if merge_result.returncode != 0:
@@ -238,6 +248,8 @@ async def get_current_branch(worktree_path: str) -> Optional[str]:
             cwd=worktree_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
         return result.stdout.strip()
@@ -265,6 +277,8 @@ async def start_merge_with_develop(worktree_path: str) -> dict:
             cwd=worktree_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
 
@@ -274,7 +288,9 @@ async def start_merge_with_develop(worktree_path: str) -> dict:
             ["git", "merge", "origin/develop", "--no-commit"],
             cwd=worktree_path,
             capture_output=True,
-            text=True
+            text=True,
+            encoding='utf-8',
+            errors='replace'
         )
 
         if merge_result.returncode == 0:
@@ -329,6 +345,8 @@ async def complete_merge(worktree_path: str, commit_message: str = "fix: merge d
             cwd=worktree_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
 
@@ -339,6 +357,8 @@ async def complete_merge(worktree_path: str, commit_message: str = "fix: merge d
             cwd=worktree_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
 
@@ -349,6 +369,8 @@ async def complete_merge(worktree_path: str, commit_message: str = "fix: merge d
             cwd=worktree_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
 
@@ -381,6 +403,8 @@ async def push_with_lease(worktree_path: str) -> dict:
             cwd=worktree_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
 
@@ -403,6 +427,8 @@ async def abort_merge(worktree_path: str) -> dict:
             cwd=worktree_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
         return {"success": True}

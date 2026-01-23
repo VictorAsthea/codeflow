@@ -32,6 +32,8 @@ async def get_repo_info(project_path: str) -> dict:
             cwd=project_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
 
@@ -77,6 +79,8 @@ async def get_pr_details(pr_number: int, project_path: str) -> dict:
             cwd=project_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
 
@@ -137,6 +141,8 @@ async def get_pr_review_comments(
             cwd=project_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
 
@@ -200,6 +206,8 @@ async def get_pr_issue_comments(pr_number: int, project_path: str) -> list[dict]
             cwd=project_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
 
@@ -332,6 +340,8 @@ async def reply_to_comment(
             cwd=project_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=True
         )
 

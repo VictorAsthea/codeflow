@@ -9,6 +9,8 @@ from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
 
+from backend.services.claude_runner import find_claude_cli
+
 
 class ReviewSeverity(str, Enum):
     ERROR = "error"
@@ -102,12 +104,32 @@ async def run_code_review(
         )
 
     try:
-        # Execute claude --print "/code-review" --output-format json
+        # Find Claude CLI executable
+        claude_cli = find_claude_cli()
+        print(f"[CODE_REVIEW] Using Claude CLI: {claude_cli}")
+
+        # Build code review prompt
+        review_prompt = """Review the recent code changes in this git worktree. Focus on:
+1. Bugs and logical errors
+2. Security vulnerabilities
+3. Performance issues
+4. Code quality problems
+
+For each issue found, output a JSON object with this format:
+{"severity": "error|warning|info", "confidence": 0-100, "message": "description", "file_path": "path/to/file", "line_number": 123}
+
+Output ONLY valid JSON objects, one per line. If no issues are found, output: {"no_issues": true}
+
+Start by running: git diff HEAD~1 --name-only
+Then review each changed file."""
+
+        # Execute claude with review prompt
         process = await asyncio.create_subprocess_exec(
-            "claude",
+            claude_cli,
             "--print",
-            "/code-review",
+            review_prompt,
             "--output-format", "json",
+            "--max-turns", "5",
             cwd=str(worktree_path_obj),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
@@ -131,16 +153,22 @@ async def run_code_review(
         raw_output = stdout.decode('utf-8') if stdout else ""
         error_output = stderr.decode('utf-8') if stderr else ""
 
+        print(f"[CODE_REVIEW] returncode: {process.returncode}")
+        print(f"[CODE_REVIEW] stdout length: {len(raw_output)}")
+        print(f"[CODE_REVIEW] stdout content: {raw_output[:2000]}")
+        print(f"[CODE_REVIEW] stderr: {error_output[:200] if error_output else '(empty)'}")
+
         if process.returncode != 0:
             return CodeReviewResult(
                 success=False,
                 issues=[],
                 raw_output=raw_output,
-                error_message=f"Claude command failed: {error_output}"
+                error_message=f"Claude command failed (code {process.returncode}): {error_output}"
             )
 
-        # Parse the JSON output
+        # Parse the JSON output - look for issue objects in the result
         issues = parse_review_output(raw_output)
+        print(f"[CODE_REVIEW] parsed {len(issues)} issues")
 
         return CodeReviewResult(
             success=True,
@@ -166,10 +194,10 @@ async def run_code_review(
 
 def parse_review_output(json_output: str) -> list[ReviewIssue]:
     """
-    Parse JSON output from Claude /code-review
+    Parse JSON output from Claude code review
 
     Args:
-        json_output: JSON string from claude command
+        json_output: JSON string stream from claude command
 
     Returns:
         List of ReviewIssue objects
@@ -177,42 +205,87 @@ def parse_review_output(json_output: str) -> list[ReviewIssue]:
     if not json_output or not json_output.strip():
         return []
 
-    try:
-        data = json.loads(json_output)
+    issues = []
 
-        # Handle different possible JSON structures
-        # Assuming format: {"issues": [...]} or direct array [...]
-        if isinstance(data, dict):
-            issues_data = data.get("issues", [])
-        elif isinstance(data, list):
-            issues_data = data
-        else:
-            return []
+    # Parse each line as potential JSON
+    for line in json_output.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
 
-        issues = []
-        for item in issues_data:
-            try:
-                # Map severity string to enum
-                severity_str = item.get("severity", "info").lower()
-                severity = ReviewSeverity(severity_str) if severity_str in ["error", "warning", "info"] else ReviewSeverity.INFO
+        try:
+            data = json.loads(line)
 
-                issue = ReviewIssue(
-                    severity=severity,
-                    confidence=float(item.get("confidence", 0)),
-                    message=item.get("message", ""),
-                    file_path=item.get("file_path"),
-                    line_number=item.get("line_number")
-                )
-                issues.append(issue)
-            except (ValueError, KeyError, TypeError) as e:
-                # Skip malformed issue entries
+            # Skip non-dict entries
+            if not isinstance(data, dict):
                 continue
 
-        return issues
+            # Skip Claude system messages (type: result, assistant, etc.)
+            if data.get("type") in ["result", "assistant", "user", "system"]:
+                # But check if result contains issues in the text
+                if data.get("type") == "result" and "result" in data:
+                    result_text = data.get("result", "")
+                    if isinstance(result_text, str):
+                        # Try to extract JSON from result text
+                        issues.extend(_extract_issues_from_text(result_text))
+                continue
 
-    except json.JSONDecodeError:
-        # If JSON parsing fails, return empty list
-        return []
+            # Skip "no_issues" marker
+            if data.get("no_issues"):
+                continue
+
+            # Check if this looks like an issue object
+            if "severity" in data and "message" in data:
+                try:
+                    severity_str = data.get("severity", "info").lower()
+                    if severity_str not in ["error", "warning", "info"]:
+                        severity_str = "info"
+
+                    issue = ReviewIssue(
+                        severity=ReviewSeverity(severity_str),
+                        confidence=float(data.get("confidence", 50)),
+                        message=data.get("message", ""),
+                        file_path=data.get("file_path"),
+                        line_number=data.get("line_number")
+                    )
+                    issues.append(issue)
+                except (ValueError, KeyError, TypeError):
+                    continue
+
+        except json.JSONDecodeError:
+            continue
+
+    return issues
+
+
+def _extract_issues_from_text(text: str) -> list[ReviewIssue]:
+    """Extract issue JSON objects embedded in text"""
+    issues = []
+
+    # Look for JSON-like patterns in the text
+    import re
+    json_pattern = r'\{[^{}]*"severity"[^{}]*"message"[^{}]*\}'
+    matches = re.findall(json_pattern, text)
+
+    for match in matches:
+        try:
+            data = json.loads(match)
+            severity_str = data.get("severity", "info").lower()
+            if severity_str not in ["error", "warning", "info"]:
+                severity_str = "info"
+
+            issue = ReviewIssue(
+                severity=ReviewSeverity(severity_str),
+                confidence=float(data.get("confidence", 50)),
+                message=data.get("message", ""),
+                file_path=data.get("file_path"),
+                line_number=data.get("line_number")
+            )
+            issues.append(issue)
+        except (json.JSONDecodeError, ValueError, KeyError, TypeError):
+            continue
+
+    return issues
 
 
 def should_auto_fix(

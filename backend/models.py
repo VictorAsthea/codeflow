@@ -81,6 +81,9 @@ class Task(BaseModel):
     review_issues: list[dict] | None = None
     review_cycles: int = 0
     review_status: str | None = None
+    review_output: str | None = None
+    archived: bool = False
+    archived_at: datetime | None = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
