@@ -10,6 +10,24 @@ let filePicker = null;
 const fileReferences = new Set();
 const screenshots = [];
 
+/**
+ * Maps task status to the correct column identifier
+ * @param {string} status - The task status
+ * @returns {string} The column identifier
+ */
+function getColumnForStatus(status) {
+    const statusMap = {
+        'backlog': 'backlog',
+        'queued': 'queued',
+        'in_progress': 'in_progress',
+        'ai_review': 'ai_review',
+        'human_review': 'human_review',
+        'done': 'done'
+    };
+
+    return statusMap[status] || 'backlog';
+}
+
 export async function initKanban() {
     await loadTasks();
     setupNewTaskButton();
@@ -75,7 +93,8 @@ function renderAllTasks() {
 
     tasks.forEach(task => {
         const card = createTaskCard(task);
-        const column = columns[task.status];
+        const columnKey = getColumnForStatus(task.status);
+        const column = columns[columnKey];
         if (column) {
             const newTaskBtn = column.querySelector('.btn-new-task');
             if (newTaskBtn) {
