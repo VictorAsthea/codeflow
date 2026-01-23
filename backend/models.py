@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
@@ -89,10 +90,30 @@ class Task(BaseModel):
 
 
 class GlobalConfig(BaseModel):
+    # General settings
+    project_path: str
+    target_branch: str = "main"
+
+    # Legacy settings (keep for compatibility)
     default_model: str = "claude-sonnet-4-20250514"
     default_intensity: str = "medium"
-    project_path: str
     auto_review: bool = True
+
+    # Agents configuration
+    max_parallel_tasks: int = Field(default=3, ge=1, le=10)
+
+    # Model configuration per phase
+    planning_model: str = "claude-sonnet-4-20250514"
+    coding_model: str = "claude-sonnet-4-20250514"
+    validation_model: str = "claude-haiku-4-20250514"
+
+    # Git settings
+    auto_create_pr: bool = True
+    pr_template: Optional[str] = None
+
+    # Notification settings
+    enable_sounds: bool = True
+    enable_desktop_notifications: bool = False
 
 
 class TaskCreate(BaseModel):
