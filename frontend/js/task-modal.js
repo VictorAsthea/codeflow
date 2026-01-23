@@ -523,10 +523,17 @@ function renderPRReviewTab() {
 
     container.innerHTML = html;
 
-    // Re-attach checkbox listeners
-    container.querySelectorAll('.pr-comment-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', handleCommentCheckboxChange);
-    });
+    // Use event delegation for checkbox clicks - more reliable than individual listeners
+    // Remove old listener first to avoid duplicates
+    container.removeEventListener('change', handleContainerChange);
+    container.addEventListener('change', handleContainerChange);
+}
+
+function handleContainerChange(event) {
+    console.log('[PR Review] Container change event:', event.target.tagName, event.target.className);
+    if (event.target.classList.contains('pr-comment-checkbox')) {
+        handleCommentCheckboxChange(event);
+    }
 }
 
 function renderComment(comment) {
@@ -561,6 +568,7 @@ function escapeHtml(text) {
 
 function handleCommentCheckboxChange(event) {
     const commentId = parseInt(event.target.dataset.commentId, 10);
+    console.log('[PR Review] Checkbox changed:', commentId, 'checked:', event.target.checked);
 
     if (event.target.checked) {
         selectedCommentIds.add(commentId);
@@ -568,6 +576,7 @@ function handleCommentCheckboxChange(event) {
         selectedCommentIds.delete(commentId);
     }
 
+    console.log('[PR Review] Selected comments:', Array.from(selectedCommentIds));
     updateFixSelectedButton();
 }
 
