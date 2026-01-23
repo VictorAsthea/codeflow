@@ -49,27 +49,29 @@ async def get_all_tasks() -> list[Task]:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM tasks ORDER BY created_at DESC") as cursor:
             rows = await cursor.fetchall()
-            return [
-                Task(
-                    id=row["id"],
-                    title=row["title"],
-                    description=row["description"],
-                    status=TaskStatus(row["status"]),
-                    phases={k: Phase(**v) for k, v in json.loads(row["phases"]).items()},
-                    worktree_path=row["worktree_path"],
-                    branch_name=row["branch_name"],
-                    pr_url=row.get("pr_url"),
-                    pr_number=row.get("pr_number"),
-                    pr_merged=bool(row.get("pr_merged", 0)),
-                    pr_merged_at=datetime.fromisoformat(row["pr_merged_at"]) if row.get("pr_merged_at") else None,
-                    review_issues=json.loads(row["review_issues"]) if row.get("review_issues") else None,
-                    review_cycles=row.get("review_cycles", 0),
-                    review_status=row.get("review_status"),
-                    created_at=datetime.fromisoformat(row["created_at"]),
-                    updated_at=datetime.fromisoformat(row["updated_at"])
-                )
-                for row in rows
-            ]
+            return [_row_to_task(row) for row in rows]
+
+
+def _row_to_task(row) -> Task:
+    """Convert a database row to a Task object."""
+    return Task(
+        id=row["id"],
+        title=row["title"],
+        description=row["description"],
+        status=TaskStatus(row["status"]),
+        phases={k: Phase(**v) for k, v in json.loads(row["phases"]).items()},
+        worktree_path=row["worktree_path"],
+        branch_name=row["branch_name"],
+        pr_url=row["pr_url"],
+        pr_number=row["pr_number"],
+        pr_merged=bool(row["pr_merged"] or 0),
+        pr_merged_at=datetime.fromisoformat(row["pr_merged_at"]) if row["pr_merged_at"] else None,
+        review_issues=json.loads(row["review_issues"]) if row["review_issues"] else None,
+        review_cycles=row["review_cycles"] or 0,
+        review_status=row["review_status"],
+        created_at=datetime.fromisoformat(row["created_at"]),
+        updated_at=datetime.fromisoformat(row["updated_at"])
+    )
 
 
 async def get_task(task_id: str) -> Task | None:
@@ -79,24 +81,7 @@ async def get_task(task_id: str) -> Task | None:
             row = await cursor.fetchone()
             if not row:
                 return None
-            return Task(
-                id=row["id"],
-                title=row["title"],
-                description=row["description"],
-                status=TaskStatus(row["status"]),
-                phases={k: Phase(**v) for k, v in json.loads(row["phases"]).items()},
-                worktree_path=row["worktree_path"],
-                branch_name=row["branch_name"],
-                pr_url=row.get("pr_url"),
-                pr_number=row.get("pr_number"),
-                pr_merged=bool(row.get("pr_merged", 0)),
-                pr_merged_at=datetime.fromisoformat(row["pr_merged_at"]) if row.get("pr_merged_at") else None,
-                review_issues=json.loads(row["review_issues"]) if row.get("review_issues") else None,
-                review_cycles=row.get("review_cycles", 0),
-                review_status=row.get("review_status"),
-                created_at=datetime.fromisoformat(row["created_at"]),
-                updated_at=datetime.fromisoformat(row["updated_at"])
-            )
+            return _row_to_task(row)
 
 
 async def create_task(task: Task):
