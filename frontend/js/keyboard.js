@@ -25,7 +25,7 @@ class KeyboardManager {
    */
   registerDefaults() {
     this.register('k', () => this.navigate('kanban'), 'Go to Kanban board');
-    this.register('w', () => this.toggleWorktrees(), 'Focus first worktree');
+    this.register('w', () => this.navigate('worktrees'), 'Go to Worktrees view');
     this.register('s', () => this.openSettings(), 'Open Settings');
     this.register('[', () => this.toggleSidebar(), 'Toggle sidebar');
     this.register('\\', () => this.toggleSidebar(), 'Toggle sidebar (alt)');
@@ -79,15 +79,30 @@ class KeyboardManager {
    * Navigate to view
    */
   navigate(view) {
-    window.dispatchEvent(new CustomEvent('sidebar-navigate', {
-      detail: { view }
-    }));
+    // Hide all views
+    document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
 
+    // Show target view
+    const targetView = document.getElementById(`${view}-view`);
+    if (targetView) {
+      targetView.classList.remove('hidden');
+    }
+
+    // Update nav active state
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
       const itemView = item.getAttribute('href')?.substring(1);
       item.classList.toggle('active', itemView === view);
     });
+
+    // Dispatch event for view-specific initialization
+    window.dispatchEvent(new CustomEvent('view-changed', {
+      detail: { view }
+    }));
+
+    window.dispatchEvent(new CustomEvent('sidebar-navigate', {
+      detail: { view }
+    }));
   }
 
   /**
