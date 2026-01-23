@@ -70,6 +70,9 @@ class Task(BaseModel):
     worktree_path: str | None = None
     branch_name: str | None = None
     pr_url: str | None = None
+    pr_number: int | None = None
+    pr_merged: bool = False
+    pr_merged_at: datetime | None = None
     skip_ai_review: bool = False
     agent_profile: AgentProfile = AgentProfile.BALANCED
     require_human_review_before_coding: bool = False

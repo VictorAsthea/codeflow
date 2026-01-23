@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     # Parallel task execution
     max_parallel_tasks: int = 3
 
+    # PR monitoring settings
+    pr_monitoring_enabled: bool = True
+    pr_check_interval: int = 300
+    github_webhook_secret: str | None = None
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
