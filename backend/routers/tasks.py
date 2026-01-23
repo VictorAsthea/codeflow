@@ -561,11 +561,13 @@ async def create_pull_request(task_id: str):
         if pr_match:
             task.pr_number = int(pr_match.group(1))
 
-        task.status = TaskStatus.DONE
+        # Stay in HUMAN_REVIEW to allow viewing PR reviews (CodeRabbit, etc)
+        # Task moves to DONE when PR is merged or manually moved
+        task.status = TaskStatus.HUMAN_REVIEW
         task.updated_at = datetime.now()
         get_storage().update_task(task)
 
-        return {"message": "PR created", "pr_url": pr_url, "task": task}
+        return {"message": "PR created - check PR Review tab for bot comments", "pr_url": pr_url, "task": task}
 
     except FileNotFoundError:
         raise HTTPException(status_code=500, detail="GitHub CLI (gh) is not installed")
