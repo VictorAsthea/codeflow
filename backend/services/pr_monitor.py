@@ -4,11 +4,16 @@ import logging
 import json
 from datetime import datetime
 from typing import Optional
-from backend.database import get_all_tasks, get_task, update_task
 from backend.models import TaskStatus
 from backend.services.worktree_manager import WorktreeManager
 
 logger = logging.getLogger(__name__)
+
+
+def get_storage():
+    """Get storage instance (lazy import to avoid circular dependency)"""
+    from backend.main import storage
+    return storage
 
 
 class PRMonitor:
@@ -52,7 +57,7 @@ class PRMonitor:
 
     async def _check_all_prs(self):
         """Check all tasks with PRs for merged status"""
-        tasks = await get_all_tasks()
+        tasks = get_storage().load_tasks()
 
         for task in tasks:
             if task.pr_number and not task.pr_merged and task.status == TaskStatus.DONE:
@@ -89,7 +94,7 @@ class PRMonitor:
 
     async def _handle_pr_merged(self, task_id: str):
         """Handle a merged PR: cleanup worktree and mark task as done"""
-        task = await get_task(task_id)
+        task = get_storage().get_task(task_id)
         if not task:
             logger.error(f"Task {task_id} not found")
             return
@@ -106,7 +111,7 @@ class PRMonitor:
             except Exception as e:
                 logger.error(f"Failed to remove worktree for task {task_id}: {e}")
 
-        await update_task(task)
+        get_storage().update_task(task)
         logger.info(f"Task {task_id} marked as merged and cleaned up")
 
     async def check_pr_status_by_webhook(self, pr_number: int, merged: bool, merged_at: Optional[str] = None):
@@ -114,7 +119,7 @@ class PRMonitor:
         if not merged:
             return
 
-        tasks = await get_all_tasks()
+        tasks = get_storage().load_tasks()
         for task in tasks:
             if task.pr_number == pr_number and not task.pr_merged:
                 logger.info(f"Webhook received: PR #{pr_number} merged for task {task.id}")

@@ -1,3 +1,9 @@
+"""
+DEPRECATED - Only used for migration from SQLite to JSON storage.
+This module will be removed in a future version once all users have migrated.
+
+New code should use backend.services.json_storage.JSONStorage instead.
+"""
 import json
 import aiosqlite
 from pathlib import Path
