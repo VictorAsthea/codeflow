@@ -1,4 +1,7 @@
 import { API } from './api.js';
+import { MentionAutocomplete } from './mention-autocomplete.js';
+import { ImagePasteHandler } from './image-paste-handler.js';
+import { FilePicker } from './file-picker.js';
 
 let tasks = [];
 

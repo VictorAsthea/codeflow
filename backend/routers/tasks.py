@@ -69,16 +69,64 @@ async def list_tasks():
 @router.post("/tasks")
 async def create_new_task(task_data: TaskCreate):
     """Create a new task"""
+    from backend.config import AGENT_PROFILES
+    from backend.services.title_generator import generate_title
+
+    title = task_data.title
+    if not title:
+        title = await generate_title(task_data.description)
+
     existing_tasks = await get_all_tasks()
-    task_id = generate_task_id(task_data.title, existing_tasks)
+    task_id = generate_task_id(title, existing_tasks)
+
+    if task_data.planning_config:
+        planning_config = task_data.planning_config
+    else:
+        planning_config = AGENT_PROFILES[task_data.agent_profile.value]["planning"]
+
+    if task_data.coding_config:
+        coding_config = task_data.coding_config
+    else:
+        coding_config = AGENT_PROFILES[task_data.agent_profile.value]["coding"]
+
+    if task_data.validation_config:
+        validation_config = task_data.validation_config
+    else:
+        validation_config = AGENT_PROFILES[task_data.agent_profile.value]["validation"]
+
+    phases = {
+        "planning": Phase(
+            name="planning",
+            config=planning_config
+        ),
+        "coding": Phase(
+            name="coding",
+            config=coding_config
+        ),
+        "validation": Phase(
+            name="validation",
+            config=validation_config
+        )
+    }
+
+    branch_name = None
+    if task_data.git_options and task_data.git_options.branch_name:
+        branch_name = task_data.git_options.branch_name
+    else:
+        branch_name = f"task/{task_id}"
 
     task = Task(
         id=task_id,
-        title=task_data.title,
+        title=title,
         description=task_data.description,
         status=TaskStatus.BACKLOG,
-        phases=create_default_phases(),
-        skip_ai_review=task_data.skip_ai_review
+        phases=phases,
+        branch_name=branch_name,
+        skip_ai_review=task_data.skip_ai_review,
+        agent_profile=task_data.agent_profile,
+        require_human_review_before_coding=task_data.require_human_review_before_coding,
+        file_references=task_data.file_references,
+        screenshots=task_data.screenshots
     )
 
     await db_create_task(task)
