@@ -1,15 +1,21 @@
 from fastapi import APIRouter
 import json
 from backend.models import GlobalConfig
-from backend.main import storage
 from backend.config import settings as app_settings
 
 router = APIRouter()
 
 
+def get_storage():
+    """Get storage instance (lazy import to avoid circular dependency)"""
+    from backend.main import storage
+    return storage
+
+
 @router.get("/settings")
 async def get_settings():
     """Get global configuration"""
+    storage = get_storage()
     config_data = storage.get_config("global")
 
     if config_data:
@@ -28,5 +34,6 @@ async def get_settings():
 @router.patch("/settings")
 async def update_settings(config: GlobalConfig):
     """Update global configuration"""
+    storage = get_storage()
     storage.set_config("global", config.model_dump())
     return config
