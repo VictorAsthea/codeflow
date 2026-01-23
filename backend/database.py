@@ -54,21 +54,27 @@ async def get_all_tasks() -> list[Task]:
 
 def _row_to_task(row) -> Task:
     """Convert a database row to a Task object."""
+    # Get available columns to handle older database schemas
+    cols = set(row.keys())
+
+    def get_col(name, default=None):
+        return row[name] if name in cols else default
+
     return Task(
         id=row["id"],
         title=row["title"],
         description=row["description"],
         status=TaskStatus(row["status"]),
         phases={k: Phase(**v) for k, v in json.loads(row["phases"]).items()},
-        worktree_path=row["worktree_path"],
-        branch_name=row["branch_name"],
-        pr_url=row["pr_url"],
-        pr_number=row["pr_number"],
-        pr_merged=bool(row["pr_merged"] or 0),
-        pr_merged_at=datetime.fromisoformat(row["pr_merged_at"]) if row["pr_merged_at"] else None,
-        review_issues=json.loads(row["review_issues"]) if row["review_issues"] else None,
-        review_cycles=row["review_cycles"] or 0,
-        review_status=row["review_status"],
+        worktree_path=get_col("worktree_path"),
+        branch_name=get_col("branch_name"),
+        pr_url=get_col("pr_url"),
+        pr_number=get_col("pr_number"),
+        pr_merged=bool(get_col("pr_merged", 0) or 0),
+        pr_merged_at=datetime.fromisoformat(row["pr_merged_at"]) if get_col("pr_merged_at") else None,
+        review_issues=json.loads(row["review_issues"]) if get_col("review_issues") else None,
+        review_cycles=get_col("review_cycles", 0) or 0,
+        review_status=get_col("review_status"),
         created_at=datetime.fromisoformat(row["created_at"]),
         updated_at=datetime.fromisoformat(row["updated_at"])
     )
