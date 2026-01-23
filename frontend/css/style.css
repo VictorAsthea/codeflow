@@ -34,8 +34,10 @@ body {
 
 #app {
   min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .header {
@@ -45,6 +47,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .header h1 {
@@ -80,6 +83,7 @@ body {
   gap: 1rem;
   padding: 2rem;
   overflow-x: auto;
+  height: 100%;
 }
 
 .column {
@@ -541,4 +545,5 @@ body {
   text-align: center;
   font-size: 0.8rem;
   color: var(--text-secondary);
+  flex-shrink: 0;
 }
