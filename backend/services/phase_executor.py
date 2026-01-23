@@ -27,6 +27,8 @@ TÂCHE: {task_description}
 PLAN:
 {planning_output}
 
+{review_context}
+
 IMPLÉMENTE DIRECTEMENT sans attendre de réponse:
 - Crée/modifie les fichiers nécessaires
 - Code propre et documenté
@@ -34,29 +36,13 @@ IMPLÉMENTE DIRECTEMENT sans attendre de réponse:
 - Pas de TODO ou FIXME
 - Commits atomiques avec messages clairs
 
-IMPORTANT: N'attends AUCUNE réponse utilisateur. Implémente directement selon la description.""",
-
-    "validation": """Tu es un QA engineer. Valide l'implémentation MAINTENANT.
-
-TÂCHE: {task_description}
-
-Vérifie:
-1. Le code compile/s'exécute sans erreur
-2. Les tests passent
-3. Pas de régression
-4. Code review (style, sécurité, performance)
-
-Si problème trouvé, liste les corrections nécessaires.
-Sinon, confirme que la tâche est prête pour review humaine.
-
-IMPORTANT: Ne pose AUCUNE question. Exécute les vérifications directement."""
+IMPORTANT: N'attends AUCUNE réponse utilisateur. Implémente directement selon la description."""
 }
 
 
 PHASE_TOOLS = {
     "planning": ["Read", "Grep", "Glob"],
-    "coding": ["Read", "Edit", "Write", "Bash", "Grep", "Glob"],
-    "validation": ["Read", "Bash", "Grep", "Glob"]
+    "coding": ["Read", "Edit", "Write", "Bash", "Grep", "Glob"]
 }
 
 
@@ -91,17 +77,19 @@ async def execute_phase(
     phase_name: str,
     working_dir: str,
     log_callback: Callable[[str], Any] = None,
-    websocket_manager = None
+    websocket_manager = None,
+    review_context: str = ""
 ) -> dict:
     """
     Execute a single phase of a task
 
     Args:
         task: The task to execute
-        phase_name: Name of the phase (planning, coding, validation)
+        phase_name: Name of the phase (planning, coding)
         working_dir: Working directory for execution
         log_callback: Optional callback for streaming logs
         websocket_manager: WebSocket manager for broadcasting progress updates
+        review_context: Optional context from code review for fixing issues
 
     Returns:
         dict with success status and output
@@ -136,7 +124,8 @@ async def execute_phase(
 
     prompt = prompt_template.format(
         task_description=f"{task.title}\n\n{task.description}",
-        planning_output=planning_output
+        planning_output=planning_output,
+        review_context=review_context
     )
 
     print(f"[DEBUG] execute_phase: {phase_name}, callback: {log_callback is not None}")
@@ -304,7 +293,8 @@ async def execute_all_phases(
     task: Task,
     working_dir: str,
     log_callback: Callable[[str], Any] = None,
-    websocket_manager = None
+    websocket_manager = None,
+    review_context: str = ""
 ) -> dict:
     """
     Execute all phases of a task sequentially
@@ -314,18 +304,22 @@ async def execute_all_phases(
         working_dir: Working directory for execution
         log_callback: Optional callback for streaming logs
         websocket_manager: WebSocket manager for broadcasting progress updates
+        review_context: Optional context from code review for fixing issues
 
     Returns:
         dict with overall success status
     """
-    phases_to_run = ["planning", "coding", "validation"]
+    phases_to_run = ["planning", "coding"]
     results = {}
 
     for phase_name in phases_to_run:
         if log_callback:
             await log_callback(f"\n=== Starting {phase_name} phase ===\n")
 
-        result = await execute_phase(task, phase_name, working_dir, log_callback, websocket_manager)
+        result = await execute_phase(
+            task, phase_name, working_dir, log_callback,
+            websocket_manager, review_context
+        )
         results[phase_name] = result
 
         if not result["success"]:

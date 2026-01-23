@@ -8,8 +8,13 @@ from backend.models import (
     Task, TaskCreate, TaskUpdate, TaskStatus, PhaseConfigUpdate,
     Phase, PhaseConfig, PhaseStatus
 )
-from backend.main import storage
 from backend.config import settings
+
+
+def get_storage():
+    """Get storage instance (lazy import to avoid circular dependency)"""
+    from backend.main import storage
+    return storage
 from backend.services.worktree_manager import WorktreeManager
 from backend.services.phase_executor import execute_all_phases
 from backend.services.task_queue import task_queue
@@ -30,7 +35,7 @@ def generate_task_id(title: str, existing_tasks: list[Task]) -> str:
 @router.get("/tasks")
 async def list_tasks():
     """List all tasks"""
-    tasks = storage.load_tasks()
+    tasks = get_storage().load_tasks()
     return {"tasks": tasks}
 
 
@@ -44,7 +49,7 @@ async def create_new_task(task_data: TaskCreate):
     if not title:
         title = await generate_title(task_data.description)
 
-    existing_tasks = storage.load_tasks()
+    existing_tasks = get_storage().load_tasks()
     task_id = generate_task_id(title, existing_tasks)
 
     if task_data.planning_config:
@@ -57,11 +62,6 @@ async def create_new_task(task_data: TaskCreate):
     else:
         coding_config = AGENT_PROFILES[task_data.agent_profile.value]["coding"]
 
-    if task_data.validation_config:
-        validation_config = task_data.validation_config
-    else:
-        validation_config = AGENT_PROFILES[task_data.agent_profile.value]["validation"]
-
     phases = {
         "planning": Phase(
             name="planning",
@@ -70,10 +70,6 @@ async def create_new_task(task_data: TaskCreate):
         "coding": Phase(
             name="coding",
             config=coding_config
-        ),
-        "validation": Phase(
-            name="validation",
-            config=validation_config
         )
     }
 
@@ -97,14 +93,14 @@ async def create_new_task(task_data: TaskCreate):
         screenshots=task_data.screenshots
     )
 
-    storage.create_task(task)
+    get_storage().create_task(task)
     return task
 
 
 @router.get("/tasks/{task_id}")
 async def get_task_detail(task_id: str):
     """Get task detail"""
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
@@ -113,7 +109,7 @@ async def get_task_detail(task_id: str):
 @router.patch("/tasks/{task_id}")
 async def update_task_detail(task_id: str, task_data: TaskUpdate):
     """Update task"""
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -127,18 +123,18 @@ async def update_task_detail(task_id: str, task_data: TaskUpdate):
         task.skip_ai_review = task_data.skip_ai_review
 
     task.updated_at = datetime.now()
-    storage.update_task(task)
+    get_storage().update_task(task)
     return task
 
 
 @router.delete("/tasks/{task_id}")
 async def delete_task_endpoint(task_id: str):
     """Delete a task"""
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    storage.delete_task(task_id)
+    get_storage().delete_task(task_id)
     return {"message": "Task deleted successfully"}
 
 
@@ -146,7 +142,7 @@ async def execute_task_background(task_id: str, project_path: str):
     """Background task to execute all phases of a task"""
     print(f"[DEBUG] Background task started for task {task_id}")
 
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     if not task:
         print(f"[DEBUG] Task {task_id} not found")
         return
@@ -171,25 +167,32 @@ async def execute_task_background(task_id: str, project_path: str):
         worktree_path = worktree_mgr.create(task.id, branch_name)
         task.worktree_path = str(worktree_path)
         task.branch_name = branch_name
-        storage.update_task(task)
+        get_storage().update_task(task)
 
         await log_handler(f"Worktree created at: {worktree_path}")
 
         result = await execute_all_phases(task, str(worktree_path), log_handler, manager)
 
         if result["success"]:
-            if task.skip_ai_review:
+            if task.skip_ai_review or not settings.code_review_auto:
                 task.status = TaskStatus.HUMAN_REVIEW
                 await log_handler("\n=== All phases completed successfully (AI Review skipped) ===")
             else:
                 task.status = TaskStatus.AI_REVIEW
                 await log_handler("\n=== All phases completed successfully ===")
+
+            task.updated_at = datetime.now()
+            get_storage().update_task(task)
+
+            # Run AI review if enabled
+            if task.status == TaskStatus.AI_REVIEW:
+                from backend.services.task_orchestrator import handle_ai_review
+                await handle_ai_review(task, log_handler)
         else:
             task.status = TaskStatus.IN_PROGRESS
             await log_handler("\n=== Execution stopped due to errors ===")
-
-        task.updated_at = datetime.now()
-        storage.update_task(task)
+            task.updated_at = datetime.now()
+            get_storage().update_task(task)
 
         await log_handler(f"\nTask status updated to: {task.status.value}")
 
@@ -197,13 +200,13 @@ async def execute_task_background(task_id: str, project_path: str):
         await log_handler(f"\nERROR: {str(e)}")
         task.status = TaskStatus.BACKLOG
         task.updated_at = datetime.now()
-        storage.update_task(task)
+        get_storage().update_task(task)
 
 
 @router.post("/tasks/{task_id}/start")
 async def start_task(task_id: str):
     """Start task execution immediately (bypasses queue)"""
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -212,7 +215,7 @@ async def start_task(task_id: str):
 
     task.status = TaskStatus.IN_PROGRESS
     task.updated_at = datetime.now()
-    storage.update_task(task)
+    get_storage().update_task(task)
 
     asyncio.create_task(execute_task_background(task_id, settings.project_path))
 
@@ -222,7 +225,7 @@ async def start_task(task_id: str):
 @router.post("/tasks/{task_id}/queue")
 async def queue_task(task_id: str):
     """Add task to the execution queue"""
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -237,14 +240,14 @@ async def queue_task(task_id: str):
         raise HTTPException(status_code=500, detail="Failed to queue task")
 
     # Refresh task
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     return {"message": "Task queued", "task": task, "queue_status": task_queue.get_status()}
 
 
 @router.delete("/tasks/{task_id}/queue")
 async def unqueue_task(task_id: str):
     """Remove task from the queue"""
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -256,7 +259,7 @@ async def unqueue_task(task_id: str):
         raise HTTPException(status_code=400, detail="Task not found in queue or already running")
 
     # Refresh task
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     return {"message": "Task removed from queue", "task": task}
 
 
@@ -269,13 +272,13 @@ async def get_queue_status():
 @router.post("/tasks/{task_id}/stop")
 async def stop_task(task_id: str):
     """Stop task execution"""
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
     task.status = TaskStatus.BACKLOG
     task.updated_at = datetime.now()
-    storage.update_task(task)
+    get_storage().update_task(task)
 
     return {"message": "Task stopped", "task": task}
 
@@ -283,13 +286,13 @@ async def stop_task(task_id: str):
 @router.post("/tasks/{task_id}/resume")
 async def resume_task(task_id: str):
     """Resume a task"""
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
     task.status = TaskStatus.IN_PROGRESS
     task.updated_at = datetime.now()
-    storage.update_task(task)
+    get_storage().update_task(task)
 
     return {"message": "Task resumed", "task": task}
 
@@ -297,7 +300,7 @@ async def resume_task(task_id: str):
 @router.patch("/tasks/{task_id}/status")
 async def change_task_status(task_id: str, status_data: dict):
     """Change task status (for drag & drop)"""
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -308,7 +311,7 @@ async def change_task_status(task_id: str, status_data: dict):
     try:
         task.status = TaskStatus(new_status)
         task.updated_at = datetime.now()
-        storage.update_task(task)
+        get_storage().update_task(task)
         return task
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid status")
@@ -317,7 +320,7 @@ async def change_task_status(task_id: str, status_data: dict):
 @router.patch("/tasks/{task_id}/phases/{phase_name}")
 async def update_phase_config(task_id: str, phase_name: str, config_data: PhaseConfigUpdate):
     """Update phase configuration"""
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -334,14 +337,14 @@ async def update_phase_config(task_id: str, phase_name: str, config_data: PhaseC
         phase.config.max_turns = config_data.max_turns
 
     task.updated_at = datetime.now()
-    storage.update_task(task)
+    get_storage().update_task(task)
     return {"message": "Phase config updated", "phase": phase}
 
 
 @router.post("/tasks/{task_id}/phases/{phase_name}/retry")
 async def retry_phase(task_id: str, phase_name: str):
     """Retry a failed phase"""
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -355,14 +358,87 @@ async def retry_phase(task_id: str, phase_name: str):
     phase.completed_at = None
 
     task.updated_at = datetime.now()
-    storage.update_task(task)
+    get_storage().update_task(task)
     return {"message": "Phase reset for retry", "phase": phase}
+
+
+@router.post("/tasks/{task_id}/review/accept")
+async def accept_review(task_id: str):
+    """Accept AI review and proceed to human review"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status != TaskStatus.AI_REVIEW:
+        raise HTTPException(status_code=400, detail="Task must be in ai_review status")
+
+    task.status = TaskStatus.HUMAN_REVIEW
+    task.review_status = "accepted"
+    task.updated_at = datetime.now()
+    get_storage().update_task(task)
+
+    return {"message": "Review accepted", "task": task}
+
+
+@router.post("/tasks/{task_id}/review/skip")
+async def skip_review(task_id: str):
+    """Skip AI review and proceed to human review"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status != TaskStatus.AI_REVIEW:
+        raise HTTPException(status_code=400, detail="Task must be in ai_review status")
+
+    task.status = TaskStatus.HUMAN_REVIEW
+    task.review_status = "skipped"
+    task.updated_at = datetime.now()
+    get_storage().update_task(task)
+
+    return {"message": "Review skipped", "task": task}
+
+
+@router.post("/tasks/{task_id}/review/retry")
+async def retry_review_fixes(task_id: str):
+    """Retry with auto-fix for review issues"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status != TaskStatus.AI_REVIEW:
+        raise HTTPException(status_code=400, detail="Task must be in ai_review status")
+
+    async def log_handler(message: str):
+        await manager.send_log(task_id, message)
+
+    from backend.services.task_orchestrator import retry_with_review_fixes
+
+    asyncio.create_task(retry_with_review_fixes(task, log_handler))
+
+    return {"message": "Retrying with fixes", "task": task}
+
+
+@router.get("/tasks/{task_id}/review/status")
+async def get_review_status(task_id: str):
+    """Get review status for a task"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return {
+        "task_id": task.id,
+        "status": task.status.value,
+        "review_status": task.review_status,
+        "review_cycles": task.review_cycles,
+        "review_issues": task.review_issues,
+        "max_cycles": settings.code_review_max_cycles
+    }
 
 
 @router.post("/tasks/{task_id}/create-pr")
 async def create_pull_request(task_id: str):
     """Create a pull request for the task"""
-    task = storage.get_task(task_id)
+    task = get_storage().get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -429,7 +505,7 @@ async def create_pull_request(task_id: str):
 
         task.status = TaskStatus.DONE
         task.updated_at = datetime.now()
-        storage.update_task(task)
+        get_storage().update_task(task)
 
         return {"message": "PR created", "pr_url": pr_url, "task": task}
 
