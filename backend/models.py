@@ -78,6 +78,9 @@ class Task(BaseModel):
     require_human_review_before_coding: bool = False
     file_references: list[FileReference] = Field(default_factory=list)
     screenshots: list[str] = Field(default_factory=list)
+    review_issues: list[dict] | None = None
+    review_cycles: int = 0
+    review_status: str | None = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 

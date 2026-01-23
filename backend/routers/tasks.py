@@ -57,11 +57,6 @@ async def create_new_task(task_data: TaskCreate):
     else:
         coding_config = AGENT_PROFILES[task_data.agent_profile.value]["coding"]
 
-    if task_data.validation_config:
-        validation_config = task_data.validation_config
-    else:
-        validation_config = AGENT_PROFILES[task_data.agent_profile.value]["validation"]
-
     phases = {
         "planning": Phase(
             name="planning",
@@ -70,10 +65,6 @@ async def create_new_task(task_data: TaskCreate):
         "coding": Phase(
             name="coding",
             config=coding_config
-        ),
-        "validation": Phase(
-            name="validation",
-            config=validation_config
         )
     }
 
@@ -178,18 +169,25 @@ async def execute_task_background(task_id: str, project_path: str):
         result = await execute_all_phases(task, str(worktree_path), log_handler, manager)
 
         if result["success"]:
-            if task.skip_ai_review:
+            if task.skip_ai_review or not settings.code_review_auto:
                 task.status = TaskStatus.HUMAN_REVIEW
                 await log_handler("\n=== All phases completed successfully (AI Review skipped) ===")
             else:
                 task.status = TaskStatus.AI_REVIEW
                 await log_handler("\n=== All phases completed successfully ===")
+
+            task.updated_at = datetime.now()
+            storage.update_task(task)
+
+            # Run AI review if enabled
+            if task.status == TaskStatus.AI_REVIEW:
+                from backend.services.task_orchestrator import handle_ai_review
+                await handle_ai_review(task, log_handler)
         else:
             task.status = TaskStatus.IN_PROGRESS
             await log_handler("\n=== Execution stopped due to errors ===")
-
-        task.updated_at = datetime.now()
-        storage.update_task(task)
+            task.updated_at = datetime.now()
+            storage.update_task(task)
 
         await log_handler(f"\nTask status updated to: {task.status.value}")
 
@@ -357,6 +355,79 @@ async def retry_phase(task_id: str, phase_name: str):
     task.updated_at = datetime.now()
     storage.update_task(task)
     return {"message": "Phase reset for retry", "phase": phase}
+
+
+@router.post("/tasks/{task_id}/review/accept")
+async def accept_review(task_id: str):
+    """Accept AI review and proceed to human review"""
+    task = storage.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status != TaskStatus.AI_REVIEW:
+        raise HTTPException(status_code=400, detail="Task must be in ai_review status")
+
+    task.status = TaskStatus.HUMAN_REVIEW
+    task.review_status = "accepted"
+    task.updated_at = datetime.now()
+    storage.update_task(task)
+
+    return {"message": "Review accepted", "task": task}
+
+
+@router.post("/tasks/{task_id}/review/skip")
+async def skip_review(task_id: str):
+    """Skip AI review and proceed to human review"""
+    task = storage.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status != TaskStatus.AI_REVIEW:
+        raise HTTPException(status_code=400, detail="Task must be in ai_review status")
+
+    task.status = TaskStatus.HUMAN_REVIEW
+    task.review_status = "skipped"
+    task.updated_at = datetime.now()
+    storage.update_task(task)
+
+    return {"message": "Review skipped", "task": task}
+
+
+@router.post("/tasks/{task_id}/review/retry")
+async def retry_review_fixes(task_id: str):
+    """Retry with auto-fix for review issues"""
+    task = storage.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status != TaskStatus.AI_REVIEW:
+        raise HTTPException(status_code=400, detail="Task must be in ai_review status")
+
+    async def log_handler(message: str):
+        await manager.send_log(task_id, message)
+
+    from backend.services.task_orchestrator import retry_with_review_fixes
+
+    asyncio.create_task(retry_with_review_fixes(task, log_handler))
+
+    return {"message": "Retrying with fixes", "task": task}
+
+
+@router.get("/tasks/{task_id}/review/status")
+async def get_review_status(task_id: str):
+    """Get review status for a task"""
+    task = storage.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return {
+        "task_id": task.id,
+        "status": task.status.value,
+        "review_status": task.review_status,
+        "review_cycles": task.review_cycles,
+        "review_issues": task.review_issues,
+        "max_cycles": settings.code_review_max_cycles
+    }
 
 
 @router.post("/tasks/{task_id}/create-pr")

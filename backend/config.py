@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     pr_check_interval: int = 300
     github_webhook_secret: str | None = None
 
+    # Code review settings
+    code_review_auto: bool = True
+    code_review_auto_fix: bool = True
+    code_review_max_cycles: int = 2
+    code_review_confidence_threshold: float = 80.0
+    code_review_timeout: int = 60
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

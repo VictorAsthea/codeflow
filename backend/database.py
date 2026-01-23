@@ -26,6 +26,9 @@ async def init_db():
                 pr_number INTEGER,
                 pr_merged INTEGER DEFAULT 0,
                 pr_merged_at TEXT,
+                review_issues TEXT,
+                review_cycles INTEGER DEFAULT 0,
+                review_status TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
@@ -59,6 +62,9 @@ async def get_all_tasks() -> list[Task]:
                     pr_number=row.get("pr_number"),
                     pr_merged=bool(row.get("pr_merged", 0)),
                     pr_merged_at=datetime.fromisoformat(row["pr_merged_at"]) if row.get("pr_merged_at") else None,
+                    review_issues=json.loads(row["review_issues"]) if row.get("review_issues") else None,
+                    review_cycles=row.get("review_cycles", 0),
+                    review_status=row.get("review_status"),
                     created_at=datetime.fromisoformat(row["created_at"]),
                     updated_at=datetime.fromisoformat(row["updated_at"])
                 )
@@ -85,6 +91,9 @@ async def get_task(task_id: str) -> Task | None:
                 pr_number=row.get("pr_number"),
                 pr_merged=bool(row.get("pr_merged", 0)),
                 pr_merged_at=datetime.fromisoformat(row["pr_merged_at"]) if row.get("pr_merged_at") else None,
+                review_issues=json.loads(row["review_issues"]) if row.get("review_issues") else None,
+                review_cycles=row.get("review_cycles", 0),
+                review_status=row.get("review_status"),
                 created_at=datetime.fromisoformat(row["created_at"]),
                 updated_at=datetime.fromisoformat(row["updated_at"])
             )
@@ -94,8 +103,10 @@ async def create_task(task: Task):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             """
-            INSERT INTO tasks (id, title, description, status, phases, worktree_path, branch_name, pr_url, pr_number, pr_merged, pr_merged_at, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO tasks (id, title, description, status, phases, worktree_path, branch_name,
+                pr_url, pr_number, pr_merged, pr_merged_at,
+                review_issues, review_cycles, review_status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 task.id,
@@ -109,6 +120,9 @@ async def create_task(task: Task):
                 task.pr_number,
                 int(task.pr_merged),
                 task.pr_merged_at.isoformat() if task.pr_merged_at else None,
+                json.dumps(task.review_issues) if task.review_issues else None,
+                task.review_cycles,
+                task.review_status,
                 task.created_at.isoformat(),
                 task.updated_at.isoformat()
             )
@@ -122,8 +136,9 @@ async def update_task(task: Task):
             """
             UPDATE tasks
             SET title = ?, description = ?, status = ?, phases = ?,
-                worktree_path = ?, branch_name = ?, pr_url = ?, pr_number = ?,
-                pr_merged = ?, pr_merged_at = ?, updated_at = ?
+                worktree_path = ?, branch_name = ?,
+                pr_url = ?, pr_number = ?, pr_merged = ?, pr_merged_at = ?,
+                review_issues = ?, review_cycles = ?, review_status = ?, updated_at = ?
             WHERE id = ?
             """,
             (
@@ -137,6 +152,9 @@ async def update_task(task: Task):
                 task.pr_number,
                 int(task.pr_merged),
                 task.pr_merged_at.isoformat() if task.pr_merged_at else None,
+                json.dumps(task.review_issues) if task.review_issues else None,
+                task.review_cycles,
+                task.review_status,
                 datetime.now().isoformat(),
                 task.id
             )
