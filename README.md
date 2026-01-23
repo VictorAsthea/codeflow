@@ -2,8 +2,7 @@
 
 **Gestionnaire de tâches Kanban avec orchestration Claude Code CLI**
 
-[![GitHub Release](https://img.shields.io/github/v/release/VictorAsthea/codeflow?style=flat-square&logo=github)](https://github.com/VictorAsthea/codeflow/releases)
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%20v3-blue.svg?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/github/license/VictorAsthea/codeflow?style=flat-square)](LICENSE)
 [![Made with Claude](https://img.shields.io/badge/Made%20with-Claude-FF6B35?style=flat-square&logo=anthropic)](https://claude.ai)
 [![Python Version](https://img.shields.io/badge/Python-3.10+-blue?style=flat-square&logo=python&logoColor=white)](https://python.org)
 
