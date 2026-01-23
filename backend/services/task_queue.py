@@ -47,6 +47,7 @@ class TaskQueue:
 
     async def _worker_loop(self):
         """Main worker loop that dequeues and executes tasks"""
+        print("[TaskQueue] Worker loop started")
         while not self._shutdown:
             try:
                 # Wait for a task from the queue (with timeout to check shutdown)
@@ -57,8 +58,11 @@ class TaskQueue:
                 except asyncio.TimeoutError:
                     continue
 
+                print(f"[TaskQueue] Dequeued task {task_id}, waiting for semaphore...")
+
                 # Acquire semaphore slot
                 await self._semaphore.acquire()
+                print(f"[TaskQueue] Semaphore acquired for {task_id}")
 
                 # Create and track the task
                 task_coro = self._execute_task(task_id, project_path)
@@ -66,11 +70,23 @@ class TaskQueue:
 
             except Exception as e:
                 print(f"[TaskQueue] Worker error: {e}")
+                import traceback
+                traceback.print_exc()
 
     async def _execute_task(self, task_id: str, project_path: str):
         """Execute a single task with semaphore management"""
+        from backend.main import storage
+
         try:
             print(f"[TaskQueue] Starting task {task_id}")
+
+            # Update task status to IN_PROGRESS
+            task = storage.get_task(task_id)
+            if task:
+                task.status = TaskStatus.IN_PROGRESS
+                task.updated_at = datetime.now()
+                storage.update_task(task)
+                print(f"[TaskQueue] Task {task_id} status updated to IN_PROGRESS")
 
             if self._executor:
                 await self._executor(task_id, project_path)
