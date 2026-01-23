@@ -109,19 +109,23 @@ async def run_code_review(
         print(f"[CODE_REVIEW] Using Claude CLI: {claude_cli}")
 
         # Build code review prompt
-        review_prompt = """Review the recent code changes in this git worktree. Focus on:
-1. Bugs and logical errors
-2. Security vulnerabilities
-3. Performance issues
-4. Code quality problems
+        review_prompt = """You are a code reviewer. Review the recent git changes and find bugs, security issues, or problems.
 
-For each issue found, output a JSON object with this format:
-{"severity": "error|warning|info", "confidence": 0-100, "message": "description", "file_path": "path/to/file", "line_number": 123}
+IMPORTANT: You MUST output your findings as JSON only. No markdown, no explanations.
 
-Output ONLY valid JSON objects, one per line. If no issues are found, output: {"no_issues": true}
+Steps:
+1. Run: git diff HEAD~1 --name-only (to see changed files)
+2. Run: git diff HEAD~1 (to see the actual changes)
+3. For EACH issue found, output exactly this JSON format (one per line):
+{"severity": "error", "confidence": 85, "message": "Description of the bug or issue", "file_path": "path/to/file.py", "line_number": 42}
 
-Start by running: git diff HEAD~1 --name-only
-Then review each changed file."""
+Severity levels: "error" (bugs, security), "warning" (potential issues), "info" (style)
+Confidence: 0-100 (how sure you are this is a real issue)
+
+If you find NO issues after reviewing, output exactly:
+{"no_issues": true, "summary": "Code looks good"}
+
+DO NOT output markdown. DO NOT explain. ONLY output JSON lines."""
 
         # Execute claude with review prompt
         process = await asyncio.create_subprocess_exec(
