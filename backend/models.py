@@ -31,11 +31,21 @@ class PhaseConfig(BaseModel):
     max_turns: int = 10
 
 
+class PhaseMetrics(BaseModel):
+    current_turn: int = 0
+    estimated_turns: int = 0
+    elapsed_time: float = 0.0
+    estimated_remaining: float | None = None
+    progress_percentage: int = 0
+    last_log_preview: str = ""
+
+
 class Phase(BaseModel):
     name: str
     status: PhaseStatus = PhaseStatus.PENDING
     config: PhaseConfig
     logs: list[str] = Field(default_factory=list)
+    metrics: PhaseMetrics = Field(default_factory=PhaseMetrics)
     started_at: datetime | None = None
     completed_at: datetime | None = None
 

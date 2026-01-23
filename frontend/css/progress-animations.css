@@ -1,0 +1,218 @@
+/* Progress Animations - Auto-Claude inspired UI enhancements */
+
+/* Spinner Animation */
+@keyframes spinner {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Progress Pulse Animation */
+@keyframes progress-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Shimmer Animation for Progress Bar */
+@keyframes shimmer {
+    0% { background-position: -200px 0; }
+    100% { background-position: 200px 0; }
+}
+
+/* Spinner Element */
+.spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--bg-tertiary);
+    border-top-color: var(--accent-blue);
+    border-radius: 50%;
+    animation: spinner 0.8s linear infinite;
+    vertical-align: middle;
+}
+
+/* Animated Progress Bar */
+.progress-bar-animated .progress-fill {
+    animation: progress-pulse 2s ease-in-out infinite;
+    background: linear-gradient(
+        90deg,
+        var(--accent-blue) 0%,
+        var(--accent-blue-bright) 50%,
+        var(--accent-blue) 100%
+    );
+    background-size: 200px 100%;
+    animation: shimmer 2s ease-in-out infinite, progress-pulse 2s ease-in-out infinite;
+}
+
+/* Phase-specific Progress Colors */
+.phase-planning .progress-fill {
+    background-color: var(--phase-planning-color) !important;
+    background: linear-gradient(
+        90deg,
+        var(--phase-planning-color) 0%,
+        var(--phase-planning-bright) 50%,
+        var(--phase-planning-color) 100%
+    ) !important;
+}
+
+.phase-planning .spinner {
+    border-top-color: var(--phase-planning-color);
+}
+
+.phase-coding .progress-fill {
+    background-color: var(--phase-coding-color) !important;
+    background: linear-gradient(
+        90deg,
+        var(--phase-coding-color) 0%,
+        var(--phase-coding-bright) 50%,
+        var(--phase-coding-color) 100%
+    ) !important;
+}
+
+.phase-coding .spinner {
+    border-top-color: var(--phase-coding-color);
+}
+
+.phase-validation .progress-fill {
+    background-color: var(--phase-validation-color) !important;
+    background: linear-gradient(
+        90deg,
+        var(--phase-validation-color) 0%,
+        var(--phase-validation-bright) 50%,
+        var(--phase-validation-color) 100%
+    ) !important;
+}
+
+.phase-validation .spinner {
+    border-top-color: var(--phase-validation-color);
+}
+
+/* Progress Bar Container */
+.progress-bar-container {
+    width: 100%;
+    margin: 10px 0;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background-color: var(--bg-tertiary);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    background-color: var(--accent-blue);
+}
+
+/* Metrics Display */
+.phase-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin: 10px 0;
+    font-size: 13px;
+}
+
+.metric {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.metric-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.metric-value {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* Log Preview */
+.log-preview {
+    background-color: var(--bg-tertiary);
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 10px 0;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    border-left: 3px solid var(--accent-blue);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.log-preview-label {
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.log-preview-text {
+    color: var(--text-primary);
+}
+
+/* Phase-specific Log Preview Borders */
+.phase-planning .log-preview {
+    border-left-color: var(--phase-planning-color);
+}
+
+.phase-coding .log-preview {
+    border-left-color: var(--phase-coding-color);
+}
+
+.phase-validation .log-preview {
+    border-left-color: var(--phase-validation-color);
+}
+
+/* Fade in animation for metrics */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.phase-metrics, .log-preview {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Mini Progress Bar for Kanban Cards */
+.phase-bar {
+    margin: 4px 0;
+}
+
+.phase-bar .progress-bar {
+    height: 4px;
+}
+
+.phase-name {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: capitalize;
+    display: inline-block;
+    width: 70px;
+}
+
+.phase-status {
+    font-size: 11px;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.phase-bar .spinner {
+    width: 10px;
+    height: 10px;
+    border-width: 1.5px;
+}
