@@ -423,6 +423,13 @@ async def create_pull_request(task_id: str):
         pr_url = result.stdout.strip()
 
         task.pr_url = pr_url
+
+        # Extract PR number from URL
+        import re
+        pr_match = re.search(r'/pull/(\d+)', pr_url)
+        if pr_match:
+            task.pr_number = int(pr_match.group(1))
+
         task.status = TaskStatus.DONE
         task.updated_at = datetime.now()
         await update_task(task)
