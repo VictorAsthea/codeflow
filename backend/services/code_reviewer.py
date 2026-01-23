@@ -108,24 +108,17 @@ async def run_code_review(
         claude_cli = find_claude_cli()
         print(f"[CODE_REVIEW] Using Claude CLI: {claude_cli}")
 
-        # Build code review prompt
-        review_prompt = """You are a code reviewer. Review the recent git changes and find bugs, security issues, or problems.
+        # Build code review prompt - very strict JSON format
+        review_prompt = """Review git diff HEAD~1 for bugs/security issues.
 
-IMPORTANT: You MUST output your findings as JSON only. No markdown, no explanations.
+OUTPUT FORMAT (STRICT - no other text allowed):
+{"severity":"error|warning|info","confidence":0-100,"message":"issue description","file_path":"path","line_number":N}
 
-Steps:
-1. Run: git diff HEAD~1 --name-only (to see changed files)
-2. Run: git diff HEAD~1 (to see the actual changes)
-3. For EACH issue found, output exactly this JSON format (one per line):
-{"severity": "error", "confidence": 85, "message": "Description of the bug or issue", "file_path": "path/to/file.py", "line_number": 42}
+One JSON object per line. No markdown. No explanations. No headers.
+If no issues: {"no_issues":true}
 
-Severity levels: "error" (bugs, security), "warning" (potential issues), "info" (style)
-Confidence: 0-100 (how sure you are this is a real issue)
-
-If you find NO issues after reviewing, output exactly:
-{"no_issues": true, "summary": "Code looks good"}
-
-DO NOT output markdown. DO NOT explain. ONLY output JSON lines."""
+Run: git diff HEAD~1
+Then output ONLY JSON lines."""
 
         # Execute claude with review prompt
         process = await asyncio.create_subprocess_exec(
@@ -259,15 +252,22 @@ def parse_review_output(json_output: str) -> list[ReviewIssue]:
         except json.JSONDecodeError:
             continue
 
+    # Fallback: if no JSON issues found, try parsing as markdown
+    if not issues:
+        print("[CODE_REVIEW] No JSON issues found, trying markdown parser...")
+        issues = _extract_issues_from_text(json_output)
+        if issues:
+            print(f"[CODE_REVIEW] Markdown parser found {len(issues)} issues")
+
     return issues
 
 
 def _extract_issues_from_text(text: str) -> list[ReviewIssue]:
-    """Extract issue JSON objects embedded in text"""
+    """Extract issues from text - supports JSON and markdown formats"""
+    import re
     issues = []
 
-    # Look for JSON-like patterns in the text
-    import re
+    # First try: Look for JSON-like patterns
     json_pattern = r'\{[^{}]*"severity"[^{}]*"message"[^{}]*\}'
     matches = re.findall(json_pattern, text)
 
@@ -288,6 +288,72 @@ def _extract_issues_from_text(text: str) -> list[ReviewIssue]:
             issues.append(issue)
         except (json.JSONDecodeError, ValueError, KeyError, TypeError):
             continue
+
+    # Second try: Parse markdown-style issues if no JSON found
+    if not issues:
+        issues.extend(_extract_issues_from_markdown(text))
+
+    return issues
+
+
+def _extract_issues_from_markdown(text: str) -> list[ReviewIssue]:
+    """Extract issues from markdown-formatted code review output"""
+    import re
+    issues = []
+
+    # Detect severity from section headers or emojis
+    current_severity = ReviewSeverity.INFO
+
+    # Split into lines for processing
+    lines = text.split('\n')
+    i = 0
+
+    while i < len(lines):
+        line = lines[i].strip()
+
+        # Update severity based on section headers
+        lower_line = line.lower()
+        if 'critical' in lower_line or '🔴' in line or 'error' in lower_line:
+            current_severity = ReviewSeverity.ERROR
+        elif 'medium' in lower_line or '🟡' in line or 'warning' in lower_line:
+            current_severity = ReviewSeverity.WARNING
+        elif 'minor' in lower_line or '🟢' in line or 'info' in lower_line:
+            current_severity = ReviewSeverity.INFO
+
+        # Look for issue titles (numbered items with bold text)
+        # Pattern: "#### 1. **Issue Title**" or "1. **Issue Title**"
+        issue_match = re.match(r'^#{0,4}\s*\d+\.\s*\*\*(.+?)\*\*', line)
+        if issue_match:
+            issue_title = issue_match.group(1).strip()
+
+            # Look for file path in following lines
+            file_path = None
+            line_number = None
+
+            # Check next few lines for file reference
+            for j in range(i + 1, min(i + 5, len(lines))):
+                next_line = lines[j]
+                # Look for patterns like (file.py:123) or `file.py:123`
+                file_match = re.search(r'[`(]([^`()]+\.\w+):(\d+)[`)]', next_line)
+                if file_match:
+                    file_path = file_match.group(1)
+                    line_number = int(file_match.group(2))
+                    break
+                # Also try just filename patterns
+                file_match2 = re.search(r'[`(]([^`()]+\.\w+)[`)]', next_line)
+                if file_match2 and not file_path:
+                    file_path = file_match2.group(1)
+
+            issue = ReviewIssue(
+                severity=current_severity,
+                confidence=75.0,  # Default confidence for markdown-parsed issues
+                message=issue_title,
+                file_path=file_path,
+                line_number=line_number
+            )
+            issues.append(issue)
+
+        i += 1
 
     return issues
 
