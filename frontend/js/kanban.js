@@ -4,6 +4,7 @@ import { ImagePasteHandler } from './image-paste-handler.js';
 import { FilePicker } from './file-picker.js';
 
 let tasks = [];
+let archivedCount = 0;
 let mentionAutocomplete = null;
 let imagePasteHandler = null;
 let filePicker = null;
@@ -32,10 +33,71 @@ export async function initKanban() {
     await loadTasks();
     setupNewTaskButton();
     setupDragAndDrop();
+    setupArchivedIndicator();
     await updateQueueStatus();
+    await updateArchivedCount();
 
     // Poll queue status every 5 seconds
     setInterval(updateQueueStatus, 5000);
+}
+
+/**
+ * Set up the archived tasks indicator in the DONE column header
+ */
+function setupArchivedIndicator() {
+    const doneColumn = document.querySelector('.column[data-status="done"]');
+    if (!doneColumn) return;
+
+    const header = doneColumn.querySelector('.column-header');
+    if (!header) return;
+
+    // Create archived indicator (hidden by default)
+    const indicator = document.createElement('button');
+    indicator.id = 'archived-indicator';
+    indicator.className = 'archived-indicator hidden';
+    indicator.title = 'View archived tasks';
+    indicator.innerHTML = '<span class="archived-icon">📦</span><span class="archived-count">0</span>';
+
+    // Insert before the count badge
+    const countBadge = header.querySelector('.count');
+    if (countBadge) {
+        header.insertBefore(indicator, countBadge);
+    } else {
+        header.appendChild(indicator);
+    }
+
+    // Click handler to open archived tasks modal
+    indicator.addEventListener('click', () => {
+        const event = new CustomEvent('open-archived-tasks');
+        window.dispatchEvent(event);
+    });
+}
+
+/**
+ * Update the archived tasks count indicator
+ */
+export async function updateArchivedCount() {
+    try {
+        const response = await API.tasks.listArchived();
+        archivedCount = response.tasks.length;
+
+        const indicator = document.getElementById('archived-indicator');
+        if (indicator) {
+            const countEl = indicator.querySelector('.archived-count');
+            if (countEl) {
+                countEl.textContent = archivedCount;
+            }
+
+            // Show/hide based on count
+            if (archivedCount > 0) {
+                indicator.classList.remove('hidden');
+            } else {
+                indicator.classList.add('hidden');
+            }
+        }
+    } catch (error) {
+        console.error('Failed to fetch archived tasks count:', error);
+    }
 }
 
 export async function updateQueueStatus() {
@@ -496,6 +558,7 @@ function openTaskModal(taskId) {
 
 window.addEventListener('task-updated', async () => {
     await loadTasks();
+    await updateArchivedCount();
 });
 
 window.addEventListener('DOMContentLoaded', () => {

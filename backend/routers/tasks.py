@@ -18,7 +18,7 @@ def get_storage():
 from backend.services.worktree_manager import WorktreeManager
 from backend.services.phase_executor import execute_all_phases
 from backend.services.task_queue import task_queue
-from backend.websocket_manager import manager
+from backend.websocket_manager import manager, kanban_manager
 
 router = APIRouter()
 
@@ -155,6 +155,9 @@ async def archive_task(task_id: str):
     task.updated_at = datetime.now()
     get_storage().update_task(task)
 
+    # Broadcast archive event to all connected clients
+    await kanban_manager.broadcast_task_archived(task_id, task.model_dump())
+
     return {"message": "Task archived successfully", "task": task}
 
 
@@ -172,6 +175,9 @@ async def unarchive_task(task_id: str):
     task.archived_at = None
     task.updated_at = datetime.now()
     get_storage().update_task(task)
+
+    # Broadcast unarchive event to all connected clients
+    await kanban_manager.broadcast_task_unarchived(task_id, task.model_dump())
 
     return {"message": "Task unarchived successfully", "task": task}
 

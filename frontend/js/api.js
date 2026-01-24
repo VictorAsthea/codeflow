@@ -21,6 +21,13 @@ export const API = {
     tasks: {
         list: () => fetchJSON(`${API_BASE}/tasks`),
 
+        listArchived: () => fetchJSON(`${API_BASE}/tasks?include_archived=true`).then(
+            response => ({
+                ...response,
+                tasks: response.tasks.filter(t => t.archived)
+            })
+        ),
+
         get: (id) => fetchJSON(`${API_BASE}/tasks/${id}`),
 
         create: (data) => fetchJSON(`${API_BASE}/tasks`, {
@@ -90,6 +97,14 @@ export const API = {
 
         resolveConflicts: (id) => fetchJSON(`${API_BASE}/tasks/${id}/resolve-conflicts`, {
             method: 'POST',
+        }),
+
+        archive: (id) => fetchJSON(`${API_BASE}/tasks/${id}/archive`, {
+            method: 'PATCH',
+        }),
+
+        unarchive: (id) => fetchJSON(`${API_BASE}/tasks/${id}/unarchive`, {
+            method: 'PATCH',
         }),
     },
 

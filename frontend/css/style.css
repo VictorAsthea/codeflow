@@ -171,6 +171,36 @@ body {
   font-size: 0.8rem;
 }
 
+/* Archived Tasks Indicator */
+.archived-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-right: 0.5rem;
+}
+
+.archived-indicator:hover {
+  background-color: var(--border);
+  border-color: var(--accent-blue);
+  color: var(--text-primary);
+}
+
+.archived-indicator .archived-icon {
+  font-size: 0.8rem;
+}
+
+.archived-indicator .archived-count {
+  font-weight: 600;
+}
+
 .column-body {
   flex: 1;
   padding: 1rem;
@@ -1939,4 +1969,109 @@ body {
 .btn-generate-roadmap {
   font-size: 1rem;
   padding: 0.75rem 2rem;
+}
+
+/* ============== Archived Tasks Modal ============== */
+
+.modal-medium {
+  max-width: 600px;
+}
+
+.archived-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.archived-task-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: border-color 0.2s;
+}
+
+.archived-task-card:hover {
+  border-color: var(--accent-blue);
+}
+
+.archived-task-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.archived-task-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archived-task-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.archived-task-id {
+  font-family: monospace;
+  color: var(--accent-blue);
+}
+
+.archived-task-date {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.archived-task-actions {
+  flex-shrink: 0;
+  margin-left: 1rem;
+}
+
+.btn-unarchive {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--accent-green);
+  color: var(--accent-green);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-unarchive:hover {
+  background-color: var(--accent-green);
+  color: white;
+}
+
+.btn-unarchive:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.archived-empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}
+
+.archived-empty-state .empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.archived-empty-state p {
+  font-size: 0.95rem;
 }

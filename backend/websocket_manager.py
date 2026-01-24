@@ -209,3 +209,73 @@ manager = EnhancedConnectionManager()
 
 # Backward compatibility alias
 ConnectionManager = EnhancedConnectionManager
+
+
+class KanbanConnectionManager:
+    """
+    WebSocket manager for broadcasting kanban-wide events (archive, unarchive, etc.)
+    to all connected clients for real-time UI sync.
+    """
+
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        """Accept and track a new WebSocket connection"""
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        logger.info(f"Kanban WebSocket connected, total: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        """Remove a WebSocket connection"""
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        logger.info(f"Kanban WebSocket disconnected, total: {len(self.active_connections)}")
+
+    async def broadcast(self, event_type: str, data: dict):
+        """
+        Broadcast an event to all connected clients.
+
+        Args:
+            event_type: Type of event (e.g., 'task_archived', 'task_unarchived')
+            data: Event payload containing relevant task data
+        """
+        message = {
+            "type": event_type,
+            "data": data,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        message_json = json.dumps(message)
+
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message_json)
+            except Exception as e:
+                logger.warning(f"Failed to send to kanban WebSocket: {e}")
+                disconnected.append(connection)
+
+        # Clean up disconnected clients
+        for conn in disconnected:
+            self.disconnect(conn)
+
+        if self.active_connections:
+            logger.debug(f"Broadcast {event_type} to {len(self.active_connections)} clients")
+
+    async def broadcast_task_archived(self, task_id: str, task_data: dict = None):
+        """Broadcast task archived event"""
+        await self.broadcast("task_archived", {
+            "task_id": task_id,
+            "task": task_data
+        })
+
+    async def broadcast_task_unarchived(self, task_id: str, task_data: dict = None):
+        """Broadcast task unarchived event"""
+        await self.broadcast("task_unarchived", {
+            "task_id": task_id,
+            "task": task_data
+        })
+
+
+# Global kanban manager instance
+kanban_manager = KanbanConnectionManager()
