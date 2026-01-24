@@ -10,7 +10,7 @@ from backend.services.migration import run_migration_if_needed
 from backend.routers import tasks, settings, git, webhooks, worktrees, roadmap
 from backend.services.task_queue import task_queue
 from backend.services.pr_monitor import PRMonitor
-from backend.websocket_manager import manager
+from backend.websocket_manager import manager, kanban_manager
 from backend.config import settings as app_settings
 
 # Configure logging
@@ -87,3 +87,14 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket, task_id)
+
+
+@app.websocket("/ws/kanban")
+async def kanban_websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for kanban-wide events (archive, unarchive, etc.)"""
+    await kanban_manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        kanban_manager.disconnect(websocket)

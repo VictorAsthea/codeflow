@@ -307,6 +307,7 @@
                 </div>
                 <div class="modal-footer">
                     <button id="btn-delete-task" class="btn btn-danger">Delete Task</button>
+                    <button id="btn-archive-task" class="btn btn-secondary hidden">Archive</button>
                     <div class="modal-actions">
                         <button id="btn-view-diff" class="btn btn-info hidden">View Diff</button>
                         <button id="btn-create-pr" class="btn btn-success hidden">Create PR</button>
@@ -717,6 +718,21 @@
             </div>
         </div>
 
+        <!-- Archived Tasks Modal -->
+        <div id="archived-tasks-modal" class="modal hidden">
+            <div class="modal-content modal-medium">
+                <div class="modal-header">
+                    <h2>📦 Archived Tasks</h2>
+                    <button class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="archived-tasks-list" class="archived-tasks-list">
+                        <p class="loading-text">Loading archived tasks...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Settings Modal -->
         <div id="settings-modal" class="modal hidden">
             <div class="modal-content">
@@ -767,6 +783,8 @@
     <script type="module" src="/js/websocket.js"></script>
     <script type="module" src="/js/kanban.js"></script>
     <script type="module" src="/js/task-modal.js"></script>
+    <script type="module" src="/js/archived-modal.js"></script>
+    <script type="module" src="/js/kanban-sync.js"></script>
     <script type="module" src="/js/log-filters.js"></script>
     <script type="module" src="/js/sidebar.js"></script>
     <script type="module" src="/js/keyboard.js"></script>

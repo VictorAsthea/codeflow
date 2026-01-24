@@ -262,6 +262,7 @@ function setupActions() {
     const startBtn = document.getElementById('btn-start-task');
     const stopBtn = document.getElementById('btn-stop-task');
     const deleteBtn = document.getElementById('btn-delete-task');
+    const archiveBtn = document.getElementById('btn-archive-task');
 
     startBtn.addEventListener('click', async () => {
         try {
@@ -297,6 +298,25 @@ function setupActions() {
         } catch (error) {
             console.error('Failed to delete task:', error);
             alert('Failed to delete task: ' + error.message);
+        }
+    });
+
+    archiveBtn.addEventListener('click', async () => {
+        if (!currentTask) return;
+
+        archiveBtn.disabled = true;
+        archiveBtn.textContent = 'Archiving...';
+
+        try {
+            await API.tasks.archive(currentTask.id);
+            document.getElementById('task-modal').classList.add('hidden');
+            window.dispatchEvent(new Event('task-updated'));
+        } catch (error) {
+            console.error('Failed to archive task:', error);
+            alert('Failed to archive task: ' + error.message);
+        } finally {
+            archiveBtn.disabled = false;
+            archiveBtn.textContent = 'Archive';
         }
     });
 
@@ -384,6 +404,7 @@ function updateActionButtons() {
     const stopBtn = document.getElementById('btn-stop-task');
     const viewDiffBtn = document.getElementById('btn-view-diff');
     const createPRBtn = document.getElementById('btn-create-pr');
+    const archiveBtn = document.getElementById('btn-archive-task');
 
     if (currentTask.status === 'in_progress') {
         startBtn.classList.add('hidden');
@@ -402,6 +423,13 @@ function updateActionButtons() {
     } else {
         viewDiffBtn.classList.add('hidden');
         createPRBtn.classList.add('hidden');
+    }
+
+    // Show archive button only for completed tasks that are not already archived
+    if (currentTask.status === 'done' && !currentTask.archived) {
+        archiveBtn.classList.remove('hidden');
+    } else {
+        archiveBtn.classList.add('hidden');
     }
 }
 
