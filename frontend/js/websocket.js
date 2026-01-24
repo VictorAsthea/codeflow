@@ -17,7 +17,39 @@ export function connectToTaskLogs(taskId) {
 
     ws.onmessage = (event) => {
         const message = event.data;
-        appendLog(taskId, message);
+
+        // Try to parse as JSON for enriched messages
+        try {
+            const data = JSON.parse(message);
+
+            // Handle subtask events - trigger task refresh
+            if (data.type && data.type.startsWith('subtask:')) {
+                console.log('[WebSocket] Subtask event:', data.type);
+                window.dispatchEvent(new Event('task-updated'));
+            }
+
+            // Handle phase events
+            if (data.type && data.type.startsWith('phase:')) {
+                console.log('[WebSocket] Phase event:', data.type);
+                window.dispatchEvent(new Event('task-updated'));
+            }
+
+            // Handle task status changes
+            if (data.type === 'task:status_changed' || data.type === 'task:failed') {
+                console.log('[WebSocket] Task status event:', data.type);
+                window.dispatchEvent(new Event('task-updated'));
+            }
+
+            // Pass log content to appendLog
+            if (data.type === 'log' && data.content) {
+                appendLog(taskId, data.content);
+            } else if (data.raw) {
+                appendLog(taskId, data.raw);
+            }
+        } catch (e) {
+            // Plain text message
+            appendLog(taskId, message);
+        }
     };
 
     ws.onerror = (error) => {

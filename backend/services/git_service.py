@@ -435,3 +435,144 @@ async def abort_merge(worktree_path: str) -> dict:
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to abort merge: {e.stderr}")
         return {"success": False, "error": str(e)}
+
+
+async def has_uncommitted_changes(worktree_path: str) -> bool:
+    """Check if there are uncommitted changes in the worktree."""
+    try:
+        result = await asyncio.to_thread(
+            subprocess.run,
+            ["git", "status", "--porcelain"],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True
+        )
+        return bool(result.stdout.strip())
+    except Exception as e:
+        logger.error(f"Error checking git status: {e}")
+        return False
+
+
+async def commit_changes(worktree_path: str, commit_message: str) -> dict:
+    """
+    Stage all changes and commit them.
+
+    Args:
+        worktree_path: Path to the git worktree
+        commit_message: Commit message
+
+    Returns:
+        dict with keys:
+            - success: bool
+            - commit_sha: str (if successful)
+            - error: str (if failed)
+    """
+    try:
+        # Check if there are changes to commit
+        has_changes = await has_uncommitted_changes(worktree_path)
+        if not has_changes:
+            logger.info("No changes to commit")
+            return {
+                "success": True,
+                "commit_sha": None,
+                "message": "No changes to commit"
+            }
+
+        # Stage all changes
+        await asyncio.to_thread(
+            subprocess.run,
+            ["git", "add", "."],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True
+        )
+
+        # Commit
+        commit_result = await asyncio.to_thread(
+            subprocess.run,
+            ["git", "commit", "-m", commit_message],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True
+        )
+
+        # Get the commit SHA
+        sha_result = await asyncio.to_thread(
+            subprocess.run,
+            ["git", "rev-parse", "HEAD"],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True
+        )
+
+        logger.info(f"Committed changes: {sha_result.stdout.strip()}")
+        return {
+            "success": True,
+            "commit_sha": sha_result.stdout.strip()
+        }
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to commit changes: {e.stderr}")
+        return {
+            "success": False,
+            "error": e.stderr.strip() if e.stderr else str(e)
+        }
+
+
+async def push_branch(worktree_path: str, set_upstream: bool = True) -> dict:
+    """
+    Push the current branch to origin.
+
+    Args:
+        worktree_path: Path to the git worktree
+        set_upstream: Whether to set upstream tracking
+
+    Returns:
+        dict with keys:
+            - success: bool
+            - error: str (if failed)
+    """
+    try:
+        # Get current branch name
+        branch = await get_current_branch(worktree_path)
+        if not branch:
+            return {"success": False, "error": "Could not determine current branch"}
+
+        cmd = ["git", "push"]
+        if set_upstream:
+            cmd.extend(["-u", "origin", branch])
+        else:
+            cmd.extend(["origin", branch])
+
+        await asyncio.to_thread(
+            subprocess.run,
+            cmd,
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True
+        )
+
+        logger.info(f"Pushed branch {branch} to origin")
+        return {"success": True}
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Push failed: {e.stderr}")
+        return {
+            "success": False,
+            "error": e.stderr.strip() if e.stderr else str(e)
+        }

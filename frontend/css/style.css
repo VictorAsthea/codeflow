@@ -2075,3 +2075,302 @@ body {
 .archived-empty-state p {
   font-size: 0.95rem;
 }
+
+/* ========================================
+   CONTEXT PAGE
+   ======================================== */
+
+.context-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.context-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.context-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 900px;
+}
+
+.context-section {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-primary);
+  overflow: hidden;
+}
+
+.context-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.context-section-header h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.context-section-content {
+  padding: 1rem;
+}
+
+.context-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.context-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.context-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.context-value {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.context-path {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--accent-blue);
+}
+
+.context-stale-badge,
+.context-valid-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  margin-left: 0.5rem;
+}
+
+.context-stale-badge {
+  background: rgba(255, 107, 107, 0.15);
+  color: var(--accent-red);
+}
+
+.context-valid-badge {
+  background: rgba(46, 204, 113, 0.15);
+  color: var(--accent-green);
+}
+
+/* Stack Tags */
+.context-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.context-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.context-tag .tag-icon {
+  font-weight: 600;
+  color: var(--accent-blue);
+  font-size: 0.75rem;
+}
+
+/* Structure */
+.context-structure-group {
+  margin-bottom: 1rem;
+}
+
+.context-structure-group:last-child {
+  margin-bottom: 0;
+}
+
+.context-structure-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.context-structure-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.context-dir,
+.context-file {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+
+.context-dir {
+  color: var(--accent-yellow);
+}
+
+.context-file {
+  color: var(--accent-blue);
+}
+
+/* Conventions */
+.context-conventions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.context-convention-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  border-left: 3px solid var(--border-primary);
+}
+
+.context-convention-item.enabled {
+  border-left-color: var(--accent-green);
+}
+
+.context-convention-item.disabled {
+  border-left-color: var(--text-secondary);
+}
+
+.convention-label {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.convention-value {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* Tree */
+.context-tree {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.context-tree.expanded {
+  max-height: none;
+}
+
+.context-tree-list {
+  list-style: none;
+  padding-left: 1.25rem;
+  margin: 0;
+}
+
+.context-tree-list:first-child {
+  padding-left: 0;
+}
+
+.context-tree-item {
+  padding: 0.2rem 0;
+}
+
+.context-tree-item .tree-name {
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.context-tree-item.is-dir .tree-name {
+  color: var(--accent-yellow);
+}
+
+.context-tree-item.is-dir .tree-name::before {
+  content: '+ ';
+  color: var(--text-secondary);
+}
+
+.context-tree-item.is-file .tree-name {
+  color: var(--text-primary);
+}
+
+.context-tree-item.is-file .tree-name::before {
+  content: '- ';
+  color: var(--text-secondary);
+}
+
+.context-tree-more {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: 0.25rem 0;
+}
+
+.context-toggle-btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.context-toggle-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.context-empty {
+  color: var(--text-secondary);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+/* Refresh button */
+#refresh-context-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  background: var(--accent-blue);
+  border: none;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#refresh-context-btn:hover {
+  background: var(--accent-blue-hover);
+}
+
+#refresh-context-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

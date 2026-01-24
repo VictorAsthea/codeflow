@@ -99,10 +99,12 @@ function renderModal() {
     document.getElementById('modal-title').textContent = `Task: ${currentTask.id}`;
 
     renderOverviewTab();
+    renderSubtasksTab();
     renderPhasesTab();
     renderLogsTab();
     updateActionButtons();
     updatePRReviewTabVisibility();
+    updateSubtasksTabVisibility();
 }
 
 function renderOverviewTab() {
@@ -238,6 +240,118 @@ function renderLogsTab() {
     } else {
         window.logViewer = new LogViewer('#log-entries');
         window.logViewer.loadLogs(logsStream);
+    }
+}
+
+function renderSubtasksTab() {
+    const container = document.getElementById('tab-subtasks');
+    if (!container) return;
+
+    const subtasks = currentTask.subtasks || [];
+    const progress = calculateSubtaskProgress(subtasks);
+
+    if (subtasks.length === 0) {
+        container.innerHTML = `
+            <div class="subtasks-tab">
+                <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                    <p>No subtasks generated yet.</p>
+                    <p style="font-size: 0.85rem; margin-top: 0.5rem;">Subtasks are generated during the Planning phase.</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="subtasks-tab">
+            <div class="subtasks-header">
+                <span class="subtasks-count">
+                    ${progress.completed} of ${progress.total} completed
+                </span>
+                <span class="subtasks-percentage">${progress.percentage}%</span>
+            </div>
+
+            <div class="subtasks-progress-bar">
+                <div class="subtasks-progress-fill" style="width: ${progress.percentage}%"></div>
+            </div>
+
+            <div class="subtasks-list">
+                ${subtasks.map(subtask => renderSubtaskItem(subtask)).join('')}
+            </div>
+        </div>
+    `;
+
+    // Add retry button handlers
+    container.querySelectorAll('.btn-retry-subtask').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const subtaskId = btn.dataset.subtaskId;
+            try {
+                await API.tasks.retrySubtask(currentTask.id, subtaskId);
+                await openModal(currentTask.id);
+            } catch (error) {
+                console.error('Failed to retry subtask:', error);
+                alert('Failed to retry subtask: ' + error.message);
+            }
+        });
+    });
+}
+
+function renderSubtaskItem(subtask) {
+    const statusIcon = getSubtaskStatusIcon(subtask.status);
+    const statusClass = `subtask-${subtask.status}`;
+    const isActive = currentTask.current_subtask_id === subtask.id;
+
+    let retryButton = '';
+    if (subtask.status === 'failed') {
+        retryButton = `<button class="btn btn-small btn-retry-subtask" data-subtask-id="${subtask.id}">Retry</button>`;
+    }
+
+    return `
+        <div class="subtask-item ${statusClass} ${isActive ? 'active' : ''}">
+            <div class="subtask-icon">${statusIcon}</div>
+            <div class="subtask-number">#${subtask.order}</div>
+            <div class="subtask-content">
+                <div class="subtask-title">${escapeHtml(subtask.title)}</div>
+                ${subtask.description ? `<div class="subtask-description">${escapeHtml(subtask.description)}</div>` : ''}
+                ${subtask.error ? `<div class="subtask-error" style="color: var(--accent-red); font-size: 0.8rem; margin-top: 0.25rem;">Error: ${escapeHtml(subtask.error)}</div>` : ''}
+            </div>
+            ${retryButton}
+        </div>
+    `;
+}
+
+function getSubtaskStatusIcon(status) {
+    switch (status) {
+        case 'completed': return '✓';
+        case 'in_progress': return '●';
+        case 'failed': return '✗';
+        default: return '○';
+    }
+}
+
+function calculateSubtaskProgress(subtasks) {
+    const total = subtasks.length;
+    const completed = subtasks.filter(s => s.status === 'completed').length;
+    return {
+        total,
+        completed,
+        percentage: total > 0 ? Math.round((completed / total) * 100) : 0
+    };
+}
+
+function updateSubtasksTabVisibility() {
+    const tabBtn = document.getElementById('tab-btn-subtasks');
+    if (!tabBtn) return;
+
+    // Show subtasks tab only if task has subtasks or is in progress
+    const hasSubtasks = currentTask.subtasks && currentTask.subtasks.length > 0;
+    const isInProgress = currentTask.status === 'in_progress';
+
+    if (hasSubtasks || isInProgress) {
+        tabBtn.style.display = 'block';
+    } else {
+        tabBtn.style.display = 'none';
     }
 }
 

@@ -139,6 +139,12 @@ export const API = {
         }),
     },
 
+    context: {
+        get: () => fetchJSON(`${API_BASE}/context`),
+        refresh: () => fetchJSON(`${API_BASE}/context/refresh`, { method: 'POST' }),
+        getSummary: () => fetchJSON(`${API_BASE}/context/summary`),
+    },
+
     roadmap: {
         get: () => fetchJSON(`${API_BASE}/roadmap`),
 

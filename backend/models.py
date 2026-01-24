@@ -16,8 +16,29 @@ class TaskStatus(str, Enum):
 class PhaseStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
+    IN_PROGRESS = "in_progress"  # Alias for running
     DONE = "done"
+    COMPLETED = "completed"  # Alias for done
     FAILED = "failed"
+
+
+class SubtaskStatus(str, Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class Subtask(BaseModel):
+    id: str  # "subtask-1", "subtask-2", etc.
+    title: str
+    description: str | None = None
+    status: SubtaskStatus = SubtaskStatus.PENDING
+    order: int  # For sorting
+    dependencies: list[str] = Field(default_factory=list)  # IDs of dependent subtasks
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error: str | None = None  # If failed
 
 
 class AgentProfile(str, Enum):
@@ -87,6 +108,10 @@ class Task(BaseModel):
     archived_at: datetime | None = None
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
+    # v0.4 - Subtask workflow
+    subtasks: list[Subtask] = Field(default_factory=list)
+    current_phase: str | None = None  # "planning", "coding", "validation"
+    current_subtask_id: str | None = None
 
 
 class GlobalConfig(BaseModel):

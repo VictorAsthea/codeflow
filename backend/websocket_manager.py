@@ -10,6 +10,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class DateTimeEncoder(json.JSONEncoder):
+    """JSON encoder that handles datetime objects."""
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+
 class EnhancedConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, List[WebSocket]] = {}
@@ -34,7 +42,7 @@ class EnhancedConnectionManager:
         if task_id in self.message_buffer:
             for buffered_message in self.message_buffer[task_id]:
                 try:
-                    await websocket.send_text(json.dumps(buffered_message))
+                    await websocket.send_text(json.dumps(buffered_message, cls=DateTimeEncoder))
                 except Exception as e:
                     logger.warning(f"Failed to send buffered message: {e}")
 
@@ -75,7 +83,7 @@ class EnhancedConnectionManager:
         # Send to all active connections
         if task_id in self.active_connections:
             disconnected = []
-            message_json = json.dumps(log_data)
+            message_json = json.dumps(log_data, cls=DateTimeEncoder)
 
             for connection in self.active_connections[task_id]:
                 try:

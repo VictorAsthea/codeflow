@@ -168,39 +168,11 @@ function createTaskCard(task) {
     card.draggable = true;
     card.dataset.taskId = task.id;
 
-    const phases = ['planning', 'coding', 'validation'];
-    const phaseBars = phases.map(phaseName => {
-        const phase = task.phases[phaseName];
-        if (!phase) return '';
+    // Phase steps (compact view)
+    const phaseSteps = renderPhaseSteps(task);
 
-        let progressWidth = 0;
-        let progressClass = '';
-        let statusText = 'Pending';
-
-        if (phase.status === 'running') {
-            progressWidth = 50;
-            progressClass = '';
-            statusText = 'Running';
-        } else if (phase.status === 'done') {
-            progressWidth = 100;
-            progressClass = 'done';
-            statusText = 'Done';
-        } else if (phase.status === 'failed') {
-            progressWidth = 100;
-            progressClass = 'failed';
-            statusText = 'Failed';
-        }
-
-        return `
-            <div class="phase-bar">
-                <span class="phase-name">${phaseName}</span>
-                <div class="progress-bar">
-                    <div class="progress-fill ${progressClass}" style="width: ${progressWidth}%"></div>
-                </div>
-                <span class="phase-status">${statusText}</span>
-            </div>
-        `;
-    }).join('');
+    // Subtask progress (if any)
+    const subtaskProgress = renderSubtaskProgress(task);
 
     const timeAgo = getTimeAgo(new Date(task.updated_at));
     const skipBadge = task.skip_ai_review ? '<span class="badge-skip-ai">⏭️ Skip AI Review</span>' : '';
@@ -226,11 +198,17 @@ function createTaskCard(task) {
         `;
     }
 
+    // Truncate description
+    const truncatedDesc = task.description.length > 100
+        ? task.description.substring(0, 100) + '...'
+        : task.description;
+
     card.innerHTML = `
         <h3>${task.title} ${skipBadge} ${statusBadge}</h3>
-        <p>${task.description}</p>
-        <div class="task-phases">
-            ${phaseBars}
+        <p>${truncatedDesc}</p>
+        ${subtaskProgress}
+        <div class="task-card-phases">
+            ${phaseSteps}
         </div>
         ${actionButtons}
         <div class="task-footer">
@@ -261,6 +239,65 @@ function createTaskCard(task) {
     });
 
     return card;
+}
+
+function renderPhaseSteps(task) {
+    const phases = task.phases || {};
+
+    const getPhaseIcon = (status) => {
+        switch (status) {
+            case 'done':
+            case 'completed': return '✓';
+            case 'running':
+            case 'in_progress': return '●';
+            case 'failed': return '✗';
+            default: return '○';
+        }
+    };
+
+    const planStatus = phases.planning?.status || 'pending';
+    const codeStatus = phases.coding?.status || 'pending';
+    const qaStatus = phases.validation?.status || 'pending';
+
+    return `
+        <div class="phase-steps">
+            <span class="phase-step ${planStatus}">
+                ${getPhaseIcon(planStatus)} Plan
+            </span>
+            <span class="phase-separator">—</span>
+            <span class="phase-step ${codeStatus}">
+                ${getPhaseIcon(codeStatus)} Code
+            </span>
+            <span class="phase-separator">—</span>
+            <span class="phase-step ${qaStatus}">
+                ${getPhaseIcon(qaStatus)} QA
+            </span>
+        </div>
+    `;
+}
+
+function renderSubtaskProgress(task) {
+    const subtasks = task.subtasks || [];
+    if (subtasks.length === 0) return '';
+
+    const total = subtasks.length;
+    const completed = subtasks.filter(s => s.status === 'completed').length;
+    const percentage = Math.round((completed / total) * 100);
+
+    return `
+        <div class="task-card-progress">
+            <div class="progress-label">
+                <span>Progress</span>
+                <span>${completed}/${total} (${percentage}%)</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: ${percentage}%"></div>
+            </div>
+            <div class="subtask-dots">
+                ${subtasks.map(s => `<span class="subtask-dot ${s.status}"></span>`).join('')}
+            </div>
+        </div>
+    `;
 }
 
 function getTimeAgo(date) {

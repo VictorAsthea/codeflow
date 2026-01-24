@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from datetime import datetime
 import re
 import asyncio
@@ -6,9 +6,10 @@ import threading
 import subprocess
 from backend.models import (
     Task, TaskCreate, TaskUpdate, TaskStatus, PhaseConfigUpdate,
-    Phase, PhaseConfig, PhaseStatus, FixCommentsRequest
+    Phase, PhaseConfig, PhaseStatus, FixCommentsRequest, SubtaskStatus
 )
 from backend.config import settings
+from backend.services.subtask_executor import get_subtask_progress
 
 
 def get_storage():
@@ -64,6 +65,12 @@ async def create_new_task(task_data: TaskCreate):
     else:
         coding_config = AGENT_PROFILES[task_data.agent_profile.value]["coding"]
 
+    # v0.4: Add validation phase config
+    if task_data.validation_config:
+        validation_config = task_data.validation_config
+    else:
+        validation_config = PhaseConfig(model=settings.validation_model, max_turns=30)
+
     phases = {
         "planning": Phase(
             name="planning",
@@ -72,6 +79,10 @@ async def create_new_task(task_data: TaskCreate):
         "coding": Phase(
             name="coding",
             config=coding_config
+        ),
+        "validation": Phase(
+            name="validation",
+            config=validation_config
         )
     }
 
@@ -183,7 +194,7 @@ async def unarchive_task(task_id: str):
 
 
 async def execute_task_background(task_id: str, project_path: str):
-    """Background task to execute all phases of a task"""
+    """Background task to execute all phases of a task (v0.4 workflow)"""
     print(f"[DEBUG] Background task started for task {task_id}")
     task_queue.register_direct_task(task_id)
 
@@ -217,30 +228,40 @@ async def execute_task_background(task_id: str, project_path: str):
 
         await log_handler(f"Worktree created at: {worktree_path}")
 
-        result = await execute_all_phases(task, str(worktree_path), log_handler, manager)
+        # v0.4: Use new task orchestrator with subtask-based workflow
+        from backend.services.task_orchestrator import start_task
+
+        def emit_event(event: str, data: dict):
+            """Emit WebSocket events for real-time UI updates"""
+            task_id_for_ws = data.get("task_id", task_id)
+            asyncio.create_task(manager.send_enriched_log(task_id_for_ws, {
+                "type": event,
+                **data
+            }))
+
+        result = await start_task(
+            task=task,
+            project_path=project_path,
+            worktree_path=str(worktree_path),
+            emit_event=emit_event,
+            log_callback=log_handler
+        )
 
         if result["success"]:
-            if task.skip_ai_review or not settings.code_review_auto:
-                task.status = TaskStatus.HUMAN_REVIEW
-                await log_handler("\n=== All phases completed successfully (AI Review skipped) ===")
-            else:
-                task.status = TaskStatus.AI_REVIEW
-                await log_handler("\n=== All phases completed successfully ===")
-
-            task.updated_at = datetime.now()
-            get_storage().update_task(task)
-
-            # Run AI review if enabled
-            if task.status == TaskStatus.AI_REVIEW:
+            # Task is already in AI_REVIEW status after coding phase
+            # Run validation if AI review is enabled
+            if task.status == TaskStatus.AI_REVIEW and not task.skip_ai_review and settings.code_review_auto:
                 from backend.services.task_orchestrator import handle_ai_review
                 await handle_ai_review(task, log_handler)
+            elif task.skip_ai_review:
+                task.status = TaskStatus.HUMAN_REVIEW
+                await log_handler("\n=== All phases completed (AI Review skipped) ===")
+                task.updated_at = datetime.now()
+                get_storage().update_task(task)
         else:
-            task.status = TaskStatus.IN_PROGRESS
-            await log_handler("\n=== Execution stopped due to errors ===")
-            task.updated_at = datetime.now()
-            get_storage().update_task(task)
+            await log_handler(f"\n=== Execution stopped: {result.get('error', 'Unknown error')} ===")
 
-        await log_handler(f"\nTask status updated to: {task.status.value}")
+        await log_handler(f"\nTask status: {task.status.value}")
 
     except Exception as e:
         await log_handler(f"\nERROR: {str(e)}")
@@ -754,3 +775,99 @@ async def resolve_conflicts(task_id: str):
     )
 
     return result
+
+
+# ============== Subtasks Endpoints (v0.4) ==============
+
+@router.get("/tasks/{task_id}/subtasks")
+async def get_task_subtasks(task_id: str):
+    """Get subtasks for a task"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return {
+        "subtasks": [s.model_dump() for s in task.subtasks],
+        "progress": get_subtask_progress(task),
+        "current_subtask_id": task.current_subtask_id
+    }
+
+
+@router.get("/tasks/{task_id}/phases")
+async def get_task_phases(task_id: str):
+    """Get phases state for a task"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    phases_data = {}
+    for name, phase in task.phases.items():
+        phases_data[name] = phase.model_dump()
+
+    return {
+        "phases": phases_data,
+        "current_phase": task.current_phase,
+        "current_subtask_id": task.current_subtask_id
+    }
+
+
+@router.post("/tasks/{task_id}/validate")
+async def trigger_validation(task_id: str, background_tasks: BackgroundTasks):
+    """Trigger validation phase manually"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status != TaskStatus.AI_REVIEW:
+        raise HTTPException(status_code=400, detail="Task must be in AI Review status")
+
+    if not task.worktree_path:
+        raise HTTPException(status_code=400, detail="Task has no worktree")
+
+    from backend.services.task_orchestrator import start_validation
+
+    async def run_validation():
+        async def log_handler(message: str):
+            await manager.send_log(task_id, message)
+
+        await start_validation(
+            task=task,
+            project_path=settings.project_path,
+            worktree_path=task.worktree_path,
+            log_callback=log_handler
+        )
+
+    asyncio.create_task(run_validation())
+
+    return {"message": "Validation started", "task_id": task_id}
+
+
+@router.post("/tasks/{task_id}/subtasks/{subtask_id}/retry")
+async def retry_subtask(task_id: str, subtask_id: str):
+    """Retry a failed subtask"""
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    subtask = None
+    for s in task.subtasks:
+        if s.id == subtask_id:
+            subtask = s
+            break
+
+    if not subtask:
+        raise HTTPException(status_code=404, detail="Subtask not found")
+
+    if subtask.status != SubtaskStatus.FAILED:
+        raise HTTPException(status_code=400, detail="Subtask is not failed")
+
+    # Reset the subtask
+    subtask.status = SubtaskStatus.PENDING
+    subtask.started_at = None
+    subtask.completed_at = None
+    subtask.error = None
+
+    task.updated_at = datetime.now()
+    get_storage().update_task(task)
+
+    return {"message": "Subtask reset for retry", "subtask": subtask.model_dump()}

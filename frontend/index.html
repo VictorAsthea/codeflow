@@ -78,6 +78,12 @@
                         <kbd class="nav-kbd">W</kbd>
                     </a>
 
+                    <a href="#context" class="nav-item" data-shortcut="C" data-view="context">
+                        <span class="nav-icon">📋</span>
+                        <span class="nav-label">Contexte</span>
+                        <kbd class="nav-kbd">C</kbd>
+                    </a>
+
                     <div class="nav-divider"></div>
 
                     <a href="#settings" class="nav-item" data-shortcut="S">
@@ -236,6 +242,22 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Context View -->
+                <div id="context-view" class="view hidden">
+                    <div class="view-header">
+                        <div class="view-header-content">
+                            <h1>Contexte du Projet</h1>
+                            <p>Ce que Codeflow connait de votre projet</p>
+                        </div>
+                        <div class="view-header-actions">
+                            <button id="refresh-context-btn" class="btn btn-secondary">Rafraichir</button>
+                        </div>
+                    </div>
+                    <div id="context-content" class="context-container">
+                        <div class="loading">Chargement du contexte...</div>
+                    </div>
+                </div>
             </main>
         </div>
 
@@ -249,12 +271,14 @@
                 <div class="modal-body">
                     <div class="tabs">
                         <button class="tab active" data-tab="overview">Overview</button>
+                        <button class="tab" data-tab="subtasks" id="tab-btn-subtasks">Subtasks</button>
                         <button class="tab" data-tab="phases">Phases</button>
                         <button class="tab" data-tab="logs">Logs</button>
                         <button class="tab" data-tab="pr-review" id="tab-btn-pr-review" style="display:none">PR Review</button>
                     </div>
                     <div class="tab-content">
                         <div id="tab-overview" class="tab-panel active"></div>
+                        <div id="tab-subtasks" class="tab-panel hidden"></div>
                         <div id="tab-phases" class="tab-panel hidden"></div>
                         <div id="tab-logs" class="tab-panel hidden">
                             <div class="log-viewer">
@@ -791,6 +815,7 @@
     <script type="module" src="/js/worktrees.js"></script>
     <script type="module" src="/js/roadmap.js"></script>
     <script type="module" src="/js/roadmap-wizard.js"></script>
+    <script type="module" src="/js/context.js"></script>
     <script type="module" src="/js/app.js"></script>
 
     <footer class="main-footer">

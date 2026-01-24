@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     code_review_confidence_threshold: float = 80.0
     code_review_timeout: int = 60
 
+    # v0.4 Model configuration per phase (for CLI)
+    planning_model: str = "claude-sonnet-4-20250514"
+    coding_model: str = "claude-sonnet-4-20250514"
+    validation_model: str = "claude-haiku-4-20250514"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
