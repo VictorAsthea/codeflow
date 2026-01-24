@@ -8,7 +8,10 @@ from backend.models import Task, TaskStatus
 from backend.config import settings
 from backend.services.code_reviewer import (
     run_code_review,
-    format_issues_for_context
+    format_issues_for_context,
+    get_actionable_issues,
+    ReviewIssue,
+    ReviewSeverity
 )
 from backend.services.phase_executor import execute_all_phases
 
@@ -81,23 +84,27 @@ async def handle_ai_review(
             "error": review_result.error_message
         }
 
-    # Check for high-confidence issues
-    high_confidence_issues = review_result.get_high_confidence_issues(
-        threshold=settings.code_review_confidence_threshold
+    # Check for actionable issues (filters out observations and non-critical feedback)
+    actionable_issues = get_actionable_issues(
+        issues=review_result.issues,
+        raw_output=review_result.raw_output,
+        confidence_threshold=settings.code_review_confidence_threshold
     )
 
     if log_callback:
         await log_callback(f"Review completed: {review_result.summary()}\n")
-        if high_confidence_issues:
-            await log_callback(f"Found {len(high_confidence_issues)} high-confidence issue(s)\n")
+        if actionable_issues:
+            await log_callback(f"Found {len(actionable_issues)} actionable issue(s) requiring fixes\n")
+        else:
+            await log_callback("No actionable issues found (observations only)\n")
 
     # Store all issues
     task.review_issues = [issue.to_dict() for issue in review_result.issues]
 
-    if not high_confidence_issues:
-        # No critical issues - proceed to human review
+    if not actionable_issues:
+        # No actionable issues - proceed to human review (PASS)
         if log_callback:
-            await log_callback("No critical issues found - proceeding to human review\n")
+            await log_callback("Review PASSED - no actionable issues, proceeding to human review\n")
 
         task.status = TaskStatus.HUMAN_REVIEW
         task.review_status = "completed"
@@ -147,8 +154,12 @@ async def handle_ai_review(
     task.review_status = "retrying"
     await update_task(task)
 
-    # Format issues as context for coding phase
-    review_context = format_issues_for_context(high_confidence_issues)
+    # Format only actionable issues as context for coding phase
+    review_context = format_issues_for_context(
+        actionable_issues,
+        raw_output=review_result.raw_output,
+        only_actionable=False  # Already filtered
+    )
 
     # Re-run coding phase with review context
     result = await execute_all_phases(
@@ -216,7 +227,6 @@ async def retry_with_review_fixes(
     await update_task(task)
 
     # Parse issues from stored dict format
-    from backend.services.code_reviewer import ReviewIssue, ReviewSeverity
     issues = []
     for issue_dict in task.review_issues:
         issues.append(ReviewIssue(
@@ -227,7 +237,13 @@ async def retry_with_review_fixes(
             line_number=issue_dict.get("line_number")
         ))
 
-    review_context = format_issues_for_context(issues)
+    # Filter to actionable issues only and format for context
+    raw_output = getattr(task, 'review_output', '') or ''
+    review_context = format_issues_for_context(
+        issues,
+        raw_output=raw_output,
+        only_actionable=True
+    )
 
     # Re-run coding phase
     result = await execute_all_phases(

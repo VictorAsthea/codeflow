@@ -145,3 +145,109 @@ class PhaseConfigUpdate(BaseModel):
 
 class FixCommentsRequest(BaseModel):
     comment_ids: list[int]
+
+
+# ============== Roadmap Models ==============
+
+class Priority(str, Enum):
+    MUST_HAVE = "must"
+    SHOULD_HAVE = "should"
+    COULD_HAVE = "could"
+    WONT_HAVE = "wont"
+
+
+class RoadmapPhase(str, Enum):
+    FOUNDATION = "foundation"
+    CORE = "core"
+    ENHANCEMENT = "enhancement"
+    POLISH = "polish"
+
+
+class Complexity(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class Impact(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class FeatureStatus(str, Enum):
+    UNDER_REVIEW = "under_review"
+    PLANNED = "planned"
+    IN_PROGRESS = "in_progress"
+    DONE = "done"
+
+
+class Feature(BaseModel):
+    id: str
+    title: str
+    description: str
+    justification: str | None = None
+    phase: RoadmapPhase
+    priority: Priority
+    complexity: Complexity
+    impact: Impact
+    status: FeatureStatus = FeatureStatus.UNDER_REVIEW
+    task_id: str | None = None
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class ProjectAnalysis(BaseModel):
+    date: datetime
+    stack: list[str] = Field(default_factory=list)
+    structure_summary: str = ""
+    files_count: int = 0
+
+
+class Competitor(BaseModel):
+    name: str
+    url: str | None = None
+    features: list[str] = Field(default_factory=list)
+
+
+class CompetitorAnalysis(BaseModel):
+    date: datetime
+    competitors: list[Competitor] = Field(default_factory=list)
+
+
+class Roadmap(BaseModel):
+    project_name: str = ""
+    project_description: str = ""
+    target_audience: str = ""
+    personas: list[str] = Field(default_factory=list)
+    features: list[Feature] = Field(default_factory=list)
+    analysis: ProjectAnalysis | None = None
+    competitor_analysis: CompetitorAnalysis | None = None
+
+
+class FeatureCreate(BaseModel):
+    title: str
+    description: str
+    justification: str | None = None
+    phase: RoadmapPhase = RoadmapPhase.CORE
+    priority: Priority = Priority.SHOULD_HAVE
+    complexity: Complexity = Complexity.MEDIUM
+    impact: Impact = Impact.MEDIUM
+
+
+class FeatureUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    justification: str | None = None
+    phase: RoadmapPhase | None = None
+    priority: Priority | None = None
+    complexity: Complexity | None = None
+    impact: Impact | None = None
+    status: FeatureStatus | None = None
+
+
+class RoadmapUpdate(BaseModel):
+    project_name: str | None = None
+    project_description: str | None = None
+    target_audience: str | None = None
+    personas: list[str] | None = None

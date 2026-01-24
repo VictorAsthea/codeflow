@@ -359,24 +359,117 @@ def _extract_issues_from_markdown(text: str) -> list[ReviewIssue]:
     return issues
 
 
+# Phrases indicating observations, not actionable issues
+NON_ACTIONABLE_PHRASES = [
+    "intentional",
+    "likely intentional",
+    "good:",
+    "good practice",
+    "no security",
+    "no vulnerabilities",
+    "no issues",
+    "looks good",
+    "correctly",
+    "properly",
+    "as expected",
+]
+
+
+def filter_actionable_issues(
+    issues: list[ReviewIssue],
+    raw_output: str = ""
+) -> list[ReviewIssue]:
+    """
+    Filter out non-actionable issues (observations, positive feedback, minor notes).
+
+    This prevents infinite loops when reviews are positive but contain observations.
+
+    Args:
+        issues: List of review issues
+        raw_output: Raw output from the review (to check for positive verdicts)
+
+    Returns:
+        List of actionable issues (error/critical severity only)
+    """
+    # Check if the overall verdict is positive
+    raw_lower = raw_output.lower()
+    if any(phrase in raw_lower for phrase in [
+        "no security vulnerabilities found",
+        "no vulnerabilities found",
+        "no issues found",
+        "code looks good",
+        "no critical issues",
+        "passes review",
+    ]):
+        print("[CODE_REVIEW] Positive verdict detected in raw output - no actionable issues")
+        return []
+
+    actionable = []
+
+    for issue in issues:
+        msg_lower = issue.message.lower()
+
+        # Skip issues that are observations/positive feedback
+        if any(phrase in msg_lower for phrase in NON_ACTIONABLE_PHRASES):
+            print(f"[CODE_REVIEW] Skipping non-actionable issue: {issue.message[:50]}...")
+            continue
+
+        # Downgrade severity if marked as minor
+        if "minor:" in msg_lower or msg_lower.startswith("minor "):
+            issue = ReviewIssue(
+                severity=ReviewSeverity.INFO,
+                confidence=issue.confidence,
+                message=issue.message,
+                file_path=issue.file_path,
+                line_number=issue.line_number
+            )
+
+        # Only keep error-level issues as actionable
+        if issue.severity == ReviewSeverity.ERROR:
+            actionable.append(issue)
+        else:
+            print(f"[CODE_REVIEW] Skipping non-error issue ({issue.severity.value}): {issue.message[:50]}...")
+
+    print(f"[CODE_REVIEW] Filtered {len(issues)} issues down to {len(actionable)} actionable")
+    return actionable
+
+
 def should_auto_fix(
     issues: list[ReviewIssue],
-    confidence_threshold: float = 80.0
+    confidence_threshold: float = 80.0,
+    raw_output: str = ""
 ) -> bool:
     """
     Determine if auto-fix should be triggered
 
+    Only triggers for actionable issues (errors with high confidence).
+    Filters out observations and positive feedback to prevent infinite loops.
+
     Args:
         issues: List of review issues
         confidence_threshold: Minimum confidence to trigger auto-fix
+        raw_output: Raw output from the review (to check for positive verdicts)
 
     Returns:
         True if auto-fix should run
     """
-    return any(
+    # First filter to actionable issues only
+    actionable = filter_actionable_issues(issues, raw_output)
+
+    if not actionable:
+        print("[CODE_REVIEW] No actionable issues - skipping auto-fix")
+        return False
+
+    # Check if any actionable issue meets the confidence threshold
+    should_fix = any(
         issue.confidence >= confidence_threshold
-        for issue in issues
+        for issue in actionable
     )
+
+    if should_fix:
+        print(f"[CODE_REVIEW] {len(actionable)} actionable issue(s) above {confidence_threshold}% confidence - triggering auto-fix")
+
+    return should_fix
 
 
 def filter_high_confidence_issues(
@@ -399,16 +492,50 @@ def filter_high_confidence_issues(
     ]
 
 
-def format_issues_for_context(issues: list[ReviewIssue]) -> str:
+def get_actionable_issues(
+    issues: list[ReviewIssue],
+    raw_output: str = "",
+    confidence_threshold: float = 80.0
+) -> list[ReviewIssue]:
+    """
+    Get only actionable issues that should be fixed.
+
+    Use this to get the filtered list of issues for the auto-fix phase.
+
+    Args:
+        issues: List of review issues
+        raw_output: Raw output from the review
+        confidence_threshold: Minimum confidence threshold
+
+    Returns:
+        List of actionable issues above confidence threshold
+    """
+    actionable = filter_actionable_issues(issues, raw_output)
+    return [
+        issue for issue in actionable
+        if issue.confidence >= confidence_threshold
+    ]
+
+
+def format_issues_for_context(
+    issues: list[ReviewIssue],
+    raw_output: str = "",
+    only_actionable: bool = True
+) -> str:
     """
     Format issues as context for coding phase
 
     Args:
         issues: List of review issues
+        raw_output: Raw output from the review (for filtering)
+        only_actionable: If True, only include actionable issues
 
     Returns:
         Formatted string for coding prompt
     """
+    if only_actionable:
+        issues = filter_actionable_issues(issues, raw_output)
+
     if not issues:
         return "No issues to fix"
 

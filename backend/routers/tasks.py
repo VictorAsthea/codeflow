@@ -537,6 +537,31 @@ async def create_pull_request(task_id: str):
         error_msg = e.stderr.strip() if e.stderr else str(e)
         raise HTTPException(status_code=500, detail=f"Failed to push branch: {error_msg}")
 
+    # Check if PR already exists for this branch
+    try:
+        existing_pr = subprocess.run(
+            ["gh", "pr", "view", task.branch_name, "--json", "url,number"],
+            capture_output=True,
+            text=True
+        )
+
+        if existing_pr.returncode == 0 and existing_pr.stdout.strip():
+            # PR already exists - update task with existing PR info
+            import json as json_module
+            pr_data = json_module.loads(existing_pr.stdout.strip())
+            pr_url = pr_data.get("url")
+            pr_number = pr_data.get("number")
+
+            task.pr_url = pr_url
+            task.pr_number = pr_number
+            task.status = TaskStatus.HUMAN_REVIEW
+            task.updated_at = datetime.now()
+            get_storage().update_task(task)
+
+            return {"message": "PR already exists - linked to task", "pr_url": pr_url, "task": task}
+    except Exception:
+        pass  # No existing PR, continue to create one
+
     try:
         result = subprocess.run(
             [
@@ -574,6 +599,66 @@ async def create_pull_request(task_id: str):
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.strip() if e.stderr else str(e)
         raise HTTPException(status_code=500, detail=f"Failed to create PR: {error_msg}")
+
+
+@router.post("/tasks/{task_id}/sync-pr")
+async def sync_pr_info(task_id: str):
+    """
+    Sync PR info from GitHub for a task.
+
+    If the task has a branch and a PR exists on GitHub, updates the task with PR info.
+    Useful when PR was created outside of Codeflow or pr_url wasn't saved properly.
+    """
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if not task.branch_name:
+        return {"synced": False, "message": "Task has no branch"}
+
+    # Already has PR info
+    if task.pr_url and task.pr_number:
+        return {"synced": False, "message": "PR info already present", "pr_url": task.pr_url}
+
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "view", task.branch_name, "--json", "url,number,state"],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            import json as json_module
+            pr_data = json_module.loads(result.stdout.strip())
+            pr_url = pr_data.get("url")
+            pr_number = pr_data.get("number")
+            pr_state = pr_data.get("state")
+
+            task.pr_url = pr_url
+            task.pr_number = pr_number
+
+            # If PR is merged, update task status
+            if pr_state == "MERGED":
+                task.pr_merged = True
+                task.status = TaskStatus.DONE
+
+            task.updated_at = datetime.now()
+            get_storage().update_task(task)
+
+            return {
+                "synced": True,
+                "message": "PR info synced from GitHub",
+                "pr_url": pr_url,
+                "pr_number": pr_number,
+                "pr_state": pr_state
+            }
+        else:
+            return {"synced": False, "message": "No PR found for this branch"}
+
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail="GitHub CLI (gh) is not installed")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to sync PR info: {str(e)}")
 
 
 @router.get("/tasks/{task_id}/check-conflicts")

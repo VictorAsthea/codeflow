@@ -52,10 +52,10 @@
                         <span class="coming-soon">Coming soon</span>
                     </a>
 
-                    <a href="#roadmap" class="nav-item disabled">
+                    <a href="#roadmap" class="nav-item" data-shortcut="D" data-view="roadmap">
                         <span class="nav-icon">🗺️</span>
                         <span class="nav-label">Roadmap</span>
-                        <span class="coming-soon">Coming soon</span>
+                        <kbd class="nav-kbd">D</kbd>
                     </a>
 
                     <a href="#ideation" class="nav-item disabled">
@@ -145,6 +145,76 @@
                 <div class="column-body" id="column-done"></div>
             </div>
                 </div>
+                </div>
+
+                <!-- Roadmap View -->
+                <div id="roadmap-view" class="view hidden">
+                    <div class="view-header">
+                        <div class="view-header-content">
+                            <h1>Roadmap</h1>
+                            <p id="roadmap-subtitle">Plan and prioritize your product features</p>
+                        </div>
+                        <div class="view-header-actions">
+                            <div class="roadmap-stats" id="roadmap-stats"></div>
+                            <button id="add-feature-btn" class="btn btn-primary">+ Add Feature</button>
+                        </div>
+                    </div>
+
+                    <div class="roadmap-tabs">
+                        <button class="roadmap-tab active" data-tab="board">Board</button>
+                        <button class="roadmap-tab" data-tab="list">List</button>
+                    </div>
+
+                    <div class="roadmap-board" id="roadmap-board">
+                        <div class="roadmap-column" data-status="under_review">
+                            <div class="roadmap-column-header">
+                                <h3>Under Review</h3>
+                                <span class="roadmap-count" id="count-under_review">0</span>
+                            </div>
+                            <div class="roadmap-column-body" id="column-under_review"></div>
+                        </div>
+
+                        <div class="roadmap-column" data-status="planned">
+                            <div class="roadmap-column-header">
+                                <h3>Planned</h3>
+                                <span class="roadmap-count" id="count-planned">0</span>
+                            </div>
+                            <div class="roadmap-column-body" id="column-planned"></div>
+                        </div>
+
+                        <div class="roadmap-column" data-status="in_progress">
+                            <div class="roadmap-column-header">
+                                <h3>In Progress</h3>
+                                <span class="roadmap-count" id="count-in_progress_rm">0</span>
+                            </div>
+                            <div class="roadmap-column-body" id="column-in_progress_rm"></div>
+                        </div>
+
+                        <div class="roadmap-column" data-status="done">
+                            <div class="roadmap-column-header">
+                                <h3>Done</h3>
+                                <span class="roadmap-count" id="count-done_rm">0</span>
+                            </div>
+                            <div class="roadmap-column-body" id="column-done_rm"></div>
+                        </div>
+                    </div>
+
+                    <div class="roadmap-list hidden" id="roadmap-list">
+                        <table class="roadmap-table">
+                            <thead>
+                                <tr>
+                                    <th>Feature</th>
+                                    <th>Phase</th>
+                                    <th>Priority</th>
+                                    <th>Complexity</th>
+                                    <th>Impact</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="roadmap-table-body"></tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Worktrees View -->
@@ -417,6 +487,236 @@
             </div>
         </div>
 
+        <!-- Add Feature Modal -->
+        <div id="add-feature-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Add Feature</h2>
+                    <button class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="add-feature-form">
+                        <div class="form-group">
+                            <label for="feature-title">Title</label>
+                            <input type="text" id="feature-title" required placeholder="Feature name">
+                        </div>
+                        <div class="form-group">
+                            <label for="feature-description">Description</label>
+                            <textarea id="feature-description" rows="3" required placeholder="What does this feature do?"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="feature-justification">Justification (optional)</label>
+                            <textarea id="feature-justification" rows="2" placeholder="Why is this feature important?"></textarea>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label for="feature-phase">Phase</label>
+                                <select id="feature-phase">
+                                    <option value="foundation">Foundation</option>
+                                    <option value="core" selected>Core</option>
+                                    <option value="enhancement">Enhancement</option>
+                                    <option value="polish">Polish</option>
+                                </select>
+                            </div>
+                            <div class="form-col">
+                                <label for="feature-priority">Priority</label>
+                                <select id="feature-priority">
+                                    <option value="must">Must Have</option>
+                                    <option value="should" selected>Should Have</option>
+                                    <option value="could">Could Have</option>
+                                    <option value="wont">Won't Have</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label for="feature-complexity">Complexity</label>
+                                <select id="feature-complexity">
+                                    <option value="low">Low</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                            <div class="form-col">
+                                <label for="feature-impact">Impact</label>
+                                <select id="feature-impact">
+                                    <option value="low">Low</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary btn-close">Cancel</button>
+                    <button id="btn-save-feature" class="btn btn-primary">Add Feature</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Roadmap Generation Wizard Modal - Auto-Claude Style -->
+        <div id="roadmap-wizard-modal" class="modal hidden">
+            <div class="modal-content wizard-modal-auto">
+                <button class="btn-close wizard-close">&times;</button>
+
+                <div class="wizard-center">
+                    <!-- Step 1: Analyze -->
+                    <div class="wizard-step" id="wizard-step-1">
+                        <div class="wizard-icon analyzing">
+                            <span class="icon-main">🔍</span>
+                        </div>
+                        <h2 class="wizard-title">Analyzing</h2>
+                        <p class="wizard-subtitle" id="analyze-status">Scanning project structure...</p>
+                        <div class="wizard-progress-bar">
+                            <div class="wizard-progress-fill" id="analyze-progress"></div>
+                        </div>
+                        <div class="wizard-result hidden" id="analyze-result">
+                            <div class="result-card-auto">
+                                <div class="result-row">
+                                    <span class="result-icon">📦</span>
+                                    <span class="result-text" id="result-project-name">Project</span>
+                                </div>
+                                <div class="result-row">
+                                    <span class="result-icon">🛠️</span>
+                                    <span class="result-text" id="result-stack">Stack</span>
+                                </div>
+                                <div class="result-row">
+                                    <span class="result-icon">📁</span>
+                                    <span class="result-text"><span id="result-files">0</span> files analyzed</span>
+                                </div>
+                                <div class="result-row">
+                                    <span class="result-icon">📝</span>
+                                    <span class="result-text result-summary" id="result-summary">Summary</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Discover -->
+                    <div class="wizard-step hidden" id="wizard-step-2">
+                        <div class="wizard-icon discovering">
+                            <span class="icon-main">🌐</span>
+                        </div>
+                        <h2 class="wizard-title">Discovering</h2>
+                        <p class="wizard-subtitle" id="discover-status">Searching for similar products...</p>
+                        <div class="wizard-progress-bar">
+                            <div class="wizard-progress-fill" id="discover-progress"></div>
+                        </div>
+                        <div class="wizard-result hidden" id="discover-result">
+                            <div id="competitors-list" class="competitors-list-auto"></div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Generate -->
+                    <div class="wizard-step hidden" id="wizard-step-3">
+                        <div class="wizard-icon generating">
+                            <span class="icon-main">✨</span>
+                        </div>
+                        <h2 class="wizard-title">Generating</h2>
+                        <p class="wizard-subtitle" id="generate-status">Creating feature suggestions...</p>
+                        <div class="wizard-progress-bar">
+                            <div class="wizard-progress-fill" id="generate-progress"></div>
+                        </div>
+                        <div class="wizard-result hidden" id="generate-result">
+                            <p class="result-summary-big" id="generate-summary">0 features generated</p>
+                            <div class="result-breakdown" id="generate-breakdown"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step Indicators -->
+                <div class="wizard-steps-indicator">
+                    <div class="step-dot active" data-step="1">
+                        <span class="step-label">Analyze</span>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step-dot" data-step="2">
+                        <span class="step-label">Discover</span>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step-dot" data-step="3">
+                        <span class="step-label">Generate</span>
+                    </div>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="wizard-footer">
+                    <button id="wizard-skip" class="btn btn-secondary hidden">Skip</button>
+                    <button id="wizard-finish" class="btn btn-success hidden">View Roadmap</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Competitor Options Modal -->
+        <div id="competitor-options-modal" class="modal hidden">
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h2>Existing Analysis Found</h2>
+                    <button class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>You already have competitor analysis data. What would you like to do?</p>
+                    <div class="option-cards">
+                        <button class="option-card" data-option="reuse">
+                            <span class="option-icon">♻️</span>
+                            <span class="option-title">Reuse Existing</span>
+                            <span class="option-desc">Keep your current competitor data</span>
+                        </button>
+                        <button class="option-card" data-option="refresh">
+                            <span class="option-icon">🔄</span>
+                            <span class="option-title">Refresh</span>
+                            <span class="option-desc">Re-discover competitors</span>
+                        </button>
+                        <button class="option-card" data-option="skip">
+                            <span class="option-icon">⏭️</span>
+                            <span class="option-title">Skip</span>
+                            <span class="option-desc">Generate without competitor data</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature Detail Modal -->
+        <div id="feature-detail-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="feature-detail-title">Feature Details</h2>
+                    <button class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="feature-detail-content">
+                        <div class="feature-meta">
+                            <span class="feature-badge priority-badge" id="detail-priority">-</span>
+                            <span class="feature-badge phase-badge" id="detail-phase">-</span>
+                            <span class="feature-badge complexity-badge" id="detail-complexity">-</span>
+                            <span class="feature-badge impact-badge" id="detail-impact">-</span>
+                        </div>
+                        <div class="feature-section">
+                            <h4>Description</h4>
+                            <p id="detail-description">-</p>
+                        </div>
+                        <div class="feature-section" id="detail-justification-section">
+                            <h4>Justification</h4>
+                            <p id="detail-justification">-</p>
+                        </div>
+                        <div class="feature-section" id="detail-task-section" style="display:none;">
+                            <h4>Linked Task</h4>
+                            <a href="#" id="detail-task-link" class="task-link">View Task</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btn-delete-feature" class="btn btn-danger">Delete</button>
+                    <div class="modal-actions">
+                        <button id="btn-expand-feature" class="btn btn-secondary">Expand with AI</button>
+                        <button id="btn-build-feature" class="btn btn-success">Build Feature</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Settings Modal -->
         <div id="settings-modal" class="modal hidden">
             <div class="modal-content">
@@ -471,6 +771,8 @@
     <script type="module" src="/js/sidebar.js"></script>
     <script type="module" src="/js/keyboard.js"></script>
     <script type="module" src="/js/worktrees.js"></script>
+    <script type="module" src="/js/roadmap.js"></script>
+    <script type="module" src="/js/roadmap-wizard.js"></script>
     <script type="module" src="/js/app.js"></script>
 
     <footer class="main-footer">

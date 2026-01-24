@@ -26,6 +26,7 @@ class KeyboardManager {
   registerDefaults() {
     this.register('k', () => this.navigate('kanban'), 'Go to Kanban board');
     this.register('w', () => this.navigate('worktrees'), 'Go to Worktrees view');
+    this.register('d', () => this.navigate('roadmap'), 'Go to Roadmap view');
     this.register('s', () => this.openSettings(), 'Open Settings');
     this.register('[', () => this.toggleSidebar(), 'Toggle sidebar');
     this.register('\\', () => this.toggleSidebar(), 'Toggle sidebar (alt)');

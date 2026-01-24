@@ -21,6 +21,22 @@ export function initTaskModal() {
 async function openModal(taskId) {
     try {
         currentTask = await API.tasks.get(taskId);
+
+        // Auto-sync PR info if task has branch but no PR url
+        if (currentTask.branch_name && !currentTask.pr_url) {
+            console.log('[Task Modal] Task has branch but no PR url - syncing...');
+            try {
+                const syncResult = await API.tasks.syncPR(taskId);
+                if (syncResult.synced) {
+                    console.log('[Task Modal] PR synced:', syncResult.pr_url);
+                    // Reload task with updated PR info
+                    currentTask = await API.tasks.get(taskId);
+                }
+            } catch (syncError) {
+                console.log('[Task Modal] PR sync failed (no PR exists?):', syncError.message);
+            }
+        }
+
         renderModal();
         document.getElementById('task-modal').classList.remove('hidden');
         startAutoRefresh();
@@ -298,6 +314,13 @@ function setupActions() {
     createPRBtn.addEventListener('click', async () => {
         if (!currentTask) return;
 
+        // If PR already exists, open it in a new tab
+        if (currentTask.pr_url) {
+            window.open(currentTask.pr_url, '_blank');
+            return;
+        }
+
+        // Create a new PR
         createPRBtn.disabled = true;
         createPRBtn.textContent = 'Creating PR...';
 
@@ -373,6 +396,9 @@ function updateActionButtons() {
     if (currentTask.status === 'human_review') {
         viewDiffBtn.classList.remove('hidden');
         createPRBtn.classList.remove('hidden');
+
+        // Change button text based on PR status
+        createPRBtn.textContent = currentTask.pr_url ? 'View PR' : 'Create PR';
     } else {
         viewDiffBtn.classList.add('hidden');
         createPRBtn.classList.add('hidden');
@@ -420,10 +446,19 @@ function updatePRReviewTabVisibility() {
     const tabBtn = document.getElementById('tab-btn-pr-review');
     if (!tabBtn) return;
 
+    console.log('[PR Review Tab] Checking visibility:', {
+        hasTask: !!currentTask,
+        pr_url: currentTask?.pr_url,
+        pr_number: currentTask?.pr_number,
+        status: currentTask?.status
+    });
+
     if (currentTask && currentTask.pr_url) {
+        console.log('[PR Review Tab] Showing tab - PR exists');
         tabBtn.style.display = 'block';
         startPRReviewPolling();
     } else {
+        console.log('[PR Review Tab] Hiding tab - No PR');
         tabBtn.style.display = 'none';
         stopPRReviewPolling();
     }

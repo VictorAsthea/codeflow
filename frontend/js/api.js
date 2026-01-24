@@ -75,6 +75,10 @@ export const API = {
             method: 'POST',
         }),
 
+        syncPR: (id) => fetchJSON(`${API_BASE}/tasks/${id}/sync-pr`, {
+            method: 'POST',
+        }),
+
         checkConflicts: (id) => fetchJSON(`${API_BASE}/tasks/${id}/check-conflicts`),
 
         getPRReviews: (id) => fetchJSON(`${API_BASE}/tasks/${id}/pr-reviews`),
@@ -116,6 +120,66 @@ export const API = {
         }),
 
         merge: (taskId, target = 'develop') => fetchJSON(`${API_BASE}/worktrees/${taskId}/merge?target=${target}`, {
+            method: 'POST',
+        }),
+    },
+
+    roadmap: {
+        get: () => fetchJSON(`${API_BASE}/roadmap`),
+
+        update: (data) => fetchJSON(`${API_BASE}/roadmap`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }),
+
+        clear: () => fetchJSON(`${API_BASE}/roadmap`, {
+            method: 'DELETE',
+        }),
+
+        // Analysis status
+        analysisStatus: () => fetchJSON(`${API_BASE}/roadmap/analysis-status`),
+
+        // AI Generation phases
+        analyze: (data) => fetchJSON(`${API_BASE}/roadmap/analyze`, {
+            method: 'POST',
+            body: JSON.stringify(data || {}),
+        }),
+
+        discover: (useExisting = false) => fetchJSON(`${API_BASE}/roadmap/discover`, {
+            method: 'POST',
+            body: JSON.stringify({ use_existing: useExisting }),
+        }),
+
+        generate: (useCompetitorAnalysis = true) => fetchJSON(`${API_BASE}/roadmap/generate`, {
+            method: 'POST',
+            body: JSON.stringify({ use_competitor_analysis: useCompetitorAnalysis }),
+        }),
+
+        // Feature CRUD
+        createFeature: (data) => fetchJSON(`${API_BASE}/roadmap/features`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+        updateFeature: (id, data) => fetchJSON(`${API_BASE}/roadmap/features/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+
+        deleteFeature: (id) => fetchJSON(`${API_BASE}/roadmap/features/${id}`, {
+            method: 'DELETE',
+        }),
+
+        updateFeatureStatus: (id, status) => fetchJSON(`${API_BASE}/roadmap/features/${id}/drag`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status }),
+        }),
+
+        buildFeature: (id) => fetchJSON(`${API_BASE}/roadmap/features/${id}/build`, {
+            method: 'POST',
+        }),
+
+        expandFeature: (id) => fetchJSON(`${API_BASE}/roadmap/features/${id}/expand`, {
             method: 'POST',
         }),
     },
