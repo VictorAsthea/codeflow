@@ -1,8 +1,9 @@
 from fastapi import WebSocket
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 import json
 import asyncio
 import time
+import threading
 from datetime import datetime, timezone
 import logging
 
@@ -218,18 +219,20 @@ class KanbanConnectionManager:
     """
 
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: Set[WebSocket] = set()
+        self._lock = threading.Lock()
 
     async def connect(self, websocket: WebSocket):
         """Accept and track a new WebSocket connection"""
         await websocket.accept()
-        self.active_connections.append(websocket)
+        with self._lock:
+            self.active_connections.add(websocket)
         logger.info(f"Kanban WebSocket connected, total: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         """Remove a WebSocket connection"""
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+        with self._lock:
+            self.active_connections.discard(websocket)
         logger.info(f"Kanban WebSocket disconnected, total: {len(self.active_connections)}")
 
     async def broadcast(self, event_type: str, data: dict):
@@ -247,8 +250,11 @@ class KanbanConnectionManager:
         }
         message_json = json.dumps(message)
 
+        with self._lock:
+            connections_to_send = list(self.active_connections)
+
         disconnected = []
-        for connection in self.active_connections:
+        for connection in connections_to_send:
             try:
                 await connection.send_text(message_json)
             except Exception as e:
