@@ -99,11 +99,9 @@ class PRMonitor:
                     await self._handle_pr_merged(task.id)
                 else:
                     logger.debug(f"📋 PR #{task.pr_number} still open (task {task.id})")
-
-                checked_count += 1
-
             except Exception as e:
                 logger.error(f"❌ Error checking PR #{task.pr_number} for task {task.id}: {e}")
+            finally:
                 checked_count += 1
 
         return checked_count
