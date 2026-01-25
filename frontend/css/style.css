@@ -3281,11 +3281,47 @@ body {
   color: var(--accent-yellow);
 }
 
+/* ==================== MODAL OVERLAY ==================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-overlay.active {
+  display: flex;
+}
+
 /* ==================== FOLDER BROWSER MODAL ==================== */
 .folder-browser-modal {
   width: 600px;
   max-width: 90vw;
   max-height: 80vh;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.folder-browser-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.folder-browser-modal .modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
 }
 
 .folder-browser-modal .modal-body {
@@ -3294,6 +3330,8 @@ body {
   gap: 0;
   padding: 0;
   max-height: 60vh;
+  flex: 1;
+  overflow: hidden;
 }
 
 /* Breadcrumb */
@@ -3445,7 +3483,9 @@ body {
   display: flex;
   align-items: center;
   gap: 1rem;
+  padding: 1rem;
   border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
 }
 
 .selected-folder {
