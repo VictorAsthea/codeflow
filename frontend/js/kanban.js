@@ -326,6 +326,11 @@ export function updateTaskCard(taskId, data) {
             const subtaskIndex = existingSubtasks.findIndex(s => s.order === order);
             if (subtaskIndex !== -1) {
                 existingSubtasks[subtaskIndex] = { ...existingSubtasks[subtaskIndex], ...subtask, status };
+            } else {
+                // Add the new subtask if it doesn't exist
+                existingSubtasks.push({ ...subtask, status });
+                // Optionally, sort to maintain order
+                existingSubtasks.sort((a, b) => a.order - b.order);
             }
 
             tasks[taskIndex].subtasks = existingSubtasks;
