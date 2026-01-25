@@ -300,6 +300,163 @@ function renderSubtaskProgress(task) {
     `;
 }
 
+/**
+ * Update a specific task card without re-rendering the entire kanban
+ * Called by WebSocket event handlers when subtask/phase status changes
+ * @param {string} taskId - The task ID to update
+ * @param {Object} data - Updated task data (subtasks, phases, status, etc.)
+ */
+export function updateTaskCard(taskId, data) {
+    // Find the card element
+    const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+    if (!card) {
+        console.warn(`updateTaskCard: Card not found for task ${taskId}`);
+        return;
+    }
+
+    // Update the local tasks array with new data
+    const taskIndex = tasks.findIndex(t => t.id === taskId);
+    if (taskIndex !== -1) {
+        // Handle partial subtask updates via _subtaskUpdate field
+        if (data._subtaskUpdate) {
+            const { order, status, subtask } = data._subtaskUpdate;
+            const existingSubtasks = tasks[taskIndex].subtasks || [];
+
+            // Find and update the specific subtask by order
+            const subtaskIndex = existingSubtasks.findIndex(s => s.order === order);
+            if (subtaskIndex !== -1) {
+                existingSubtasks[subtaskIndex] = { ...existingSubtasks[subtaskIndex], ...subtask, status };
+            }
+
+            tasks[taskIndex].subtasks = existingSubtasks;
+        }
+        // Handle partial phase updates via _phaseUpdate field
+        else if (data._phaseUpdate) {
+            const { phase, status } = data._phaseUpdate;
+            const existingPhases = tasks[taskIndex].phases || {};
+
+            // Update the specific phase status
+            if (!existingPhases[phase]) {
+                existingPhases[phase] = {};
+            }
+            existingPhases[phase].status = status;
+
+            tasks[taskIndex].phases = existingPhases;
+        } else {
+            // Merge the new data into the existing task
+            tasks[taskIndex] = { ...tasks[taskIndex], ...data };
+        }
+    }
+
+    // Get the updated task (either from merged data or use provided data)
+    const task = taskIndex !== -1 ? tasks[taskIndex] : data;
+
+    // Update progress bar and subtask dots
+    updateCardProgress(card, task);
+
+    // Update phase steps
+    updateCardPhases(card, task);
+
+    // Update status badge if status changed
+    if (data.status !== undefined) {
+        updateCardStatusBadge(card, task);
+    }
+}
+
+/**
+ * Update the progress bar and subtask dots on a card
+ * @param {HTMLElement} card - The card DOM element
+ * @param {Object} task - The task data
+ */
+function updateCardProgress(card, task) {
+    const subtasks = task.subtasks || [];
+    const progressContainer = card.querySelector('.task-card-progress');
+
+    // If no subtasks, remove progress section if it exists
+    if (subtasks.length === 0) {
+        if (progressContainer) {
+            progressContainer.remove();
+        }
+        return;
+    }
+
+    const total = subtasks.length;
+    const completed = subtasks.filter(s => s.status === 'completed').length;
+    const percentage = Math.round((completed / total) * 100);
+
+    if (progressContainer) {
+        // Update existing progress elements
+        const progressLabel = progressContainer.querySelector('.progress-label span:last-child');
+        if (progressLabel) {
+            progressLabel.textContent = `${completed}/${total} (${percentage}%)`;
+        }
+
+        const progressFill = progressContainer.querySelector('.progress-fill');
+        if (progressFill) {
+            progressFill.style.width = `${percentage}%`;
+        }
+
+        // Update subtask dots
+        const dotsContainer = progressContainer.querySelector('.subtask-dots');
+        if (dotsContainer) {
+            dotsContainer.innerHTML = subtasks.map(s =>
+                `<span class="subtask-dot ${s.status}"></span>`
+            ).join('');
+        }
+    } else {
+        // Create progress section if it doesn't exist but we have subtasks
+        const progressHtml = renderSubtaskProgress(task);
+        if (progressHtml) {
+            const phasesContainer = card.querySelector('.task-card-phases');
+            if (phasesContainer) {
+                phasesContainer.insertAdjacentHTML('beforebegin', progressHtml);
+            }
+        }
+    }
+}
+
+/**
+ * Update the phase steps on a card
+ * @param {HTMLElement} card - The card DOM element
+ * @param {Object} task - The task data
+ */
+function updateCardPhases(card, task) {
+    const phasesContainer = card.querySelector('.task-card-phases');
+    if (!phasesContainer) return;
+
+    // Re-render the phase steps using the existing function
+    phasesContainer.innerHTML = renderPhaseSteps(task);
+}
+
+/**
+ * Update the status badge on a card
+ * @param {HTMLElement} card - The card DOM element
+ * @param {Object} task - The task data
+ */
+function updateCardStatusBadge(card, task) {
+    const h3 = card.querySelector('h3');
+    if (!h3) return;
+
+    // Remove existing status badges
+    const existingBadges = h3.querySelectorAll('.badge-queued, .badge-running, .badge-reviewing');
+    existingBadges.forEach(badge => badge.remove());
+
+    // Add new status badge if applicable
+    let statusBadge = '';
+    if (task.status === 'queued') {
+        statusBadge = '<span class="badge-queued">⏳ Queued</span>';
+    } else if (task.status === 'in_progress') {
+        statusBadge = '<span class="badge-running">▶️ Running</span>';
+    } else if (task.status === 'ai_review') {
+        const reviewText = task.review_status === 'in_progress' ? '🔍 Reviewing...' : '🔍 AI Review';
+        statusBadge = `<span class="badge-reviewing">${reviewText}</span>`;
+    }
+
+    if (statusBadge) {
+        h3.insertAdjacentHTML('beforeend', ` ${statusBadge}`);
+    }
+}
+
 function getTimeAgo(date) {
     const seconds = Math.floor((new Date() - date) / 1000);
 
