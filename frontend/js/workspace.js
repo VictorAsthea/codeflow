@@ -81,11 +81,11 @@ class WorkspaceManager {
 
     showOpenModal() {
         const html = `
-            <div class="modal-overlay active" id="open-project-modal">
-                <div class="modal folder-browser-modal">
+            <div class="modal" id="open-project-modal">
+                <div class="modal-content folder-browser-modal">
                     <div class="modal-header">
                         <h2>Ouvrir un projet</h2>
-                        <button class="modal-close" onclick="workspace.closeModal()">✕</button>
+                        <button class="btn-close" onclick="workspace.closeModal()">&times;</button>
                     </div>
                     <div class="modal-body">
                         <!-- Breadcrumb path -->

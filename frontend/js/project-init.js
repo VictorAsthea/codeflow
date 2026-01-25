@@ -50,11 +50,11 @@ class ProjectInitManager {
 
     showInitModal(status) {
         const html = `
-            <div class="modal-overlay active" id="init-modal">
-                <div class="modal init-modal">
+            <div class="modal" id="init-modal">
+                <div class="modal-content init-modal">
                     <div class="modal-header">
                         <h2>Initialiser Codeflow</h2>
-                        <button class="modal-close" onclick="projectInit.closeModal()">x</button>
+                        <button class="btn-close" onclick="projectInit.closeModal()">&times;</button>
                     </div>
                     <div class="modal-body">
                         <p>Ce projet n'a pas Codeflow initialise. Voulez-vous le configurer ?</p>
