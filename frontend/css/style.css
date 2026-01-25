@@ -3017,7 +3017,39 @@ body {
 .subtask-item .btn-retry-subtask:hover {
   background-color: var(--accent-yellow);
   color: black;
+}
 
+/* ========================================
+   SUBTASK DOTS (Kanban Card Progress)
+   ======================================== */
+
+.subtask-dots {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.subtask-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  /* Pending state (default) - visible against gray card background */
+  background-color: var(--text-secondary);
+  opacity: 0.5;
+  transition: all 0.2s ease;
+}
+
+.subtask-dot.completed {
+  /* Completed state - bright green for clear visibility */
+  background-color: var(--accent-green);
+  opacity: 1;
+}
+
+.subtask-dot.in_progress {
+  /* In-progress state - yellow for clear visibility */
+  background-color: var(--accent-yellow);
+  opacity: 1;
+}
 
 /* Error Message */
 .error-message {
