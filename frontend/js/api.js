@@ -106,6 +106,10 @@ export const API = {
         unarchive: (id) => fetchJSON(`${API_BASE}/tasks/${id}/unarchive`, {
             method: 'PATCH',
         }),
+
+        retrySubtask: (taskId, subtaskId) => fetchJSON(`${API_BASE}/tasks/${taskId}/subtasks/${subtaskId}/retry`, {
+            method: 'POST',
+        }),
     },
 
     settings: {
