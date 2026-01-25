@@ -13,9 +13,9 @@ from backend.services.subtask_executor import get_subtask_progress
 
 
 def get_storage():
-    """Get storage instance (lazy import to avoid circular dependency)"""
-    from backend.main import storage
-    return storage
+    """Get storage for the active project."""
+    from backend.services.storage_manager import get_project_storage
+    return get_project_storage()
 from backend.services.worktree_manager import WorktreeManager
 from backend.services.phase_executor import execute_all_phases
 from backend.services.task_queue import task_queue

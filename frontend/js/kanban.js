@@ -730,3 +730,6 @@ window.addEventListener('task-updated', async () => {
 window.addEventListener('DOMContentLoaded', () => {
     initKanban();
 });
+
+// Expose globally for workspace.js
+window.loadKanban = loadTasks;
