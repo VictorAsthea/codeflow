@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from pathlib import Path
 
 from backend.services.workspace_service import get_workspace_service
-from backend.services.settings_service import get_settings, save_settings
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
 
@@ -31,14 +30,7 @@ async def open_project(request: ProjectPathRequest):
     """Ouvre un projet."""
     try:
         service = get_workspace_service()
-        result = service.open_project(request.project_path)
-
-        if result["success"]:
-            settings = get_settings()
-            settings["project_path"] = request.project_path
-            save_settings(settings)
-
-        return result
+        return service.open_project(request.project_path)
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -48,14 +40,7 @@ async def close_project(request: ProjectPathRequest):
     """Ferme un projet."""
     try:
         service = get_workspace_service()
-        result = service.close_project(request.project_path)
-
-        if result["success"] and result.get("active_project"):
-            settings = get_settings()
-            settings["project_path"] = result["active_project"]
-            save_settings(settings)
-
-        return result
+        return service.close_project(request.project_path)
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -65,14 +50,7 @@ async def set_active_project(request: ProjectPathRequest):
     """Définit le projet actif."""
     try:
         service = get_workspace_service()
-        result = service.set_active_project(request.project_path)
-
-        if result["success"]:
-            settings = get_settings()
-            settings["project_path"] = request.project_path
-            save_settings(settings)
-
-        return result
+        return service.set_active_project(request.project_path)
     except Exception as e:
         raise HTTPException(500, str(e))
 
