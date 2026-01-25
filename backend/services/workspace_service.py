@@ -51,6 +51,9 @@ class WorkspaceService:
 
     def get_workspace_state(self) -> Dict[str, Any]:
         """Retourne l'état complet du workspace."""
+        # Reload from file to ensure fresh data
+        self.data = self._load()
+
         projects = []
         for p in self.data["open_projects"]:
             project_info = dict(p)
