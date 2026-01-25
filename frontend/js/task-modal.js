@@ -543,6 +543,10 @@ function updateActionButtons() {
     if (currentTask.status === 'in_progress') {
         startBtn.classList.add('hidden');
         stopBtn.classList.remove('hidden');
+    } else if (currentTask.status === 'done') {
+        // Hide both start and stop for completed tasks
+        startBtn.classList.add('hidden');
+        stopBtn.classList.add('hidden');
     } else {
         startBtn.classList.remove('hidden');
         stopBtn.classList.add('hidden');
