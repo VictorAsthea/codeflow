@@ -2,7 +2,7 @@
  * Context Page - Affiche le contexte du projet
  */
 
-import { api } from './api.js';
+import { API } from './api.js';
 
 class ContextManager {
     constructor() {
@@ -25,7 +25,7 @@ class ContextManager {
         this.container.innerHTML = '<div class="loading">Chargement du contexte...</div>';
 
         try {
-            this.contextData = await api.context.get();
+            this.contextData = await API.context.get();
             this.render();
         } catch (error) {
             console.error('Failed to load context:', error);
@@ -44,7 +44,7 @@ class ContextManager {
         this.refreshBtn.textContent = 'Scan en cours...';
 
         try {
-            const result = await api.context.refresh();
+            const result = await API.context.refresh();
             this.contextData = result.context;
             this.render();
             window.showToast?.('Contexte rafraichi', 'success');
