@@ -256,7 +256,7 @@ class KanbanConnectionManager:
             "data": data,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        message_json = json.dumps(message)
+        message_json = json.dumps(message, cls=DateTimeEncoder)
 
         with self._lock:
             connections_to_send = list(self.active_connections)
