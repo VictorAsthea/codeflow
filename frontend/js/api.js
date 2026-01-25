@@ -149,6 +149,11 @@ export const API = {
         getSummary: () => fetchJSON(`${API_BASE}/context/summary`),
     },
 
+    changelog: {
+        get: (limit = 50, offset = 0, codeflowOnly = true) =>
+            fetchJSON(`${API_BASE}/changelog?limit=${limit}&offset=${offset}&codeflow_only=${codeflowOnly}`),
+    },
+
     roadmap: {
         get: () => fetchJSON(`${API_BASE}/roadmap`),
 

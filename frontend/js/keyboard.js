@@ -28,6 +28,7 @@ class KeyboardManager {
     this.register('w', () => this.navigate('worktrees'), 'Go to Worktrees view');
     this.register('d', () => this.navigate('roadmap'), 'Go to Roadmap view');
     this.register('c', () => this.navigate('context'), 'Go to Context view');
+    this.register('l', () => this.navigate('changelog'), 'Go to Changelog view');
     this.register('s', () => this.openSettings(), 'Open Settings');
     this.register('[', () => this.toggleSidebar(), 'Toggle sidebar');
     this.register('\\', () => this.toggleSidebar(), 'Toggle sidebar (alt)');

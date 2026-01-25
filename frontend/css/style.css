@@ -2459,3 +2459,318 @@ body {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* ==================== */
+/* Changelog Styles     */
+/* ==================== */
+
+.changelog-container {
+  max-width: 800px;
+  padding: 0 1rem;
+}
+
+.changelog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.changelog-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 1rem;
+  transition: border-color 0.2s;
+}
+
+.changelog-item:hover {
+  border-color: var(--accent-blue);
+}
+
+.changelog-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.changelog-time {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.changelog-hash {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.changelog-message {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.4;
+  margin-bottom: 0.75rem;
+}
+
+.changelog-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.changelog-files {
+  cursor: help;
+}
+
+.changelog-task-id {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  background: rgba(102, 126, 234, 0.15);
+  color: var(--accent-blue);
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.changelog-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-secondary);
+}
+
+.changelog-empty .empty-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.changelog-empty p {
+  margin: 0.5rem 0;
+}
+
+.changelog-empty .empty-hint {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+#refresh-changelog-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  background: var(--accent-blue);
+  border: none;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#refresh-changelog-btn:hover {
+  background: var(--accent-blue-hover);
+}
+
+#refresh-changelog-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Changelog Day Groups */
+.changelog-day-group {
+  margin-bottom: 1.5rem;
+}
+
+.changelog-day-group:last-child {
+  margin-bottom: 0;
+}
+
+.changelog-day-header {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.5rem 0;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.changelog-day-commits {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Changelog Files Toggle Button */
+.changelog-files-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.changelog-files-toggle:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--accent-blue);
+  color: var(--text-primary);
+}
+
+.changelog-files-toggle .toggle-icon {
+  font-size: 0.65rem;
+  transition: transform 0.2s;
+}
+
+.changelog-files-toggle[aria-expanded="true"] .toggle-icon {
+  transform: rotate(90deg);
+}
+
+.changelog-files-toggle .files-icon {
+  font-size: 0.85rem;
+}
+
+.changelog-files-empty {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* Expandable Files List */
+.changelog-files-list {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.changelog-files-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.changelog-file-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+.changelog-file-item:last-child {
+  border-bottom: none;
+}
+
+.changelog-file-item .file-icon {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+/* Task Link Styling */
+.changelog-task-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.6rem;
+  background-color: rgba(88, 166, 255, 0.15);
+  color: var(--accent-blue);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.changelog-task-link:hover {
+  background-color: rgba(88, 166, 255, 0.3);
+  color: var(--accent-blue-bright);
+  text-decoration: none;
+}
+
+.changelog-task-link::before {
+  content: "→";
+  font-size: 0.7rem;
+  opacity: 0;
+  margin-left: -0.5rem;
+  transition: all 0.2s;
+}
+
+.changelog-task-link:hover::before {
+  opacity: 1;
+  margin-left: 0;
+}
+
+/* Update existing changelog-task-id to differentiate from link */
+.changelog-task-id {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  background: rgba(102, 126, 234, 0.15);
+  color: var(--accent-blue);
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+/* Generic Loading State */
+.loading {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 3rem 1rem;
+  font-size: 0.95rem;
+}
+
+.loading::before {
+  content: "⏳";
+  display: block;
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.95); }
+}
+
+/* Error Message */
+.error-message {
+  text-align: center;
+  color: var(--accent-red);
+  padding: 2rem 1rem;
+  background-color: rgba(248, 81, 73, 0.1);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  border-radius: 8px;
+  margin: 1rem;
+}
+
+.error-message::before {
+  content: "⚠️";
+  display: block;
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+}
