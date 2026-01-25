@@ -80,6 +80,21 @@ class ProjectInitManager {
         `;
         document.body.insertAdjacentHTML('beforeend', html);
         this.modal = document.getElementById('init-modal');
+
+        // Setup modal click handlers
+        this.modal.addEventListener('click', (e) => {
+            if (e.target === this.modal) {
+                this.closeModal();
+            }
+        });
+
+        // Prevent clicks inside modal-content from bubbling to overlay
+        const modalContent = this.modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
     }
 
     showProgressState() {

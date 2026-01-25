@@ -173,6 +173,14 @@ function setupModalClose() {
         }
     });
 
+    // Prevent clicks inside modal-content from bubbling to overlay
+    const modalContent = modal.querySelector('.modal-content');
+    if (modalContent) {
+        modalContent.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    }
+
     // ESC key to close
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
