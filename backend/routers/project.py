@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from backend.services.project_init_service import get_project_init_service
+from backend.services.workspace_service import get_workspace_service
 
 router = APIRouter()
 
@@ -15,11 +16,19 @@ class InitRequest(BaseModel):
     project_path: Optional[str] = None
 
 
+def _get_active_project_path() -> str:
+    """Retourne le chemin du projet actif depuis le workspace."""
+    ws = get_workspace_service()
+    state = ws.get_workspace_state()
+    return state.get("active_project")
+
+
 @router.get("/project/status")
 async def get_project_status():
     """Retourne le statut d'initialisation du projet actuel."""
     try:
-        service = get_project_init_service()
+        project_path = _get_active_project_path()
+        service = get_project_init_service(project_path)
         return service.get_status()
     except Exception as e:
         raise HTTPException(500, f"Failed to get project status: {str(e)}")
@@ -29,7 +38,7 @@ async def get_project_status():
 async def initialize_project(request: InitRequest = None):
     """Initialise Codeflow pour le projet actuel."""
     try:
-        project_path = request.project_path if request else None
+        project_path = request.project_path if request and request.project_path else _get_active_project_path()
         service = get_project_init_service(project_path)
 
         if service.is_initialized():

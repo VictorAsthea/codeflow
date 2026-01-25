@@ -30,7 +30,8 @@ class ProjectInitManager {
         try {
             const response = await fetch('/api/project/init', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
             });
 
             const result = await response.json();
@@ -49,11 +50,12 @@ class ProjectInitManager {
     }
 
     showInitModal(status) {
+        const projectName = status?.project_name || 'le projet';
         const html = `
             <div class="modal" id="init-modal">
                 <div class="modal-content init-modal">
                     <div class="modal-header">
-                        <h2>Initialiser Codeflow</h2>
+                        <h2>Initialiser ${projectName}</h2>
                         <button class="btn-close" onclick="projectInit.closeModal()">&times;</button>
                     </div>
                     <div class="modal-body">
