@@ -1,0 +1,165 @@
+{
+  "roadmap": {
+    "project_name": "Codeflow",
+    "project_description": "Gestionnaire de tâches Kanban avec orchestration Claude Code CLI",
+    "target_audience": "Developers",
+    "personas": [],
+    "features": [
+      {
+        "id": "feat-65207090",
+        "title": "Database Migrations",
+        "description": "Alembic-based database schema migrations for safe upgrades.",
+        "justification": "Essential for evolving the data model safely.",
+        "phase": "foundation",
+        "priority": "must",
+        "complexity": "low",
+        "impact": "high",
+        "status": "under_review",
+        "task_id": null,
+        "created_at": "2026-01-24T18:02:23.990645",
+        "updated_at": "2026-01-24T18:02:23.990645"
+      },
+      {
+        "id": "feat-4fb4be8c",
+        "title": "Background Tasks",
+        "description": "Async task queue for long-running operations.",
+        "justification": "Prevents blocking the main application.",
+        "phase": "enhancement",
+        "priority": "should",
+        "complexity": "medium",
+        "impact": "medium",
+        "status": "under_review",
+        "task_id": null,
+        "created_at": "2026-01-24T18:02:23.990645",
+        "updated_at": "2026-01-24T18:02:23.990645"
+      },
+      {
+        "id": "feat-060a9acc",
+        "title": "User Authentication",
+        "description": "Implement secure user authentication with login, logout, and session management.",
+        "justification": "Essential for user management and security.",
+        "phase": "foundation",
+        "priority": "must",
+        "complexity": "medium",
+        "impact": "high",
+        "status": "under_review",
+        "task_id": null,
+        "created_at": "2026-01-24T18:02:23.990645",
+        "updated_at": "2026-01-24T18:02:23.990645"
+      },
+      {
+        "id": "feat-8e19aa38",
+        "title": "Error Handling & Logging",
+        "description": "Comprehensive error handling with structured logging for debugging and monitoring.",
+        "justification": "Critical for maintaining production stability and debugging issues.",
+        "phase": "foundation",
+        "priority": "must",
+        "complexity": "low",
+        "impact": "high",
+        "status": "under_review",
+        "task_id": null,
+        "created_at": "2026-01-24T18:02:23.990645",
+        "updated_at": "2026-01-24T18:02:23.990645"
+      },
+      {
+        "id": "feat-cb96d379",
+        "title": "API Documentation",
+        "description": "Auto-generated API documentation with interactive examples.",
+        "justification": "Improves developer experience and onboarding.",
+        "phase": "core",
+        "priority": "should",
+        "complexity": "low",
+        "impact": "medium",
+        "status": "under_review",
+        "task_id": null,
+        "created_at": "2026-01-24T18:02:23.990645",
+        "updated_at": "2026-01-24T18:02:23.990645"
+      },
+      {
+        "id": "feat-8660fca5",
+        "title": "Configuration Management",
+        "description": "Centralized configuration with environment-based settings.",
+        "justification": "Enables easy deployment across environments.",
+        "phase": "foundation",
+        "priority": "must",
+        "complexity": "low",
+        "impact": "medium",
+        "status": "under_review",
+        "task_id": null,
+        "created_at": "2026-01-24T18:02:23.990645",
+        "updated_at": "2026-01-24T18:02:23.990645"
+      },
+      {
+        "id": "feat-2444f156",
+        "title": "Performance Optimization",
+        "description": "Implement caching, lazy loading, and query optimization.",
+        "justification": "Improves user experience and reduces server costs.",
+        "phase": "enhancement",
+        "priority": "should",
+        "complexity": "medium",
+        "impact": "high",
+        "status": "under_review",
+        "task_id": null,
+        "created_at": "2026-01-24T18:02:23.990645",
+        "updated_at": "2026-01-24T18:02:23.990645"
+      },
+      {
+        "id": "feat-daea6c41",
+        "title": "Automated Testing",
+        "description": "Unit tests, integration tests, and end-to-end testing setup.",
+        "justification": "Ensures code quality and prevents regressions.",
+        "phase": "core",
+        "priority": "must",
+        "complexity": "medium",
+        "impact": "high",
+        "status": "under_review",
+        "task_id": null,
+        "created_at": "2026-01-24T18:02:23.990645",
+        "updated_at": "2026-01-24T18:02:23.990645"
+      },
+      {
+        "id": "feat-ee224600",
+        "title": "CI/CD Pipeline",
+        "description": "Automated build, test, and deployment workflow.",
+        "justification": "Speeds up development and ensures consistent deployments.",
+        "phase": "core",
+        "priority": "should",
+        "complexity": "medium",
+        "impact": "high",
+        "status": "under_review",
+        "task_id": null,
+        "created_at": "2026-01-24T18:02:23.990645",
+        "updated_at": "2026-01-24T18:02:23.990645"
+      },
+      {
+        "id": "feat-d5def34a",
+        "title": "User Dashboard",
+        "description": "Central dashboard for users to view and manage their data.",
+        "justification": "Core user interface for the application.",
+        "phase": "core",
+        "priority": "must",
+        "complexity": "medium",
+        "impact": "high",
+        "status": "under_review",
+        "task_id": null,
+        "created_at": "2026-01-24T18:02:23.990645",
+        "updated_at": "2026-01-24T18:02:23.990645"
+      }
+    ],
+    "analysis": {
+      "date": "2026-01-24T18:02:12.594384",
+      "stack": [
+        "Python",
+        "FastAPI"
+      ],
+      "structure_summary": "**Gestionnaire de tâches Kanban avec orchestration Claude Code CLI** [![License](https://img.shields.io/github/license/VictorAsthea/codeflow?style=flat-square)](LICENSE) [![Made with Claude](https://img.shields.io/badge/Made%20with-Claude-FF6B35?style=flat-square&logo=anthropic)](https://claude.ai)",
+      "files_count": 75
+    },
+    "competitor_analysis": {
+      "date": "2026-01-24T18:02:18.190156",
+      "competitors": []
+    }
+  },
+  "version": "1.0",
+  "last_updated": "2026-01-24T18:02:23.990645"
+}

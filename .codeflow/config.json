@@ -1,0 +1,18 @@
+{
+  "global": {
+    "project_path": "C:\\Users\\victo\\Documents\\DEV\\Codeflow",
+    "target_branch": "main",
+    "default_model": "claude-opus-4-20250514",
+    "default_intensity": "medium",
+    "auto_review": true,
+    "max_parallel_tasks": 3,
+    "planning_model": "claude-sonnet-4-20250514",
+    "coding_model": "claude-sonnet-4-20250514",
+    "validation_model": "claude-haiku-4-20250514",
+    "auto_create_pr": true,
+    "pr_template": null,
+    "enable_sounds": true,
+    "enable_desktop_notifications": false
+  },
+  "last_updated": "2026-01-24T19:49:32.789657"
+}

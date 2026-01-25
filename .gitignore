@@ -42,3 +42,19 @@ logs/
 .coverage
 htmlcov/
 .claude/settings.local.json
+
+# Codeflow local data
+.codeflow/tasks.json
+.codeflow/sessions/
+.codeflow/logs/
+.codeflow/project_context.json
+*/.codeflow/
+
+# Backup files
+*.bak
+
+# Windows artifacts
+nul
+
+# Spec files (temporary)
+*-spec.md
