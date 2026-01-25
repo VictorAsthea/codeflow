@@ -45,26 +45,8 @@ export async function initKanban() {
  * Set up the archived tasks indicator in the DONE column header
  */
 function setupArchivedIndicator() {
-    const doneColumn = document.querySelector('.column[data-status="done"]');
-    if (!doneColumn) return;
-
-    const header = doneColumn.querySelector('.column-header');
-    if (!header) return;
-
-    // Create archived indicator (hidden by default)
-    const indicator = document.createElement('button');
-    indicator.id = 'archived-indicator';
-    indicator.className = 'archived-indicator hidden';
-    indicator.title = 'View archived tasks';
-    indicator.innerHTML = '<span class="archived-icon">📦</span><span class="archived-count">0</span>';
-
-    // Insert before the count badge
-    const countBadge = header.querySelector('.count');
-    if (countBadge) {
-        header.insertBefore(indicator, countBadge);
-    } else {
-        header.appendChild(indicator);
-    }
+    const indicator = document.getElementById('archived-indicator');
+    if (!indicator) return;
 
     // Click handler to open archived tasks modal
     indicator.addEventListener('click', () => {
@@ -74,27 +56,12 @@ function setupArchivedIndicator() {
 }
 
 /**
- * Update the archived tasks count indicator
+ * Update the archived tasks count
  */
 export async function updateArchivedCount() {
     try {
         const response = await API.tasks.listArchived();
         archivedCount = response.tasks.length;
-
-        const indicator = document.getElementById('archived-indicator');
-        if (indicator) {
-            const countEl = indicator.querySelector('.archived-count');
-            if (countEl) {
-                countEl.textContent = archivedCount;
-            }
-
-            // Show/hide based on count
-            if (archivedCount > 0) {
-                indicator.classList.remove('hidden');
-            } else {
-                indicator.classList.add('hidden');
-            }
-        }
     } catch (error) {
         console.error('Failed to fetch archived tasks count:', error);
     }
