@@ -65,6 +65,9 @@ function renderArchivedTasks() {
                     <button class="btn-unarchive" data-task-id="${task.id}">
                         Unarchive
                     </button>
+                    <button class="btn-delete-archived" data-task-id="${task.id}" title="Delete task (keeps code)">
+                        🗑️
+                    </button>
                 </div>
             </div>
         `;
@@ -75,6 +78,11 @@ function renderArchivedTasks() {
     // Add click handlers for unarchive buttons
     listContainer.querySelectorAll('.btn-unarchive').forEach(btn => {
         btn.addEventListener('click', handleUnarchive);
+    });
+
+    // Add click handlers for delete buttons
+    listContainer.querySelectorAll('.btn-delete-archived').forEach(btn => {
+        btn.addEventListener('click', handleDelete);
     });
 }
 
@@ -109,6 +117,42 @@ async function handleUnarchive(event) {
         alert('Failed to unarchive task: ' + error.message);
         btn.disabled = false;
         btn.textContent = 'Unarchive';
+    }
+}
+
+async function handleDelete(event) {
+    const btn = event.target;
+    const taskId = btn.dataset.taskId;
+
+    if (!taskId) return;
+
+    // Confirmation
+    if (!confirm(`Delete task "${taskId}"?\n\nThis only removes the task from Codeflow. The code and branch will be kept.`)) {
+        return;
+    }
+
+    btn.disabled = true;
+
+    try {
+        await API.tasks.delete(taskId);
+
+        // Remove from local array
+        archivedTasks = archivedTasks.filter(t => t.id !== taskId);
+
+        // Re-render the list
+        renderArchivedTasks();
+
+        // Update the archived count
+        await updateArchivedCount();
+
+        // Close modal if no more archived tasks
+        if (archivedTasks.length === 0) {
+            closeModal();
+        }
+    } catch (error) {
+        console.error('Failed to delete task:', error);
+        alert('Failed to delete task: ' + error.message);
+        btn.disabled = false;
     }
 }
 

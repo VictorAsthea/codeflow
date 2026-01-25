@@ -2166,6 +2166,28 @@ body {
   cursor: not-allowed;
 }
 
+.btn-delete-archived {
+  padding: 0.4rem 0.5rem;
+  font-size: 0.9rem;
+  background-color: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-delete-archived:hover {
+  background-color: var(--accent-red);
+  border-color: var(--accent-red);
+  color: white;
+}
+
+.btn-delete-archived:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .archived-empty-state {
   text-align: center;
   padding: 2rem;
