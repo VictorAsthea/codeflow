@@ -37,6 +37,14 @@ function setupModals() {
             });
         });
 
+        // Prevent clicks inside modal-content from bubbling to the overlay
+        const modalContent = modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
+
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.classList.add('hidden');

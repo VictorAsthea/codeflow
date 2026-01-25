@@ -36,6 +36,14 @@ export class FilePicker {
             }
         });
 
+        // Prevent clicks inside modal-content from bubbling to overlay
+        const modalContent = this.modal.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
+
         const searchInput = this.modal.querySelector('#file-search');
         let searchTimeout;
         searchInput.addEventListener('input', (e) => {

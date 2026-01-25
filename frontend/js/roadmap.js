@@ -492,6 +492,14 @@ function setupAddFeatureModal() {
             modal.classList.add('hidden');
         }
     });
+
+    // Prevent clicks inside modal-content from bubbling to overlay
+    const modalContent = modal.querySelector('.modal-content');
+    if (modalContent) {
+        modalContent.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    }
 }
 
 /**
@@ -618,6 +626,14 @@ function setupFeatureDetailModal() {
             modal.classList.add('hidden');
         }
     });
+
+    // Prevent clicks inside modal-content from bubbling to overlay
+    const detailModalContent = modal.querySelector('.modal-content');
+    if (detailModalContent) {
+        detailModalContent.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    }
 }
 
 /**

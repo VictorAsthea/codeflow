@@ -110,6 +110,25 @@ class WorkspaceManager {
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', html);
+
+        // Setup modal click handlers for the dynamically created modal
+        const modal = document.getElementById('open-project-modal');
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    this.closeModal();
+                }
+            });
+
+            // Prevent clicks inside modal-content from bubbling to overlay
+            const modalContent = modal.querySelector('.modal-content');
+            if (modalContent) {
+                modalContent.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
+            }
+        }
+
         this.browseTo(null); // Start at default location
         this.loadRecentProjects();
     }
