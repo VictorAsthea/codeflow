@@ -68,10 +68,10 @@
                         <span class="coming-soon">Coming soon</span>
                     </a>
 
-                    <a href="#changelog" class="nav-item disabled">
+                    <a href="#changelog" class="nav-item" data-shortcut="L" data-view="changelog">
                         <span class="nav-icon">📝</span>
                         <span class="nav-label">Changelog</span>
-                        <span class="coming-soon">Coming soon</span>
+                        <kbd class="nav-kbd">L</kbd>
                     </a>
 
                     <div class="nav-divider"></div>
@@ -260,6 +260,22 @@
                     </div>
                     <div id="context-content" class="context-container">
                         <div class="loading">Chargement du contexte...</div>
+                    </div>
+                </div>
+
+                <!-- Changelog View -->
+                <div id="changelog-view" class="view hidden">
+                    <div class="view-header">
+                        <div class="view-header-content">
+                            <h1>Changelog</h1>
+                            <p>Journal des modifications effectuées par Codeflow</p>
+                        </div>
+                        <div class="view-header-actions">
+                            <button id="refresh-changelog-btn" class="btn btn-secondary">Rafraîchir</button>
+                        </div>
+                    </div>
+                    <div id="changelog-content" class="changelog-container">
+                        <div class="loading">Chargement du changelog...</div>
                     </div>
                 </div>
             </main>
@@ -820,6 +836,7 @@
     <script type="module" src="/js/roadmap.js"></script>
     <script type="module" src="/js/roadmap-wizard.js"></script>
     <script type="module" src="/js/context.js"></script>
+    <script type="module" src="/js/changelog.js"></script>
     <script type="module" src="/js/app.js"></script>
 
     <footer class="main-footer">
