@@ -1,8 +1,48 @@
 from fastapi import APIRouter, HTTPException
 import subprocess
+import logging
 from backend.config import settings
+from backend.services import git_service
+from backend.websocket_manager import kanban_manager
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+@router.get("/git/sync-status")
+async def get_sync_status():
+    """Get the sync status of local develop vs origin/develop"""
+    result = await git_service.get_sync_status(settings.project_path)
+    return result
+
+
+@router.post("/git/sync")
+async def sync_develop():
+    """
+    Sync local develop with origin/develop.
+    Emits git:synced WebSocket event on success.
+    """
+    # Broadcast syncing started
+    await kanban_manager.broadcast("git:syncing", {
+        "message": "Syncing with origin/develop..."
+    })
+
+    result = await git_service.pull_develop(settings.project_path)
+
+    if result["success"]:
+        # Broadcast sync completed
+        await kanban_manager.broadcast("git:synced", {
+            "message": result["message"],
+            "commits_pulled": result["commits_pulled"]
+        })
+        logger.info(f"Git sync completed: {result['message']}")
+        return result
+    else:
+        # Broadcast sync error
+        await kanban_manager.broadcast("git:sync_error", {
+            "message": result.get("error", "Unknown error")
+        })
+        raise HTTPException(status_code=500, detail=result.get("error", "Sync failed"))
 
 
 @router.post("/sync-main")

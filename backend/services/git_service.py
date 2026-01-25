@@ -531,6 +531,188 @@ async def commit_changes(worktree_path: str, commit_message: str) -> dict:
         }
 
 
+async def get_sync_status(project_path: str) -> dict:
+    """
+    Check if local develop is behind origin/develop.
+
+    Returns:
+        dict with keys:
+            - behind_count: int (commits behind origin)
+            - ahead_count: int (commits ahead of origin)
+            - is_behind: bool
+            - last_fetch: str (ISO timestamp of last fetch)
+    """
+    try:
+        # Fetch from origin first
+        await asyncio.to_thread(
+            subprocess.run,
+            ["git", "fetch", "origin", "develop"],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True
+        )
+
+        # Count commits behind
+        behind_result = await asyncio.to_thread(
+            subprocess.run,
+            ["git", "rev-list", "--count", "HEAD..origin/develop"],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace'
+        )
+
+        behind_count = 0
+        if behind_result.returncode == 0:
+            behind_count = int(behind_result.stdout.strip() or "0")
+
+        # Count commits ahead
+        ahead_result = await asyncio.to_thread(
+            subprocess.run,
+            ["git", "rev-list", "--count", "origin/develop..HEAD"],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace'
+        )
+
+        ahead_count = 0
+        if ahead_result.returncode == 0:
+            ahead_count = int(ahead_result.stdout.strip() or "0")
+
+        from datetime import datetime
+        return {
+            "behind_count": behind_count,
+            "ahead_count": ahead_count,
+            "is_behind": behind_count > 0,
+            "last_fetch": datetime.now().isoformat()
+        }
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to get sync status: {e.stderr}")
+        return {
+            "behind_count": 0,
+            "ahead_count": 0,
+            "is_behind": False,
+            "error": str(e)
+        }
+    except Exception as e:
+        logger.error(f"Error getting sync status: {e}")
+        return {
+            "behind_count": 0,
+            "ahead_count": 0,
+            "is_behind": False,
+            "error": str(e)
+        }
+
+
+async def pull_develop(project_path: str) -> dict:
+    """
+    Pull latest changes from origin/develop into local develop.
+    This is used to sync the main project directory after PR merges.
+
+    Returns:
+        dict with keys:
+            - success: bool
+            - message: str
+            - commits_pulled: int
+            - error: str (if failed)
+    """
+    try:
+        # Get current branch
+        branch_result = await asyncio.to_thread(
+            subprocess.run,
+            ["git", "branch", "--show-current"],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True
+        )
+        current_branch = branch_result.stdout.strip()
+
+        # Count commits before pull
+        before_result = await asyncio.to_thread(
+            subprocess.run,
+            ["git", "rev-list", "--count", "HEAD..origin/develop"],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace'
+        )
+        commits_to_pull = int(before_result.stdout.strip() or "0") if before_result.returncode == 0 else 0
+
+        # If not on develop, checkout develop first
+        if current_branch != "develop":
+            await asyncio.to_thread(
+                subprocess.run,
+                ["git", "checkout", "develop"],
+                cwd=project_path,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                check=True
+            )
+
+        # Pull from origin
+        pull_result = await asyncio.to_thread(
+            subprocess.run,
+            ["git", "pull", "origin", "develop"],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            check=True
+        )
+
+        # Return to original branch if needed
+        if current_branch != "develop" and current_branch:
+            await asyncio.to_thread(
+                subprocess.run,
+                ["git", "checkout", current_branch],
+                cwd=project_path,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                check=True
+            )
+
+        logger.info(f"Successfully pulled {commits_to_pull} commits from origin/develop")
+        return {
+            "success": True,
+            "message": f"Pulled {commits_to_pull} commit(s) from origin/develop",
+            "commits_pulled": commits_to_pull,
+            "output": pull_result.stdout
+        }
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to pull develop: {e.stderr}")
+        return {
+            "success": False,
+            "message": "Pull failed",
+            "commits_pulled": 0,
+            "error": e.stderr.strip() if e.stderr else str(e)
+        }
+    except Exception as e:
+        logger.error(f"Error pulling develop: {e}")
+        return {
+            "success": False,
+            "message": "Pull failed",
+            "commits_pulled": 0,
+            "error": str(e)
+        }
+
+
 async def push_branch(worktree_path: str, set_upstream: bool = True) -> dict:
     """
     Push the current branch to origin.

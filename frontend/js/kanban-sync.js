@@ -73,6 +73,21 @@ function handleKanbanEvent(message) {
             window.dispatchEvent(new Event('task-updated'));
             break;
 
+        case 'git:syncing':
+            console.log('Git syncing:', data);
+            document.dispatchEvent(new CustomEvent('git:syncing', { detail: data }));
+            break;
+
+        case 'git:synced':
+            console.log('Git synced:', data);
+            document.dispatchEvent(new CustomEvent('git:synced', { detail: data }));
+            break;
+
+        case 'git:sync_error':
+            console.log('Git sync error:', data);
+            document.dispatchEvent(new CustomEvent('git:sync_error', { detail: data }));
+            break;
+
         default:
             console.log('Unknown kanban event:', type);
     }

@@ -57,6 +57,33 @@ async def github_webhook(
             if pr_monitor_instance:
                 await pr_monitor_instance.check_pr_status_by_webhook(pr_number, merged, merged_at)
 
+            # Auto-sync: Pull latest develop after PR merge
+            from backend.services import git_service
+            from backend.websocket_manager import kanban_manager
+
+            logger.info(f"PR #{pr_number} merged, auto-syncing develop branch...")
+
+            # Broadcast syncing started
+            await kanban_manager.broadcast("git:syncing", {
+                "message": f"PR #{pr_number} merged, syncing develop..."
+            })
+
+            sync_result = await git_service.pull_develop(settings.project_path)
+
+            if sync_result["success"]:
+                await kanban_manager.broadcast("git:synced", {
+                    "message": sync_result["message"],
+                    "commits_pulled": sync_result["commits_pulled"],
+                    "triggered_by": f"PR #{pr_number} merge"
+                })
+                logger.info(f"Auto-sync after PR #{pr_number} merge: {sync_result['message']}")
+            else:
+                await kanban_manager.broadcast("git:sync_error", {
+                    "message": sync_result.get("error", "Auto-sync failed"),
+                    "triggered_by": f"PR #{pr_number} merge"
+                })
+                logger.error(f"Auto-sync failed after PR #{pr_number} merge: {sync_result.get('error')}")
+
         return {"status": "received", "event": "pull_request", "action": action, "pr": pr_number}
 
     return {"status": "received", "event": x_github_event}

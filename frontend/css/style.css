@@ -111,6 +111,91 @@ body {
   border-color: var(--text-secondary);
 }
 
+.btn-icon.btn-small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+/* Sync Status Indicator */
+.sync-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  transition: all 0.3s ease;
+}
+
+.sync-status-indicator.hidden {
+  display: none;
+}
+
+.sync-status-indicator.behind {
+  border-color: var(--accent-yellow);
+  background-color: rgba(210, 153, 34, 0.1);
+}
+
+.sync-status-indicator.behind .sync-status-text {
+  color: var(--accent-yellow);
+}
+
+.sync-status-indicator.behind .sync-status-text::before {
+  content: "\26A0\FE0F ";
+}
+
+.sync-status-indicator.syncing {
+  border-color: var(--accent-blue);
+  background-color: rgba(88, 166, 255, 0.1);
+}
+
+.sync-status-indicator.syncing .sync-status-text {
+  color: var(--accent-blue);
+}
+
+.sync-status-indicator.syncing .sync-status-text::before {
+  content: "\1F504 ";
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.sync-status-indicator.synced {
+  border-color: var(--accent-green);
+  background-color: rgba(63, 185, 80, 0.1);
+}
+
+.sync-status-indicator.synced .sync-status-text {
+  color: var(--accent-green);
+}
+
+.sync-status-indicator.synced .sync-status-text::before {
+  content: "\2705 ";
+}
+
+.sync-status-indicator.error {
+  border-color: var(--accent-red);
+  background-color: rgba(248, 81, 73, 0.1);
+}
+
+.sync-status-indicator.error .sync-status-text {
+  color: var(--accent-red);
+}
+
+.sync-status-indicator.error .sync-status-text::before {
+  content: "\274C ";
+}
+
+.sync-status-text {
+  color: var(--text-secondary);
+}
+
 .kanban-board {
   flex: 1;
   display: grid;

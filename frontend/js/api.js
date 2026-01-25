@@ -121,6 +121,10 @@ export const API = {
         syncMain: () => fetchJSON(`${API_BASE}/sync-main`, {
             method: 'POST',
         }),
+        syncStatus: () => fetchJSON(`${API_BASE}/git/sync-status`),
+        sync: () => fetchJSON(`${API_BASE}/git/sync`, {
+            method: 'POST',
+        }),
     },
 
     queue: {
