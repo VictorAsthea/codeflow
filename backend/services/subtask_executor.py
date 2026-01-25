@@ -25,6 +25,8 @@ You are implementing subtask {subtask_order} of {total_subtasks} for this task.
 Title: {task_title}
 Description: {task_description}
 
+{task_screenshots}
+
 ### Your Subtask
 ID: {subtask_id}
 Title: {subtask_title}
@@ -120,12 +122,20 @@ def build_subtask_prompt(task: Task, subtask: Subtask, project_path: str) -> str
                  if s.status == SubtaskStatus.PENDING and s.id != subtask.id]
     remaining_str = "\n".join([f"- {s.title}" for s in remaining]) or "None"
 
+    # Format screenshots if any
+    screenshots_str = ""
+    if task.screenshots:
+        screenshots_str = "### Screenshots\nThe following screenshots show the visual context for this task:\n"
+        for i, screenshot in enumerate(task.screenshots, 1):
+            screenshots_str += f"\n[Screenshot {i}]\n{screenshot}\n"
+
     return SUBTASK_PROMPT_TEMPLATE.format(
         subtask_order=subtask.order,
         total_subtasks=len(task.subtasks),
         project_context=project_context,
         task_title=task.title,
         task_description=task.description or "",
+        task_screenshots=screenshots_str,
         subtask_id=subtask.id,
         subtask_title=subtask.title,
         subtask_description=subtask.description or "",

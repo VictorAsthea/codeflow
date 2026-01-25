@@ -26,6 +26,8 @@ Description: {task_description}
 
 {file_references}
 
+{screenshots_section}
+
 ## Instructions
 
 Break this task into 3-7 subtasks. Each subtask should:
@@ -95,12 +97,20 @@ async def generate_subtasks(
                 refs.append(f"- {ref.path}")
         file_refs_str = "## Referenced Files\n" + "\n".join(refs)
 
+    # Format screenshots if any
+    screenshots_str = ""
+    if task.screenshots:
+        screenshots_str = "## Screenshots\nThe following screenshots are provided to help understand the visual context of the task:\n"
+        for i, screenshot in enumerate(task.screenshots, 1):
+            screenshots_str += f"\n[Screenshot {i}]\n{screenshot}\n"
+
     # Build the prompt
     prompt = PLANNING_PROMPT.format(
         project_context=project_context,
         task_title=task.title,
         task_description=task.description or task.title,
-        file_references=file_refs_str
+        file_references=file_refs_str,
+        screenshots_section=screenshots_str
     )
 
     logger.info(f"Generating subtasks for task {task.id}: {task.title}")

@@ -160,7 +160,27 @@ function renderOverviewTab() {
                 Updated: ${new Date(currentTask.updated_at).toLocaleString()}
             </p>
         </div>
+
+        ${currentTask.screenshots && currentTask.screenshots.length > 0 ? `
+        <div style="margin-bottom: 1.5rem;">
+            <h3 style="margin-bottom: 0.5rem;">Screenshots (${currentTask.screenshots.length})</h3>
+            <div class="screenshots-gallery">
+                ${currentTask.screenshots.map((screenshot, i) => `
+                    <img src="${screenshot}" alt="Screenshot ${i+1}" class="screenshot-thumbnail" data-index="${i}">
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
     `;
+
+    // Add click handlers for screenshot lightbox
+    if (currentTask.screenshots && currentTask.screenshots.length > 0) {
+        container.querySelectorAll('.screenshot-thumbnail').forEach(img => {
+            img.addEventListener('click', () => {
+                openScreenshotLightbox(currentTask.screenshots, parseInt(img.dataset.index));
+            });
+        });
+    }
 }
 
 function renderPhasesTab() {
@@ -848,6 +868,66 @@ window.retryPhase = async function(phaseName) {
         alert('Failed to retry phase: ' + error.message);
     }
 };
+
+// Screenshot Lightbox Functions
+function openScreenshotLightbox(screenshots, startIndex = 0) {
+    // Create lightbox overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'screenshot-lightbox-overlay';
+    overlay.innerHTML = `
+        <div class="screenshot-lightbox">
+            <button class="lightbox-close">&times;</button>
+            <button class="lightbox-nav lightbox-prev">&lt;</button>
+            <img src="${screenshots[startIndex]}" class="lightbox-image" alt="Screenshot">
+            <button class="lightbox-nav lightbox-next">&gt;</button>
+            <div class="lightbox-counter">${startIndex + 1} / ${screenshots.length}</div>
+        </div>
+    `;
+
+    let currentIndex = startIndex;
+
+    const updateImage = () => {
+        overlay.querySelector('.lightbox-image').src = screenshots[currentIndex];
+        overlay.querySelector('.lightbox-counter').textContent = `${currentIndex + 1} / ${screenshots.length}`;
+    };
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay || e.target.classList.contains('lightbox-close')) {
+            overlay.remove();
+        }
+    });
+
+    // Navigation
+    overlay.querySelector('.lightbox-prev').addEventListener('click', (e) => {
+        e.stopPropagation();
+        currentIndex = (currentIndex - 1 + screenshots.length) % screenshots.length;
+        updateImage();
+    });
+
+    overlay.querySelector('.lightbox-next').addEventListener('click', (e) => {
+        e.stopPropagation();
+        currentIndex = (currentIndex + 1) % screenshots.length;
+        updateImage();
+    });
+
+    // Keyboard navigation
+    const handleKeydown = (e) => {
+        if (e.key === 'Escape') {
+            overlay.remove();
+            document.removeEventListener('keydown', handleKeydown);
+        } else if (e.key === 'ArrowLeft') {
+            currentIndex = (currentIndex - 1 + screenshots.length) % screenshots.length;
+            updateImage();
+        } else if (e.key === 'ArrowRight') {
+            currentIndex = (currentIndex + 1) % screenshots.length;
+            updateImage();
+        }
+    };
+    document.addEventListener('keydown', handleKeydown);
+
+    document.body.appendChild(overlay);
+}
 
 window.addEventListener('DOMContentLoaded', () => {
     initTaskModal();

@@ -2749,13 +2749,275 @@ body {
   display: block;
   font-size: 2rem;
   margin-bottom: 0.75rem;
+}
+
+/* ========================================
+   SCREENSHOTS GALLERY & LIGHTBOX
+   ======================================== */
+
+.screenshots-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.screenshot-thumbnail {
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.screenshot-thumbnail:hover {
+  border-color: var(--accent-blue);
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Lightbox Overlay */
+.screenshot-lightbox-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.screenshot-lightbox {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightbox-image {
+  max-width: 85vw;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.lightbox-close {
+  position: absolute;
+  top: -40px;
+  right: -10px;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 2rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: color 0.2s;
+}
+
+.lightbox-close:hover {
+  color: var(--accent-red);
+}
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  font-size: 2rem;
+  padding: 1rem 1.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border-radius: 4px;
+}
+
+.lightbox-nav:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.lightbox-prev {
+  left: -80px;
+}
+
+.lightbox-next {
+  right: -80px;
+}
+
+.lightbox-counter {
+  position: absolute;
+  bottom: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* ========================================
+   SUBTASKS TAB
+   ======================================== */
+
+.subtasks-tab {
+  padding: 0.5rem 0;
+}
+
+.subtasks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding: 0 0.25rem;
+}
+
+.subtasks-count {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.subtasks-percentage {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent-green);
+}
+
+.subtasks-progress-bar {
+  height: 6px;
+  background-color: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+}
+
+.subtasks-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.subtasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.subtask-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background-color: var(--bg-tertiary);
+  border-radius: 8px;
+  border-left: 3px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.subtask-item.active {
+  border-left-color: var(--accent-yellow);
+  background-color: rgba(210, 153, 34, 0.1);
+}
+
+.subtask-item.subtask-completed {
+  border-left-color: var(--accent-green);
+}
+
+.subtask-item.subtask-completed .subtask-icon {
+  color: var(--accent-green);
+}
+
+.subtask-item.subtask-in_progress {
+  border-left-color: var(--accent-yellow);
+}
+
+.subtask-item.subtask-in_progress .subtask-icon {
+  color: var(--accent-yellow);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.95); }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
+
+.subtask-item.subtask-failed {
+  border-left-color: var(--accent-red);
+  background-color: rgba(248, 81, 73, 0.05);
+}
+
+.subtask-item.subtask-failed .subtask-icon {
+  color: var(--accent-red);
+}
+
+.subtask-icon {
+  font-size: 1rem;
+  font-weight: 600;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.subtask-number {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background-color: var(--bg-secondary);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.subtask-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.subtask-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.subtask-description {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.subtask-error {
+  font-size: 0.8rem;
+  color: var(--accent-red);
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: rgba(248, 81, 73, 0.1);
+  border-radius: 4px;
+}
+
+.subtask-item .btn-retry-subtask {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  background-color: transparent;
+  border: 1px solid var(--accent-yellow);
+  color: var(--accent-yellow);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.subtask-item .btn-retry-subtask:hover {
+  background-color: var(--accent-yellow);
+  color: black;
+
 
 /* Error Message */
 .error-message {
