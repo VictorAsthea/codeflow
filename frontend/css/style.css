@@ -3111,3 +3111,79 @@ body {
   font-size: 2rem;
   margin-bottom: 0.75rem;
 }
+
+/* ========================================
+   PROJECT INIT MODAL
+   ======================================== */
+
+.init-modal {
+  max-width: 480px;
+}
+
+.init-info-box {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.init-info-box ul {
+  margin: 0.5rem 0 0 0;
+  padding-left: 1.25rem;
+  color: var(--text-secondary);
+}
+
+.init-info-box li {
+  margin-bottom: 0.25rem;
+}
+
+.init-info-box code {
+  background: var(--bg-secondary);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-size: 0.85rem;
+}
+
+.init-progress {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.init-success {
+  text-align: left;
+}
+
+.success-section {
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.success-label {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.success-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.success-files {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.85rem;
+}
+
+.init-tag {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
