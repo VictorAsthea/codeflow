@@ -3188,6 +3188,40 @@ body {
   font-size: 0.8rem;
 }
 
+/* Init Modal specific */
+.init-modal {
+  width: 450px;
+  max-width: 90vw;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.init-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.init-modal .modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.init-modal .modal-body {
+  padding: 1rem;
+}
+
+.init-modal .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+}
+
 /* ==================== PROJECT TABS ==================== */
 .project-tabs-bar {
   background: var(--bg-secondary);

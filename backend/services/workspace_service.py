@@ -64,10 +64,34 @@ class WorkspaceService:
             "recent_projects": self.data.get("recent_projects", [])
         }
 
+    def _is_valid_project(self, path: Path) -> bool:
+        """Vérifie si le dossier est un projet valide."""
+        project_indicators = [
+            "package.json",
+            "requirements.txt",
+            "pyproject.toml",
+            "Cargo.toml",
+            "go.mod",
+            ".git",
+            ".codeflow",
+            "pom.xml",
+            "build.gradle",
+            "Makefile",
+        ]
+        return any((path / indicator).exists() for indicator in project_indicators)
+
     def open_project(self, project_path: str) -> Dict[str, Any]:
         """Ouvre un projet (ajoute aux onglets)."""
         path = str(Path(project_path).resolve())
-        name = Path(path).name
+        path_obj = Path(path)
+        name = path_obj.name
+
+        # Vérifier que c'est un vrai projet
+        if not self._is_valid_project(path_obj):
+            return {
+                "success": False,
+                "error": f"'{name}' n'est pas un projet valide (pas de package.json, .git, etc.)"
+            }
 
         # Vérifier si déjà ouvert
         for p in self.data["open_projects"]:
