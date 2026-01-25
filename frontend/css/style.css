@@ -3187,3 +3187,276 @@ body {
   border-radius: 4px;
   font-size: 0.8rem;
 }
+
+/* ==================== PROJECT TABS ==================== */
+.project-tabs-bar {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  padding: 0 1rem;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.project-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+}
+
+.project-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  height: 100%;
+}
+
+.project-tab:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.project-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent-yellow);
+  background: var(--bg-tertiary);
+}
+
+.tab-name {
+  font-size: 0.85rem;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-status.warning {
+  color: var(--accent-yellow);
+  font-size: 0.75rem;
+}
+
+.tab-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  font-size: 0.8rem;
+  padding: 0.1rem 0.25rem;
+  transition: opacity 0.15s;
+}
+
+.project-tab:hover .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  color: var(--accent-red);
+}
+
+.project-tab-add {
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1.2rem;
+  margin-left: 0.5rem;
+  transition: all 0.15s;
+}
+
+.project-tab-add:hover {
+  border-color: var(--accent-yellow);
+  color: var(--accent-yellow);
+}
+
+/* ==================== FOLDER BROWSER MODAL ==================== */
+.folder-browser-modal {
+  width: 600px;
+  max-width: 90vw;
+  max-height: 80vh;
+}
+
+.folder-browser-modal .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  max-height: 60vh;
+}
+
+/* Breadcrumb */
+.browser-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.breadcrumb-item {
+  color: var(--accent-blue);
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+}
+
+.breadcrumb-item:hover {
+  background: var(--bg-secondary);
+}
+
+.breadcrumb-sep {
+  color: var(--text-secondary);
+}
+
+/* Folder list */
+.browser-folders {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 200px;
+  max-height: 350px;
+}
+
+.browser-folder {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+
+.browser-folder:hover {
+  background: var(--bg-tertiary);
+}
+
+.browser-folder.selected {
+  background: rgba(210, 153, 34, 0.15);
+  border-left: 3px solid var(--accent-yellow);
+}
+
+.browser-folder.is-project {
+  background: rgba(63, 185, 80, 0.05);
+}
+
+.browser-folder.is-project.selected {
+  background: rgba(210, 153, 34, 0.2);
+}
+
+.folder-icon {
+  font-size: 1.25rem;
+}
+
+.folder-name {
+  flex: 1;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.folder-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  background: var(--accent-green);
+  color: var(--bg-primary);
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.folder-open-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  font-size: 1rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.browser-folder:hover .folder-open-btn {
+  opacity: 1;
+}
+
+.folder-open-btn:hover {
+  color: var(--accent-blue);
+}
+
+.browser-empty,
+.browser-loading {
+  padding: 3rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+/* Recent projects */
+.browser-recent {
+  border-top: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+}
+
+.recent-header {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.recent-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.recent-icon {
+  font-size: 1rem;
+}
+
+.recent-name {
+  color: var(--text-primary);
+}
+
+/* Footer with selection */
+.folder-browser-modal .modal-footer {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.selected-folder {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-folder strong {
+  color: var(--text-primary);
+}

@@ -7,7 +7,7 @@ import logging
 
 from backend.services.json_storage import JSONStorage
 from backend.services.migration import run_migration_if_needed
-from backend.routers import tasks, settings, git, webhooks, worktrees, roadmap, context, changelog, project
+from backend.routers import tasks, settings, git, webhooks, worktrees, roadmap, context, changelog, project, workspace
 from backend.services.task_queue import task_queue
 from backend.services.pr_monitor import PRMonitor
 from backend.websocket_manager import manager, kanban_manager
@@ -53,6 +53,11 @@ async def lifespan(app: FastAPI):
         )
         await pr_monitor_instance.start()
 
+    # Ensure workspace has at least one project
+    from backend.services.workspace_service import get_workspace_service
+    ws = get_workspace_service()
+    ws.ensure_default_project(app_settings.project_path)
+
     yield
 
     # Cleanup
@@ -72,6 +77,7 @@ app.include_router(roadmap.router, prefix="/api", tags=["roadmap"])
 app.include_router(context.router, tags=["context"])
 app.include_router(changelog.router, prefix="/api", tags=["changelog"])
 app.include_router(project.router, prefix="/api", tags=["project"])
+app.include_router(workspace.router, prefix="/api", tags=["workspace"])
 
 app.mount("/css", StaticFiles(directory="frontend/css"), name="css")
 app.mount("/js", StaticFiles(directory="frontend/js"), name="js")
