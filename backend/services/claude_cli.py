@@ -60,165 +60,58 @@ class RetryMetadata:
         }
 
 
-class ErrorClassifier:
-    """Classifies errors from Claude CLI process output and return codes.
+# Claude CLI specific return codes for timeout detection
+CLAUDE_CLI_TIMEOUT_RETURN_CODES = {124, 137}  # timeout command, SIGKILL
 
-    This class analyzes the output and return code from the Claude CLI
-    process to determine the error type and whether it's recoverable.
+
+def classify_claude_cli_error(
+    output: str,
+    return_code: int | None = None,
+    exception: Exception | None = None,
+    retry_manager: RetryManager | None = None,
+) -> tuple[str, ErrorCategory, int | None]:
     """
+    Classify errors from Claude CLI process output and return codes.
 
-    # Return code patterns (Claude CLI specific)
-    TIMEOUT_RETURN_CODES = {124, 137}  # timeout command, SIGKILL
-    CONNECTION_ERROR_CODES = {1, 2}  # General error, often network-related
+    This function uses the central error classification logic from RetryManager
+    but handles Claude CLI specific cases like return codes.
 
-    # Output patterns for error detection
-    RATE_LIMIT_PATTERNS = [
-        r"rate\s*limit",
-        r"too\s*many\s*requests",
-        r"429",
-        r"throttl",
-        r"quota\s*exceeded",
-        r"overloaded",
-    ]
+    Args:
+        output: The CLI output (stdout/stderr combined)
+        return_code: Process return code (if available)
+        exception: Exception that occurred (if any)
+        retry_manager: Optional RetryManager instance to use for classification
 
-    TIMEOUT_PATTERNS = [
-        r"timeout",
-        r"timed?\s*out",
-        r"deadline\s*exceeded",
-        r"ETIMEDOUT",
-        r"request\s*timeout",
-    ]
+    Returns:
+        Tuple of (error_type, category, http_code_if_detected)
+    """
+    # Handle Claude CLI specific return codes first
+    if return_code is not None and return_code in CLAUDE_CLI_TIMEOUT_RETURN_CODES:
+        return RecoverableErrorType.TIMEOUT.value, ErrorCategory.RECOVERABLE, None
 
-    CONNECTION_PATTERNS = [
-        r"connection\s*(error|refused|reset|closed)",
-        r"ECONNREFUSED",
-        r"ECONNRESET",
-        r"network\s*(error|unreachable)",
-        r"socket\s*(hang\s*up|error)",
-        r"EPIPE",
-        r"EOF\s*error",
-        r"fetch\s*failed",
-    ]
+    # Use the actual exception if available, otherwise create a RuntimeError with the output
+    error_to_classify = exception
+    if error_to_classify is None and output:
+        error_to_classify = RuntimeError(output)
+    elif error_to_classify is None:
+        error_to_classify = RuntimeError("Unknown error")
 
-    SERVER_ERROR_PATTERNS = [
-        r"502\s*(bad\s*gateway)?",
-        r"503\s*(service\s*unavailable)?",
-        r"504\s*(gateway\s*timeout)?",
-        r"520",  # Cloudflare errors
-        r"521",
-        r"522",
-        r"523",
-        r"524",
-        r"internal\s*server\s*error",
-        r"server\s*error",
-    ]
+    # Extract HTTP code from output if present
+    http_code = None
+    if output:
+        # Common HTTP error codes
+        for code in [400, 401, 403, 404, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]:
+            if str(code) in output:
+                http_code = code
+                break
 
-    AUTH_ERROR_PATTERNS = [
-        r"401\s*(unauthorized)?",
-        r"403\s*(forbidden)?",
-        r"authentication\s*failed",
-        r"invalid\s*(token|api\s*key|credentials)",
-        r"not\s*authenticated",
-    ]
+    # Use RetryManager's classification logic
+    if retry_manager is None:
+        retry_manager = create_retry_manager_from_settings()
 
-    BAD_REQUEST_PATTERNS = [
-        r"400\s*(bad\s*request)?",
-        r"invalid\s*request",
-        r"malformed",
-        r"validation\s*error",
-        r"content\s*blocked",
-        r"content\s*policy",
-    ]
+    retry_error = retry_manager.classify_error(error_to_classify, http_code)
 
-    def __init__(self):
-        """Initialize and compile regex patterns."""
-        self._rate_limit_re = re.compile(
-            "|".join(self.RATE_LIMIT_PATTERNS), re.IGNORECASE
-        )
-        self._timeout_re = re.compile(
-            "|".join(self.TIMEOUT_PATTERNS), re.IGNORECASE
-        )
-        self._connection_re = re.compile(
-            "|".join(self.CONNECTION_PATTERNS), re.IGNORECASE
-        )
-        self._server_error_re = re.compile(
-            "|".join(self.SERVER_ERROR_PATTERNS), re.IGNORECASE
-        )
-        self._auth_error_re = re.compile(
-            "|".join(self.AUTH_ERROR_PATTERNS), re.IGNORECASE
-        )
-        self._bad_request_re = re.compile(
-            "|".join(self.BAD_REQUEST_PATTERNS), re.IGNORECASE
-        )
-
-    def classify(
-        self,
-        output: str,
-        return_code: int | None = None,
-        exception: Exception | None = None,
-    ) -> tuple[str, ErrorCategory, int | None]:
-        """Classify an error based on output, return code, and exception.
-
-        Args:
-            output: The CLI output (stdout/stderr combined)
-            return_code: Process return code (if available)
-            exception: Exception that occurred (if any)
-
-        Returns:
-            Tuple of (error_type, category, http_code_if_detected)
-        """
-        http_code = None
-
-        # Check for asyncio.TimeoutError
-        if isinstance(exception, asyncio.TimeoutError):
-            return RecoverableErrorType.TIMEOUT.value, ErrorCategory.RECOVERABLE, None
-
-        # Check return code first
-        if return_code is not None:
-            if return_code in self.TIMEOUT_RETURN_CODES:
-                return RecoverableErrorType.TIMEOUT.value, ErrorCategory.RECOVERABLE, None
-
-        # Analyze output text
-        if output:
-            # Check fatal errors first (non-recoverable)
-            if self._auth_error_re.search(output):
-                # Try to extract HTTP code
-                if "401" in output:
-                    http_code = 401
-                elif "403" in output:
-                    http_code = 403
-                return "authentication_error", ErrorCategory.FATAL, http_code
-
-            if self._bad_request_re.search(output):
-                if "400" in output:
-                    http_code = 400
-                return "bad_request", ErrorCategory.FATAL, http_code
-
-            # Check recoverable errors
-            if self._rate_limit_re.search(output):
-                http_code = 429 if "429" in output else None
-                return RecoverableErrorType.RATE_LIMIT.value, ErrorCategory.RECOVERABLE, http_code
-
-            if self._timeout_re.search(output):
-                return RecoverableErrorType.TIMEOUT.value, ErrorCategory.RECOVERABLE, None
-
-            if self._connection_re.search(output):
-                return RecoverableErrorType.CONNECTION_ERROR.value, ErrorCategory.RECOVERABLE, None
-
-            if self._server_error_re.search(output):
-                # Extract HTTP code if present
-                for code in [502, 503, 504, 520, 521, 522, 523, 524]:
-                    if str(code) in output:
-                        http_code = code
-                        break
-                return RecoverableErrorType.SERVER_ERROR.value, ErrorCategory.RECOVERABLE, http_code
-
-        # Default: unknown error (treat as non-recoverable to be safe)
-        return "unknown", ErrorCategory.UNKNOWN, None
-
-
-# Global error classifier instance
-_error_classifier = ErrorClassifier()
+    return retry_error.error_type, retry_error.category, retry_error.http_code
 
 
 def get_project_allowed_tools(project_path: str, base_tools: List[str]) -> List[str]:
@@ -535,8 +428,8 @@ async def run_claude_cli(
             return True, output, retry_metadata
 
         # Classify the error
-        error_type, category, http_code = _error_classifier.classify(
-            output, return_code, exception
+        error_type, category, http_code = classify_claude_cli_error(
+            output, return_code, exception, retry_manager
         )
 
         # Record error in metadata
