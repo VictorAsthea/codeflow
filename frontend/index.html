@@ -92,10 +92,10 @@
                         <kbd class="nav-kbd">C</kbd>
                     </a>
 
-                    <a href="#memory" class="nav-item" data-shortcut="Y" data-view="memory">
-                        <span class="nav-icon">🧠</span>
-                        <span class="nav-label">Memory</span>
-                        <kbd class="nav-kbd">Y</kbd>
+                    <a href="#mcp" class="nav-item" data-shortcut="M" data-view="mcp">
+                        <span class="nav-icon">🔌</span>
+                        <span class="nav-label">Serveurs MCP</span>
+                        <kbd class="nav-kbd">M</kbd>
                     </a>
 
                     <div class="nav-divider"></div>
@@ -292,39 +292,31 @@
                     </div>
                 </div>
 
-                <!-- Memory View -->
-                <div id="memory-view" class="view hidden">
+                <!-- MCP Servers View -->
+                <div id="mcp-view" class="view hidden">
                     <div class="view-header">
                         <div class="view-header-content">
-                            <h1>🧠 Memory</h1>
-                            <p>Historique des sessions Claude Code</p>
+                            <h1>🔌 Serveurs MCP</h1>
+                            <p>Configurez les serveurs MCP et commandes autorisées pour les agents</p>
                         </div>
                         <div class="view-header-actions">
-                            <div class="memory-filter">
-                                <label for="memory-filter-select">Filtre:</label>
-                                <select id="memory-filter-select" class="input">
-                                    <option value="all">Toutes</option>
-                                    <option value="task">Par tâche</option>
-                                </select>
-                            </div>
-                            <button id="refresh-memory-btn" class="btn btn-secondary">Rafraîchir</button>
+                            <span id="mcp-active-count" class="mcp-count-badge">0 serveurs activés</span>
                         </div>
                     </div>
-
-                    <!-- Sessions List -->
-                    <div class="memory-content">
-                        <div class="memory-section">
-                            <h3>Sessions</h3>
-                            <div id="memory-sessions-list" class="memory-sessions-list">
-                                <div class="loading">Chargement des sessions...</div>
+                    <div class="mcp-container">
+                        <div class="mcp-section">
+                            <h3 class="mcp-section-title">Configuration des serveurs MCP</h3>
+                            <p class="mcp-section-hint">Les serveurs désactivés réduisent l'utilisation du contexte et le temps de démarrage</p>
+                            <div id="mcp-servers-list" class="mcp-servers-list">
+                                <div class="loading">Chargement...</div>
                             </div>
                         </div>
 
-                        <!-- Project Context Summary -->
-                        <div class="memory-section">
-                            <h3>Contexte projet (depuis analyse)</h3>
-                            <div id="memory-project-context" class="memory-project-context">
-                                <div class="loading">Chargement du contexte...</div>
+                        <div class="mcp-section">
+                            <h3 class="mcp-section-title">Commandes autorisées</h3>
+                            <p class="mcp-section-hint">Commandes Bash que Claude peut exécuter (depuis security.json)</p>
+                            <div id="mcp-commands-summary" class="mcp-commands-summary">
+                                <div class="loading">Chargement...</div>
                             </div>
                         </div>
                     </div>
@@ -828,65 +820,61 @@
             </div>
         </div>
 
-        <!-- Memory Session Detail Modal -->
-        <div id="memory-detail-modal" class="modal hidden">
-            <div class="modal-content memory-detail-modal">
-                <div class="modal-header">
-                    <h2 id="memory-detail-title">Session Details</h2>
-                    <button class="btn-close">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="memory-detail-meta" id="memory-detail-meta">
-                        <!-- Session metadata will be rendered here -->
-                    </div>
-                    <div class="memory-conversation" id="memory-conversation">
-                        <div class="loading">Chargement de la conversation...</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="btn-delete-session" class="btn btn-danger">Supprimer</button>
-                    <div class="modal-actions">
-                        <button id="btn-resume-session" class="btn btn-success hidden">Reprendre</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Settings Modal -->
         <div id="settings-modal" class="modal hidden">
-            <div class="modal-content">
+            <div class="modal-content modal-large">
                 <div class="modal-header">
-                    <h2>Settings</h2>
+                    <h2>⚙️ Paramètres</h2>
                     <button class="btn-close">&times;</button>
                 </div>
-                <div class="modal-body">
-                    <form id="settings-form">
-                        <div class="form-group">
-                            <label for="default-model">Default Model</label>
-                            <select id="default-model">
-                                <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
-                                <option value="claude-opus-4-20250514">Claude Opus 4</option>
-                            </select>
+                <div class="modal-body settings-body">
+                    <div class="settings-tabs">
+                        <button class="settings-tab active" data-tab="general">Général</button>
+                        <button class="settings-tab" data-tab="github">GitHub</button>
+                    </div>
+
+                    <div class="settings-content">
+                        <!-- General Tab -->
+                        <div id="settings-tab-general" class="settings-panel active">
+                            <form id="settings-form">
+                                <div class="form-group">
+                                    <label for="default-model">Default Model</label>
+                                    <select id="default-model">
+                                        <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                                        <option value="claude-opus-4-20250514">Claude Opus 4</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="default-intensity">Default Intensity</label>
+                                    <select id="default-intensity">
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="project-path">Project Path</label>
+                                    <input type="text" id="project-path" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="auto-review">
+                                        Auto Review
+                                    </label>
+                                </div>
+                            </form>
                         </div>
-                        <div class="form-group">
-                            <label for="default-intensity">Default Intensity</label>
-                            <select id="default-intensity">
-                                <option value="low">Low</option>
-                                <option value="medium">Medium</option>
-                                <option value="high">High</option>
-                            </select>
+
+                        <!-- GitHub Tab -->
+                        <div id="settings-tab-github" class="settings-panel hidden">
+                            <h3 class="settings-section-title">🐙 Intégration GitHub</h3>
+                            <p class="settings-section-hint">Configuration du repository pour ce projet</p>
+
+                            <div id="settings-github-content" class="settings-github-content">
+                                <div class="loading">Chargement...</div>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="project-path">Project Path</label>
-                            <input type="text" id="project-path" required>
-                        </div>
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="auto-review">
-                                Auto Review
-                            </label>
-                        </div>
-                    </form>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary btn-close">Cancel</button>
@@ -912,7 +900,8 @@
     <script type="module" src="/js/roadmap-wizard.js"></script>
     <script type="module" src="/js/context.js"></script>
     <script type="module" src="/js/changelog.js"></script>
-    <script type="module" src="/js/memory.js"></script>
+    <script type="module" src="/js/mcp.js"></script>
+    <script type="module" src="/js/settings-github.js"></script>
     <script type="module" src="/js/app.js"></script>
     <script src="/js/project-init.js"></script>
     <script src="/js/workspace.js"></script>

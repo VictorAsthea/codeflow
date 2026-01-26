@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from typing import Dict, Any, Optional
 from backend.models import GlobalConfig
 from backend.config import settings as app_settings
+from backend.services.project_config_service import get_project_config
 
 
 logger = logging.getLogger(__name__)
@@ -28,20 +29,48 @@ class SettingsService:
         """Initialize settings service with storage backend"""
         self.storage = storage
 
-    async def get_settings(self) -> GlobalConfig:
-        """Get current global configuration with defaults"""
-        config_data = self.storage.get_config("global")
+    async def get_settings(self, project_path: Optional[str] = None) -> GlobalConfig:
+        """
+        Get current configuration with project-specific overrides.
 
+        Priority:
+        1. Project .codeflow/config.json settings
+        2. Global config from storage
+        3. Default configuration
+        """
+        # Start with default config
+        config = self._get_default_config()
+
+        # Try to load global config from storage
+        config_data = self.storage.get_config("global")
         if config_data:
             try:
-                return GlobalConfig(**config_data)
+                config = GlobalConfig(**config_data)
             except ValidationError as e:
-                # If validation fails, log and fallback to default
                 logger.warning(f"Failed to load GlobalConfig from config_data: {e}")
-                pass
 
-        # Return default configuration
-        return self._get_default_config()
+        # Override with project-specific settings from .codeflow/config.json
+        try:
+            project_config = get_project_config(project_path)
+            if project_config.is_initialized():
+                project_settings = project_config.get_settings()
+
+                # Apply project overrides
+                if "default_branch" in project_settings:
+                    config.target_branch = project_settings["default_branch"]
+                if "auto_commit" in project_settings:
+                    # Map to closest global setting
+                    pass  # Could add auto_commit to GlobalConfig later
+                if "auto_push" in project_settings:
+                    # Map to closest global setting
+                    pass  # Could add auto_push to GlobalConfig later
+
+                logger.debug(f"Applied project settings from {project_config.project_path}")
+
+        except Exception as e:
+            logger.warning(f"Failed to load project config: {e}")
+
+        return config
 
     async def update_settings(self, settings: GlobalConfig) -> GlobalConfig:
         """Update global configuration with validation"""

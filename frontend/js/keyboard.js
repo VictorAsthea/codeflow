@@ -29,7 +29,7 @@ class KeyboardManager {
     this.register('d', () => this.navigate('roadmap'), 'Go to Roadmap view');
     this.register('c', () => this.navigate('context'), 'Go to Context view');
     this.register('l', () => this.navigate('changelog'), 'Go to Changelog view');
-    this.register('y', () => this.navigate('memory'), 'Go to Memory view');
+    this.register('m', () => this.navigate('mcp'), 'Go to MCP Servers view');
     this.register('s', () => this.openSettings(), 'Open Settings');
     this.register('[', () => this.toggleSidebar(), 'Toggle sidebar');
     this.register('\\', () => this.toggleSidebar(), 'Toggle sidebar (alt)');

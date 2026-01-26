@@ -3,9 +3,11 @@ Service d'initialisation de projet Codeflow.
 """
 
 import json
+import subprocess
+import re
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from backend.services.stack_detector import StackDetector
 from backend.config import settings
@@ -27,6 +29,75 @@ BASE_COMMANDS = [
     "type", "uname", "unexpand", "uniq", "unset", "unzip", "watch", "wc",
     "wget", "whereis", "which", "whoami", "xargs", "yes", "yq", "zip", "zsh"
 ]
+
+
+def detect_github_repo(project_path: Path) -> Optional[str]:
+    """
+    Détecte le repo GitHub depuis git remote.
+    Retourne le format 'owner/repo' ou None.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=str(project_path),
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode != 0:
+            return None
+
+        url = result.stdout.strip()
+
+        # Parse different URL formats:
+        # https://github.com/owner/repo.git
+        # git@github.com:owner/repo.git
+        # https://github.com/owner/repo
+
+        patterns = [
+            r'github\.com[:/]([^/]+)/([^/\.]+?)(?:\.git)?$',
+            r'github\.com[:/]([^/]+)/([^/]+)$',
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                owner, repo = match.groups()
+                return f"{owner}/{repo}"
+
+        return None
+    except Exception:
+        return None
+
+
+def detect_default_branch(project_path: Path) -> str:
+    """Détecte la branche par défaut (main ou develop si existe)."""
+    try:
+        # Check if develop branch exists
+        result = subprocess.run(
+            ["git", "branch", "--list", "develop"],
+            cwd=str(project_path),
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.stdout.strip():
+            return "develop"
+
+        # Check remote develop
+        result = subprocess.run(
+            ["git", "branch", "-r", "--list", "origin/develop"],
+            cwd=str(project_path),
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.stdout.strip():
+            return "develop"
+
+        return "main"
+    except Exception:
+        return "main"
 
 
 class ProjectInitService:
@@ -130,6 +201,10 @@ class ProjectInitService:
 
     def _generate_config_json(self, stack_info: Dict[str, Any]):
         """Génère le fichier config.json."""
+        # Auto-detect GitHub repo and default branch
+        github_repo = detect_github_repo(self.project_path)
+        default_branch = detect_default_branch(self.project_path)
+
         config = {
             "version": "0.4",
             "project_name": self.project_path.name,
@@ -138,9 +213,13 @@ class ProjectInitService:
             "settings": {
                 "auto_commit": True,
                 "auto_push": True,
-                "default_branch": "develop",
+                "default_branch": default_branch,
                 "worktrees_dir": ".worktrees",
                 "language": "fr"
+            },
+            "github": {
+                "repo": github_repo,
+                "default_branch": default_branch
             },
             "phases": {
                 "planning": {"enabled": True},

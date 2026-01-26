@@ -3473,550 +3473,473 @@ body {
   color: var(--text-primary);
 }
 
-/* ========================================
-   MEMORY VIEW STYLES
-   ======================================== */
+/* ================================
+   MCP Servers Page
+   ================================ */
 
-.memory-content {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding: 2rem;
-  max-width: 1000px;
+.mcp-container {
+  padding: 1.5rem;
+  max-width: 900px;
 }
 
-.memory-section {
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  overflow: hidden;
+.mcp-section {
+  margin-bottom: 2rem;
 }
 
-.memory-section h3 {
+.mcp-section-title {
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
-  padding: 1rem 1.25rem;
-  margin: 0;
-  background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.25rem;
 }
 
-.memory-sessions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+.mcp-section-hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
 }
 
-/* Memory Session Card */
-.memory-session-card {
+.mcp-count-badge {
+  background: var(--accent-green);
+  color: var(--bg-primary);
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.mcp-servers-list {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 1rem 1.25rem;
+}
+
+.mcp-server-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
   background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
-  transition: background-color 0.2s ease;
-}
-
-.memory-session-card:last-child {
-  border-bottom: none;
-}
-
-.memory-session-card:hover {
-  background-color: var(--bg-tertiary);
-}
-
-.memory-session-card.active {
-  background-color: rgba(88, 166, 255, 0.1);
-  border-left: 3px solid var(--accent-blue);
-}
-
-/* Session Header */
-.memory-session-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
-.memory-session-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-  min-width: 0;
-}
-
-.memory-session-icon {
-  font-size: 1rem;
-  flex-shrink: 0;
-}
-
-.memory-session-name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.memory-session-time {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  flex-shrink: 0;
-}
-
-/* Session Meta - message count, tokens, status */
-.memory-session-meta {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  flex-wrap: wrap;
-}
-
-.memory-session-meta span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.memory-session-messages {
-  color: var(--text-secondary);
-}
-
-.memory-session-tokens {
-  color: var(--accent-yellow);
-}
-
-.memory-session-status {
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.memory-session-status.completed {
-  background: rgba(63, 185, 80, 0.15);
-  color: var(--accent-green);
-}
-
-.memory-session-status.running {
-  background: rgba(210, 153, 34, 0.15);
-  color: var(--accent-yellow);
-}
-
-.memory-session-status.failed {
-  background: rgba(248, 81, 73, 0.15);
-  color: var(--accent-red);
-}
-
-/* Session Worktree Info */
-.memory-session-worktree {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  font-family: monospace;
-}
-
-.memory-session-worktree::before {
-  content: "↳ ";
-  color: var(--accent-blue);
-}
-
-/* Session Actions */
-.memory-session-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.25rem;
-}
-
-.memory-session-actions .btn-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.65rem;
-  font-size: 0.75rem;
-  background: transparent;
   border: 1px solid var(--border);
-  color: var(--text-secondary);
-  border-radius: 4px;
-  cursor: pointer;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
   transition: all 0.2s ease;
 }
 
-.memory-session-actions .btn-action:hover {
-  background-color: var(--bg-tertiary);
+.mcp-server-card:hover {
   border-color: var(--text-secondary);
-  color: var(--text-primary);
 }
 
-.memory-session-actions .btn-view {
-  border-color: var(--accent-blue);
-  color: var(--accent-blue);
-}
-
-.memory-session-actions .btn-view:hover {
-  background-color: var(--accent-blue);
-  color: white;
-}
-
-.memory-session-actions .btn-resume {
+.mcp-server-card.enabled {
   border-color: var(--accent-green);
-  color: var(--accent-green);
+  background: rgba(63, 185, 80, 0.05);
 }
 
-.memory-session-actions .btn-resume:hover {
+.mcp-server-icon {
+  font-size: 1.5rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+.mcp-server-info {
+  flex: 1;
+}
+
+.mcp-server-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.15rem;
+}
+
+.mcp-server-description {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Toggle Switch */
+.mcp-toggle {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+  cursor: pointer;
+}
+
+.mcp-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.mcp-toggle-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  transition: all 0.3s ease;
+}
+
+.mcp-toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
+  background-color: var(--text-secondary);
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.mcp-toggle input:checked + .mcp-toggle-slider {
   background-color: var(--accent-green);
-  color: white;
+  border-color: var(--accent-green);
 }
 
-.memory-session-actions .btn-delete {
-  border-color: var(--accent-red);
-  color: var(--accent-red);
+.mcp-toggle input:checked + .mcp-toggle-slider:before {
+  transform: translateX(24px);
+  background-color: white;
 }
 
-.memory-session-actions .btn-delete:hover {
-  background-color: var(--accent-red);
-  color: white;
+.mcp-toggle:hover .mcp-toggle-slider {
+  border-color: var(--text-secondary);
 }
 
-/* Memory Filter Dropdown */
-.memory-filter {
+/* Commands Section */
+.mcp-commands-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.mcp-commands-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.mcp-commands-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
-.memory-filter label {
+.mcp-commands-icon {
+  font-size: 1.1rem;
+}
+
+.mcp-commands-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.mcp-commands-count {
+  background: var(--bg-tertiary);
+  padding: 0.2rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.mcp-commands-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.mcp-commands-list code {
+  background: var(--bg-tertiary);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  color: var(--accent-blue);
+  font-family: 'SF Mono', Monaco, monospace;
+}
+
+.mcp-commands-more {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  padding: 0.15rem 0.4rem;
+}
+
+.mcp-no-commands {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.mcp-stack-info {
+  font-size: 0.75rem;
+  color: var(--accent-yellow);
+  margin-bottom: 0.5rem;
+}
+
+.mcp-total-commands {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
   font-size: 0.85rem;
   color: var(--text-secondary);
 }
 
-.memory-filter select,
-.memory-filter-dropdown {
-  background-color: var(--bg-tertiary);
+.mcp-total-commands strong {
+  color: var(--accent-green);
+}
+
+.mcp-not-initialized {
+  text-align: center;
+  padding: 2rem;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+}
+
+.mcp-not-initialized p:first-child {
+  font-size: 1.1rem;
+  color: var(--accent-yellow);
+  margin-bottom: 0.5rem;
+}
+
+.mcp-error {
+  color: var(--accent-red);
+  padding: 1rem;
+  background: rgba(248, 81, 73, 0.1);
+  border-radius: 8px;
+}
+
+/* GitHub Configuration */
+.github-config-section {
+  margin-bottom: 1rem;
+}
+
+.github-config-card {
+  background: var(--bg-secondary);
   border: 1px solid var(--border);
-  color: var(--text-primary);
-  padding: 0.4rem 0.75rem;
-  border-radius: 6px;
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.github-field {
+  margin-bottom: 1rem;
+}
+
+.github-field:last-child {
+  margin-bottom: 0;
+}
+
+.github-field label {
+  display: block;
   font-size: 0.85rem;
-  cursor: pointer;
-  transition: border-color 0.2s;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 0.4rem;
 }
 
-.memory-filter select:hover,
-.memory-filter-dropdown:hover {
-  border-color: var(--accent-blue);
+.github-input-row {
+  display: flex;
+  gap: 0.5rem;
 }
 
-.memory-filter select:focus,
-.memory-filter-dropdown:focus {
+.github-input {
+  flex: 1;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.github-input:focus {
   outline: none;
   border-color: var(--accent-blue);
 }
 
-/* Memory Context Summary */
-.memory-project-context {
-  padding: 1rem 1.25rem;
+.github-input::placeholder {
+  color: var(--text-secondary);
 }
 
-.memory-context-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem;
+.github-select {
   background: var(--bg-tertiary);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  border: 1px solid var(--border);
-}
-
-.memory-context-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--text-primary);
   font-size: 0.9rem;
+  cursor: pointer;
+  min-width: 150px;
 }
 
-.memory-context-label {
-  color: var(--text-secondary);
-  font-weight: 500;
-  min-width: 100px;
+.github-select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
 }
 
-.memory-context-value {
-  color: var(--text-primary);
+.github-connection-status {
+  margin-bottom: 0.5rem;
 }
 
-.memory-context-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.memory-context-tag {
-  display: inline-block;
-  padding: 0.2rem 0.5rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font-size: 0.8rem;
-  color: var(--text-primary);
-}
-
-.memory-context-date {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  margin-top: 0.5rem;
-}
-
-/* Memory Empty State */
-.memory-empty {
-  text-align: center;
-  padding: 3rem 2rem;
-  color: var(--text-secondary);
-}
-
-.memory-empty .empty-icon {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  opacity: 0.5;
-}
-
-.memory-empty p {
-  margin: 0.5rem 0;
-}
-
-.memory-empty .empty-hint {
-  font-size: 0.85rem;
-  opacity: 0.8;
-}
-
-/* Memory Session Detail Modal */
-.memory-detail-modal {
-  max-width: 800px;
-}
-
-.memory-conversation {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  max-height: 60vh;
-  overflow-y: auto;
-  padding: 1rem;
-}
-
-.memory-message {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 1rem;
-  border-radius: 8px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-}
-
-.memory-message.user {
-  border-left: 3px solid var(--accent-blue);
-  background: rgba(88, 166, 255, 0.05);
-}
-
-.memory-message.assistant {
-  border-left: 3px solid var(--accent-green);
-  background: rgba(63, 185, 80, 0.05);
-}
-
-.memory-message-header {
-  display: flex;
-  justify-content: space-between;
+.github-status {
+  display: inline-flex;
   align-items: center;
-  font-size: 0.8rem;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
 }
 
-.memory-message-role {
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.memory-message.user .memory-message-role {
-  color: var(--accent-blue);
-}
-
-.memory-message.assistant .memory-message-role {
+.github-status.connected {
+  background: rgba(63, 185, 80, 0.15);
   color: var(--accent-green);
 }
 
-.memory-message-time {
-  color: var(--text-secondary);
+.github-status.disconnected {
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--accent-red);
 }
 
-.memory-message-content {
-  font-size: 0.9rem;
-  color: var(--text-primary);
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
+.github-status.checking {
+  background: rgba(210, 153, 34, 0.15);
+  color: var(--accent-yellow);
 }
 
-/* Memory Day Groups */
-.memory-sessions-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+.github-status.error {
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--accent-red);
 }
 
-.memory-day-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+.github-status .status-icon {
+  font-weight: bold;
 }
 
-.memory-day-header {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: capitalize;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border);
+.github-toggles {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
 }
 
-.memory-day-sessions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-/* Memory Detail Modal */
-.memory-detail-modal {
-  max-width: 900px;
-  max-height: 90vh;
-}
-
-.memory-detail-modal .modal-body {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-.memory-detail-meta {
-  background: var(--bg-tertiary);
-  border-radius: 8px;
-  padding: 1rem;
-  flex-shrink: 0;
-}
-
-.memory-detail-info {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.75rem;
-}
-
-.memory-detail-row {
+.github-toggle-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-}
-
-.memory-detail-label {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  min-width: 80px;
-}
-
-.memory-detail-value {
-  color: var(--text-primary);
-  font-size: 0.9rem;
-}
-
-.memory-detail-value.monospace {
-  font-family: monospace;
-  font-size: 0.8rem;
-  word-break: break-all;
-}
-
-/* Conversation in detail modal */
-.memory-conversation {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 0.5rem;
-}
-
-.memory-message {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 1rem;
-  border-radius: 8px;
-  background: var(--bg-secondary);
-  border-left: 3px solid var(--border);
-}
-
-.memory-message.user {
-  border-left-color: var(--accent-blue);
-  background: rgba(88, 166, 255, 0.05);
-}
-
-.memory-message.assistant {
-  border-left-color: var(--accent-green);
-  background: rgba(63, 185, 80, 0.05);
-}
-
-.memory-message-header {
-  display: flex;
   justify-content: space-between;
-  align-items: center;
+  cursor: pointer;
 }
 
-.memory-message-role {
-  font-weight: 600;
-  font-size: 0.85rem;
-}
-
-.memory-message.user .memory-message-role {
-  color: var(--accent-blue);
-}
-
-.memory-message.assistant .memory-message-role {
-  color: var(--accent-green);
-}
-
-.memory-message-time {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.memory-message-content {
+.github-toggle-label span {
   font-size: 0.9rem;
-  line-height: 1.6;
   color: var(--text-primary);
-  word-wrap: break-word;
-  overflow-wrap: break-word;
 }
 
-.memory-message-content pre {
-  background: var(--bg-tertiary);
-  padding: 0.75rem;
-  border-radius: 4px;
-  overflow-x: auto;
-  margin: 0.5rem 0;
+.btn-small {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
 }
 
-.memory-message-content code {
-  font-family: monospace;
-  font-size: 0.85rem;
-  background: var(--bg-tertiary);
-  padding: 0.15rem 0.3rem;
-  border-radius: 3px;
+/* Settings Modal Tabs */
+.modal-large {
+  max-width: 600px;
+  width: 90%;
 }
 
-.memory-message-content pre code {
-  background: none;
+.settings-body {
   padding: 0;
+}
+
+.settings-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 1rem;
+  background: var(--bg-secondary);
+}
+
+.settings-tab {
+  background: none;
+  border: none;
+  padding: 0.75rem 1.25rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.2s ease;
+}
+
+.settings-tab:hover {
+  color: var(--text-primary);
+}
+
+.settings-tab.active {
+  color: var(--accent-blue);
+  border-bottom-color: var(--accent-blue);
+}
+
+.settings-content {
+  padding: 1.5rem;
+}
+
+.settings-panel {
+  display: block;
+}
+
+.settings-panel.hidden {
+  display: none;
+}
+
+.settings-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.settings-section-hint {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.settings-not-initialized {
+  text-align: center;
+  padding: 2rem;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+}
+
+.input-with-button {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.input-with-button .input {
+  flex: 1;
+}
+
+.connection-status-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
 }

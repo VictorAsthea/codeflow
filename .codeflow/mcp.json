@@ -1,0 +1,43 @@
+{
+  "servers": {
+    "context7": {
+      "enabled": true,
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "description": "Documentation des librairies"
+    },
+    "github": {
+      "enabled": true,
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "description": "PR, Issues, Webhooks"
+    },
+    "puppeteer": {
+      "enabled": false,
+      "command": "npx",
+      "args": [
+        "-y",
+        "puppeteer-mcp-claude",
+        "serve"
+      ],
+      "description": "Tests E2E navigateur"
+    },
+    "memory": {
+      "enabled": true,
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "description": "Memoire persistante"
+    }
+  },
+  "auto_detected": true,
+  "last_updated": "2026-01-25T18:38:04.459964"
+}
