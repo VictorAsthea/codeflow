@@ -304,6 +304,198 @@ async def extract_project_info(project_path: Path | None = None) -> dict:
     }
 
 
+def scan_codebase_deep(project_path: Path) -> dict:
+    """
+    Deep scan of the codebase to understand the project structure.
+
+    Returns a dict with:
+    - directory_tree: Folder structure (max 3 levels)
+    - key_files: List of important files found
+    - file_samples: Content excerpts from key files
+    - patterns: Detected patterns (tests, CI, docker, etc.)
+    - endpoints: Detected API endpoints (if any)
+    - components: Detected UI components (if any)
+    """
+    EXCLUDED_DIRS = {
+        '.git', 'node_modules', '__pycache__', '.venv', 'venv',
+        'dist', 'build', '.worktrees', '.next', '.nuxt', 'coverage',
+        '.pytest_cache', '.mypy_cache', 'eggs', '*.egg-info'
+    }
+
+    EXCLUDED_EXTENSIONS = {'.pyc', '.pyo', '.ico', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf', '.eot'}
+
+    KEY_FILE_PATTERNS = [
+        # Entry points
+        'main.py', 'app.py', 'index.py', 'server.py', '__init__.py',
+        'main.ts', 'main.js', 'index.ts', 'index.js', 'app.ts', 'app.js',
+        'main.go', 'main.rs',
+        # Config
+        'package.json', 'pyproject.toml', 'requirements.txt', 'Cargo.toml', 'go.mod',
+        'tsconfig.json', 'vite.config.ts', 'next.config.js', 'webpack.config.js',
+        # API/Routes
+        'routes.py', 'urls.py', 'api.py', 'router.py', 'endpoints.py',
+        'routes.ts', 'routes.js', 'api.ts', 'api.js',
+        # Models/Schema
+        'models.py', 'schema.py', 'schemas.py', 'types.ts', 'types.py',
+        # Database
+        'database.py', 'db.py', 'migrations.py',
+        # Components (frontend)
+        'App.tsx', 'App.jsx', 'App.vue', 'App.svelte',
+    ]
+
+    KEY_DIRECTORIES = ['routers', 'routes', 'api', 'endpoints', 'controllers', 'views', 'components', 'pages', 'services', 'models', 'schemas']
+
+    result = {
+        'directory_tree': [],
+        'key_files': [],
+        'file_samples': {},
+        'patterns': [],
+        'endpoints': [],
+        'components': [],
+        'services': [],
+    }
+
+    def should_exclude(path: Path) -> bool:
+        for part in path.parts:
+            if part in EXCLUDED_DIRS or part.startswith('.'):
+                return True
+        if path.suffix.lower() in EXCLUDED_EXTENSIONS:
+            return True
+        return False
+
+    # Build directory tree (max 3 levels)
+    def build_tree(path: Path, prefix: str = "", level: int = 0) -> list[str]:
+        if level > 3 or should_exclude(path):
+            return []
+
+        tree = []
+        try:
+            items = sorted(path.iterdir(), key=lambda x: (x.is_file(), x.name.lower()))
+            dirs = [i for i in items if i.is_dir() and not should_exclude(i)]
+            files = [i for i in items if i.is_file() and not should_exclude(i)]
+
+            # Limit items per level
+            for d in dirs[:10]:
+                tree.append(f"{prefix}{d.name}/")
+                tree.extend(build_tree(d, prefix + "  ", level + 1))
+
+            for f in files[:15]:
+                tree.append(f"{prefix}{f.name}")
+        except PermissionError:
+            pass
+
+        return tree
+
+    result['directory_tree'] = build_tree(project_path)
+
+    # Find key files
+    all_files = []
+    try:
+        for path in project_path.rglob("*"):
+            if path.is_file() and not should_exclude(path):
+                all_files.append(path)
+    except Exception:
+        pass
+
+    # Identify key files
+    for file_path in all_files:
+        rel_path = file_path.relative_to(project_path)
+        rel_str = str(rel_path).replace('\\', '/')
+
+        # Check if it's a key file by name
+        if file_path.name in KEY_FILE_PATTERNS:
+            result['key_files'].append(rel_str)
+
+        # Check if it's in a key directory
+        for key_dir in KEY_DIRECTORIES:
+            if f"/{key_dir}/" in f"/{rel_str}" or rel_str.startswith(f"{key_dir}/"):
+                result['key_files'].append(rel_str)
+                break
+
+    # Remove duplicates and limit
+    result['key_files'] = list(set(result['key_files']))[:30]
+
+    # Read samples from key files (first 40 lines)
+    for rel_path in result['key_files'][:15]:
+        file_path = project_path / rel_path
+        try:
+            content = file_path.read_text(encoding='utf-8', errors='ignore')
+            lines = content.split('\n')[:40]
+            result['file_samples'][rel_path] = '\n'.join(lines)
+        except Exception:
+            pass
+
+    # Detect patterns
+    patterns = []
+
+    # Tests
+    if any('test' in str(f).lower() for f in all_files):
+        patterns.append('Tests (unit/integration)')
+    if (project_path / 'pytest.ini').exists() or (project_path / 'conftest.py').exists():
+        patterns.append('Pytest')
+    if (project_path / 'jest.config.js').exists() or (project_path / 'jest.config.ts').exists():
+        patterns.append('Jest')
+
+    # CI/CD
+    if (project_path / '.github' / 'workflows').exists():
+        patterns.append('GitHub Actions CI/CD')
+    if (project_path / '.gitlab-ci.yml').exists():
+        patterns.append('GitLab CI')
+    if (project_path / 'Jenkinsfile').exists():
+        patterns.append('Jenkins CI')
+
+    # Docker
+    if (project_path / 'Dockerfile').exists() or (project_path / 'docker-compose.yml').exists():
+        patterns.append('Docker')
+
+    # Database
+    if any('alembic' in str(f).lower() for f in all_files):
+        patterns.append('Alembic migrations')
+    if any('prisma' in str(f).lower() for f in all_files):
+        patterns.append('Prisma ORM')
+    if any('sequelize' in str(f).lower() for f in all_files):
+        patterns.append('Sequelize ORM')
+
+    # API patterns
+    if any('swagger' in str(f).lower() or 'openapi' in str(f).lower() for f in all_files):
+        patterns.append('OpenAPI/Swagger')
+    if any('graphql' in str(f).lower() for f in all_files):
+        patterns.append('GraphQL')
+
+    result['patterns'] = patterns
+
+    # Detect API endpoints from router files
+    for rel_path, content in result['file_samples'].items():
+        if any(kw in rel_path.lower() for kw in ['router', 'route', 'api', 'endpoint', 'controller']):
+            # Python FastAPI/Flask patterns
+            for line in content.split('\n'):
+                if '@router.' in line or '@app.' in line or '@blueprint.' in line:
+                    # Extract method and path
+                    if any(method in line for method in ['.get(', '.post(', '.put(', '.delete(', '.patch(']):
+                        result['endpoints'].append(line.strip())
+                # Express.js patterns
+                if 'router.' in line.lower() and any(m in line.lower() for m in ['get(', 'post(', 'put(', 'delete(']):
+                    result['endpoints'].append(line.strip())
+
+    result['endpoints'] = result['endpoints'][:20]
+
+    # Detect components from frontend files
+    for rel_path in result['key_files']:
+        if 'component' in rel_path.lower() or rel_path.endswith(('.tsx', '.jsx', '.vue', '.svelte')):
+            result['components'].append(rel_path)
+
+    result['components'] = result['components'][:15]
+
+    # Detect services
+    for rel_path in result['key_files']:
+        if 'service' in rel_path.lower():
+            result['services'].append(rel_path)
+
+    result['services'] = result['services'][:10]
+
+    return result
+
+
 async def analyze_project(project_path: Path | None = None) -> ProjectAnalysis:
     """
     Analyze the project structure and detect stack.
@@ -345,13 +537,32 @@ async def analyze_project(project_path: Path | None = None) -> ProjectAnalysis:
                     stack.append("Next.js")
                 if "typescript" in deps:
                     stack.append("TypeScript")
+                if "express" in deps:
+                    stack.append("Express.js")
+                if "fastify" in deps:
+                    stack.append("Fastify")
+                if "tailwindcss" in deps:
+                    stack.append("Tailwind CSS")
             except Exception:
                 pass
 
         if (project_path / "requirements.txt").exists() or (project_path / "pyproject.toml").exists():
             stack.append("Python")
-            if (project_path / "backend").exists():
+            # Check for frameworks
+            req_content = ""
+            if (project_path / "requirements.txt").exists():
+                req_content = (project_path / "requirements.txt").read_text(errors='ignore').lower()
+            if (project_path / "pyproject.toml").exists():
+                req_content += (project_path / "pyproject.toml").read_text(errors='ignore').lower()
+
+            if "fastapi" in req_content:
                 stack.append("FastAPI")
+            if "django" in req_content:
+                stack.append("Django")
+            if "flask" in req_content:
+                stack.append("Flask")
+            if "sqlalchemy" in req_content:
+                stack.append("SQLAlchemy")
 
         if (project_path / "Cargo.toml").exists():
             stack.append("Rust")
@@ -612,10 +823,11 @@ async def generate_features(
     target_audience: str,
     analysis: ProjectAnalysis | None = None,
     competitor_analysis: CompetitorAnalysis | None = None,
-    existing_features: list[Feature] | None = None
+    existing_features: list[Feature] | None = None,
+    project_path: Path | None = None
 ) -> list[Feature]:
     """
-    Generate feature suggestions using Claude.
+    Generate feature suggestions using Claude with deep codebase analysis.
 
     Args:
         project_name: Name of the project
@@ -624,6 +836,7 @@ async def generate_features(
         analysis: Project analysis data
         competitor_analysis: Competitor analysis data
         existing_features: Existing features to avoid duplicates
+        project_path: Path to project for deep scanning
 
     Returns:
         List of suggested features
@@ -631,41 +844,99 @@ async def generate_features(
     existing_titles = {f.title.lower() for f in (existing_features or [])}
     stack = analysis.stack if analysis else []
 
-    context = f"""Project: {project_name}
-Description: {project_description}
-Target Audience: {target_audience}
+    # Perform deep codebase scan
+    if project_path is None:
+        project_path = Path(settings.project_path)
+
+    codebase_scan = scan_codebase_deep(project_path)
+
+    # Build rich context for Claude
+    context = f"""# Analyse du projet: {project_name}
+
+## Description
+{project_description}
+
+## Public cible
+{target_audience}
+
+## Stack technique
+{', '.join(analysis.stack) if analysis else 'Non détecté'}
+
+## Taille du projet
+{analysis.files_count if analysis else 0} fichiers
+
+## Structure du projet
+```
+{chr(10).join(codebase_scan['directory_tree'][:50])}
+```
+
+## Fichiers clés identifiés
+{chr(10).join('- ' + f for f in codebase_scan['key_files'][:20])}
+
+## Patterns détectés
+{chr(10).join('- ' + p for p in codebase_scan['patterns']) if codebase_scan['patterns'] else 'Aucun pattern spécifique détecté'}
+
+## Endpoints API existants
+{chr(10).join('- ' + e for e in codebase_scan['endpoints'][:15]) if codebase_scan['endpoints'] else 'Aucun endpoint détecté'}
+
+## Services backend
+{chr(10).join('- ' + s for s in codebase_scan['services'][:10]) if codebase_scan['services'] else 'Aucun service détecté'}
+
+## Composants frontend
+{chr(10).join('- ' + c for c in codebase_scan['components'][:10]) if codebase_scan['components'] else 'Aucun composant détecté'}
 """
 
-    if analysis:
-        context += f"""
-Tech Stack: {', '.join(analysis.stack)}
-Project Size: {analysis.files_count} files
-"""
+    # Add code samples from key files (limit to avoid token overflow)
+    code_samples = ""
+    samples_added = 0
+    for file_path, content in list(codebase_scan['file_samples'].items())[:8]:
+        if samples_added >= 3000:  # Limit total code samples
+            break
+        sample = content[:500]  # First 500 chars of each file
+        code_samples += f"\n### {file_path}\n```\n{sample}\n```\n"
+        samples_added += len(sample)
 
+    if code_samples:
+        context += f"\n## Extraits de code clés\n{code_samples}"
+
+    # Add competitors if available
     if competitor_analysis and competitor_analysis.competitors:
-        context += "\nCompetitors:\n"
+        context += "\n## Concurrents identifiés\n"
         for comp in competitor_analysis.competitors:
-            context += f"- {comp.name}: {', '.join(comp.features[:3])}\n"
+            context += f"- **{comp.name}**: {', '.join(comp.features[:3])}\n"
 
-    system_prompt = """You are a product manager AI that outputs ONLY valid JSON arrays.
-You MUST respond with ONLY a JSON array, no markdown, no explanations, no other text.
-Your entire response must be parseable as JSON."""
+    # Add existing features to avoid duplicates
+    if existing_features:
+        context += f"\n## Fonctionnalités existantes (à ne pas dupliquer)\n"
+        context += '\n'.join(f"- {f.title}" for f in existing_features[:10])
+
+    system_prompt = """Tu es un expert en product management et architecture logicielle.
+Tu analyses des projets en profondeur pour suggérer des fonctionnalités pertinentes.
+
+IMPORTANT:
+- Tes suggestions doivent être SPÉCIFIQUES au projet analysé
+- Ne propose PAS de fonctionnalités génériques qui existent déjà (regarde les endpoints, services, composants)
+- Propose des améliorations concrètes basées sur ce que tu vois dans le code
+- Priorise les fonctionnalités qui apportent de la valeur aux utilisateurs
+
+Tu dois répondre UNIQUEMENT avec un tableau JSON valide, sans markdown, sans explication."""
 
     prompt = f"""{context}
 
-Generate 8-10 feature suggestions. Return a JSON array where each object has:
-- title: string (short name)
-- description: string (1-2 sentences)
-- justification: string (why it matters)
+---
+
+En te basant sur cette analyse approfondie du codebase, génère 8-10 suggestions de fonctionnalités PERTINENTES et SPÉCIFIQUES à ce projet.
+
+Pour chaque fonctionnalité, fournis:
+- title: string (nom court et clair)
+- description: string (1-2 phrases décrivant la fonctionnalité)
+- justification: string (pourquoi c'est important pour ce projet spécifiquement)
 - phase: "foundation" | "core" | "enhancement" | "polish"
 - priority: "must" | "should" | "could" | "wont"
 - complexity: "low" | "medium" | "high"
 - impact: "low" | "medium" | "high"
 
-Example format:
-[{{"title": "Auth", "description": "User login", "justification": "Security", "phase": "foundation", "priority": "must", "complexity": "medium", "impact": "high"}}]
-
-Respond with ONLY the JSON array:"""
+Réponds UNIQUEMENT avec le tableau JSON:"""
 
     features = []
     data = []

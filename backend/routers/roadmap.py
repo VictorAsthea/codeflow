@@ -25,6 +25,8 @@ from backend.services.roadmap_storage import RoadmapStorage
 from backend.services import roadmap_ai
 from backend.config import settings
 from backend.validation import FeatureId
+from backend.utils.project_helpers import get_active_project_path
+from pathlib import Path
 
 router = APIRouter()
 
@@ -254,10 +256,13 @@ async def analyze_project_endpoint(data: AnalyzeRequest | None = None):
     if not roadmap:
         roadmap = Roadmap()
 
+    # Get active project path
+    project_path = Path(get_active_project_path())
+
     # Auto-extract project info if not provided
     if not data or (not data.project_name and not data.project_description):
         # Use AI to extract project info from files
-        project_info = await roadmap_ai.extract_project_info()
+        project_info = await roadmap_ai.extract_project_info(project_path)
         roadmap.project_name = project_info["project_name"]
         roadmap.project_description = project_info["description"]
         roadmap.target_audience = project_info["target_audience"]
@@ -270,8 +275,8 @@ async def analyze_project_endpoint(data: AnalyzeRequest | None = None):
         if data.target_audience:
             roadmap.target_audience = data.target_audience
 
-    # Run analysis
-    analysis = await roadmap_ai.analyze_project()
+    # Run analysis with active project path
+    analysis = await roadmap_ai.analyze_project(project_path)
     roadmap.analysis = analysis
     storage.save_roadmap(roadmap)
 
@@ -336,14 +341,18 @@ async def generate_features(data: GenerateRequest | None = None):
 
     use_competitors = data.use_competitor_analysis if data else True
 
-    # Generate features
+    # Get active project path for deep scanning
+    project_path = Path(get_active_project_path())
+
+    # Generate features with deep codebase analysis
     new_features = await roadmap_ai.generate_features(
         project_name=roadmap.project_name,
         project_description=roadmap.project_description,
         target_audience=roadmap.target_audience,
         analysis=roadmap.analysis,
         competitor_analysis=roadmap.competitor_analysis if use_competitors else None,
-        existing_features=roadmap.features
+        existing_features=roadmap.features,
+        project_path=project_path
     )
 
     # Add new features to roadmap
