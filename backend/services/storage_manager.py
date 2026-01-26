@@ -80,3 +80,18 @@ def get_project_storage(project_path: Optional[str] = None) -> JSONStorage:
         JSONStorage instance for the project
     """
     return get_storage_manager().get_storage(project_path)
+
+
+def get_active_project_path() -> Optional[str]:
+    """
+    Get the active project path from workspace service.
+
+    Returns:
+        The active project path, or None if not set.
+    """
+    try:
+        ws = get_workspace_service()
+        state = ws.get_workspace_state()
+        return state.get("active_project")
+    except Exception:
+        return None

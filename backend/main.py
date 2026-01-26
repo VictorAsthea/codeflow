@@ -108,3 +108,65 @@ async def kanban_websocket_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         kanban_manager.disconnect(websocket)
+
+
+@app.websocket("/ws/ideation")
+async def ideation_websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for ideation chat with streaming responses.
+    Receives messages from client and streams AI responses back.
+    """
+    from backend.routers.ideation import ideation_chat_manager
+    from backend.services.ideation_service import get_ideation_service
+    from backend.services.storage_manager import get_active_project_path
+    import json
+    from datetime import datetime, timezone
+
+    await ideation_chat_manager.connect(websocket)
+
+    project_path = get_active_project_path() or app_settings.project_path
+    service = get_ideation_service(project_path)
+
+    try:
+        while True:
+            # Receive message from client
+            data = await websocket.receive_text()
+            try:
+                message_data = json.loads(data)
+                user_message = message_data.get("message", "")
+            except json.JSONDecodeError:
+                user_message = data
+
+            if not user_message:
+                continue
+
+            # Send acknowledgment
+            await ideation_chat_manager.send_message(websocket, {
+                "type": "user_message",
+                "content": user_message,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+
+            # Stream response
+            chunks = []
+
+            async def on_output(chunk: str):
+                chunks.append(chunk)
+                await ideation_chat_manager.send_message(websocket, {
+                    "type": "stream",
+                    "content": chunk,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                })
+
+            # Get AI response with streaming
+            response = await service.chat(user_message, on_output=on_output)
+
+            # Send completion message
+            await ideation_chat_manager.send_message(websocket, {
+                "type": "complete",
+                "content": response,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+
+    except WebSocketDisconnect:
+        ideation_chat_manager.disconnect(websocket)
