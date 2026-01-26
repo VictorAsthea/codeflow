@@ -193,16 +193,15 @@ async def accept_suggestion(suggestion_id: str):
 *Generated from ideation suggestion {suggestion.id}*
 """
 
-    default_config = PhaseConfig()
     task = Task(
         id=task_id,
         title=f"{emoji} {suggestion.title}",
         description=description,
         status=TaskStatus.BACKLOG,
         phases={
-            "planning": Phase(name="planning", config=default_config),
-            "coding": Phase(name="coding", config=default_config),
-            "validation": Phase(name="validation", config=default_config),
+            "planning": Phase(name="planning", config=PhaseConfig()),
+            "coding": Phase(name="coding", config=PhaseConfig()),
+            "validation": Phase(name="validation", config=PhaseConfig()),
         },
         created_at=datetime.now(),
         updated_at=datetime.now()

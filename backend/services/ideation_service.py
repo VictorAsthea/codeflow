@@ -11,6 +11,7 @@ import json
 import uuid
 import logging
 import fcntl
+import asyncio
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -139,6 +140,162 @@ class IdeationStorage:
 def generate_suggestion_id() -> str:
     """Generate a unique suggestion ID."""
     return f"sug-{uuid.uuid4().hex[:8]}"
+
+
+def _scan_project_sync(path: Path, analysis: IdeationAnalysis) -> IdeationAnalysis:
+    """Synchronous project scanning helper for thread execution."""
+    # Directories to ignore
+    ignore_dirs = {
+        '.git', 'node_modules', '__pycache__', '.venv', 'venv',
+        '.next', 'dist', 'build', '.codeflow', '.worktrees',
+        'coverage', '.nyc_output', '.pytest_cache', '.mypy_cache'
+    }
+
+    # Extensions to count
+    code_extensions = {
+        '.py', '.js', '.ts', '.jsx', '.tsx', '.vue', '.svelte',
+        '.java', '.go', '.rs', '.rb', '.php', '.cs', '.cpp', '.c', '.h',
+        '.html', '.css', '.scss', '.sass', '.less'
+    }
+
+    try:
+        # Scan files and count lines
+        for file_path in path.rglob("*"):
+            if file_path.is_file():
+                # Get relative path parts to check against ignore dirs
+                try:
+                    relative_parts = file_path.relative_to(path).parts
+                except ValueError:
+                    relative_parts = file_path.parts
+
+                # Skip ignored directories
+                if any(part in ignore_dirs for part in relative_parts):
+                    continue
+
+                # Count code files
+                if file_path.suffix.lower() in code_extensions:
+                    analysis.files_count += 1
+                    try:
+                        content = file_path.read_text(encoding="utf-8", errors="ignore")
+                        analysis.lines_count += len(content.splitlines())
+                    except Exception:
+                        pass
+
+        # Detect stack from package.json
+        package_json = path / "package.json"
+        if package_json.exists():
+            try:
+                pkg = json.loads(package_json.read_text(encoding="utf-8"))
+                analysis.stack.append("node")
+                deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
+
+                if "react" in deps:
+                    analysis.frameworks.append("react")
+                if "next" in deps:
+                    analysis.frameworks.append("nextjs")
+                if "vue" in deps:
+                    analysis.frameworks.append("vue")
+                if "express" in deps:
+                    analysis.frameworks.append("express")
+                if "fastify" in deps:
+                    analysis.frameworks.append("fastify")
+                if "typescript" in deps:
+                    analysis.stack.append("typescript")
+            except Exception as e:
+                logger.warning(f"Error reading package.json: {e}")
+
+        # Detect Python stack
+        requirements = path / "requirements.txt"
+        pyproject = path / "pyproject.toml"
+
+        if requirements.exists() or pyproject.exists():
+            analysis.stack.append("python")
+
+            req_content = ""
+            if requirements.exists():
+                try:
+                    req_content = requirements.read_text(encoding="utf-8").lower()
+                except Exception:
+                    pass
+            if pyproject.exists():
+                try:
+                    req_content += pyproject.read_text(encoding="utf-8").lower()
+                except Exception:
+                    pass
+
+            if "fastapi" in req_content:
+                analysis.frameworks.append("fastapi")
+            if "django" in req_content:
+                analysis.frameworks.append("django")
+            if "flask" in req_content:
+                analysis.frameworks.append("flask")
+
+        # Detect Rust
+        if (path / "Cargo.toml").exists():
+            analysis.stack.append("rust")
+
+        # Detect Go
+        if (path / "go.mod").exists():
+            analysis.stack.append("go")
+
+        # Detect key directories
+        key_dirs = [
+            "src", "lib", "app", "components", "pages", "api",
+            "backend", "frontend", "services", "utils", "models",
+            "tests", "test", "__tests__", "spec"
+        ]
+        for dir_name in key_dirs:
+            if (path / dir_name).is_dir():
+                analysis.key_directories.append(dir_name)
+
+        # Detect patterns
+        patterns = []
+
+        # Check for testing patterns
+        if (path / "tests").is_dir() or (path / "test").is_dir() or (path / "__tests__").is_dir():
+            patterns.append("unit_tests")
+        if (path / "pytest.ini").exists() or (path / "conftest.py").exists():
+            patterns.append("pytest")
+        if (path / "jest.config.js").exists() or (path / "jest.config.ts").exists():
+            patterns.append("jest")
+
+        # Check for CI/CD
+        if (path / ".github" / "workflows").is_dir():
+            patterns.append("github_actions")
+        if (path / ".gitlab-ci.yml").exists():
+            patterns.append("gitlab_ci")
+        if (path / "Dockerfile").exists():
+            patterns.append("docker")
+        if (path / "docker-compose.yml").exists() or (path / "docker-compose.yaml").exists():
+            patterns.append("docker_compose")
+
+        # Check for linting/formatting
+        if (path / ".eslintrc.js").exists() or (path / ".eslintrc.json").exists():
+            patterns.append("eslint")
+        if (path / ".prettierrc").exists() or (path / ".prettierrc.json").exists():
+            patterns.append("prettier")
+        if (path / "pyproject.toml").exists():
+            try:
+                content = (path / "pyproject.toml").read_text(encoding="utf-8")
+                if "ruff" in content:
+                    patterns.append("ruff")
+                if "black" in content:
+                    patterns.append("black")
+            except Exception:
+                pass
+
+        # Check for documentation
+        if (path / "docs").is_dir():
+            patterns.append("documentation")
+        if (path / "README.md").exists():
+            patterns.append("readme")
+
+        analysis.patterns_detected = patterns
+
+    except Exception as e:
+        logger.error(f"Error analyzing project: {e}")
+
+    return analysis
 
 
 async def analyze_project(project_path: Optional[str] = None) -> IdeationAnalysis:
