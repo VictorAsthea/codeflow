@@ -1,251 +1,320 @@
 """
-Router for Ideation feature endpoints.
-Provides AI-powered project analysis, suggestions, and brainstorming chat.
+Ideation API endpoints.
+
+Provides endpoints for project analysis, AI-powered suggestions, and brainstorming chat.
 """
 
-import asyncio
-import logging
-from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException
+from datetime import datetime
+import uuid
 
-from backend.config import settings
 from backend.models import (
-    Suggestion, IdeationChatRequest, SuggestionToTaskRequest,
-    TaskCreate, SuggestionCategory, IdeationChatMessage,
-    IdeationAnalysis, SuggestionStatus, ChatRequest, ChatResponse
+    IdeationAnalysis,
+    IdeationData,
+    Suggestion,
+    SuggestionStatus,
+    ChatRequest,
+    ChatResponse,
+    ChatMessage,
+    Task,
+    TaskStatus,
+    Phase,
+    PhaseConfig,
 )
-from backend.services.ideation_service import get_ideation_service
+from backend.services.ideation_service import (
+    IdeationStorage,
+    analyze_project,
+    generate_suggestions,
+    chat_ideation,
+    get_ideation_storage,
+)
+from backend.services.workspace_service import get_workspace_service
+from backend.config import settings
 
-logger = logging.getLogger(__name__)
-
-router = APIRouter(prefix="/ideation", tags=["ideation"])
+router = APIRouter()
 
 
-def get_service():
-    """Get ideation service for the active project."""
-    from backend.services.storage_manager import get_active_project_path
-    project_path = get_active_project_path() or settings.project_path
-    return get_ideation_service(project_path)
-
-
-@router.get("/state")
-async def get_ideation_state():
-    """
-    Get current ideation state (suggestions + chat history).
-    """
+def _get_active_project_path() -> str:
+    """Get the active project path from workspace service."""
     try:
-        service = get_service()
-        state = service.get_state()
-        return {
-            "suggestions": [s for s in state.suggestions if not s.dismissed],
-            "suggestions_count": len([s for s in state.suggestions if not s.dismissed]),
-            "chat_history": state.chat_history,
-            "last_analysis_at": state.last_analysis_at
-        }
-    except Exception as e:
-        logger.error(f"Failed to get ideation state: {e}")
-        raise HTTPException(500, f"Failed to get ideation state: {str(e)}")
+        ws = get_workspace_service()
+        state = ws.get_workspace_state()
+        return state.get("active_project") or settings.project_path
+    except Exception:
+        return settings.project_path
 
 
-@router.get("/suggestions")
-async def get_suggestions(include_dismissed: bool = False):
+def get_storage() -> IdeationStorage:
+    """Get storage for the active project."""
+    return get_ideation_storage(_get_active_project_path())
+
+
+# ============== Analysis Endpoints ==============
+
+@router.post("/ideation/analyze")
+async def analyze_project_endpoint():
     """
-    Get all suggestions.
+    Analyze the project structure, patterns, and stack.
 
-    Args:
-        include_dismissed: Include dismissed suggestions (default: False)
+    Scans files, detects patterns (tests, CI/CD, linting), and counts lines.
+    Results are cached in .codeflow/ideation/analysis.json
     """
-    try:
-        service = get_service()
-        suggestions = service.get_suggestions(include_dismissed=include_dismissed)
-        return {
-            "suggestions": suggestions,
-            "count": len(suggestions)
-        }
-    except Exception as e:
-        logger.error(f"Failed to get suggestions: {e}")
-        raise HTTPException(500, f"Failed to get suggestions: {str(e)}")
+    project_path = _get_active_project_path()
+    analysis = await analyze_project(project_path)
+
+    return {
+        "analysis": analysis.model_dump(mode="json"),
+        "message": f"Analyzed {analysis.files_count} files, {analysis.lines_count} lines"
+    }
 
 
-@router.post("/analyze")
-async def analyze_project():
+@router.get("/ideation/analysis")
+async def get_analysis():
+    """Get the cached project analysis."""
+    storage = get_storage()
+    data = storage.get_data()
+
+    if not data.analysis:
+        raise HTTPException(
+            status_code=404,
+            detail="No analysis found. Run POST /api/ideation/analyze first."
+        )
+
+    return {"analysis": data.analysis.model_dump(mode="json")}
+
+
+# ============== Suggestions Endpoints ==============
+
+@router.post("/ideation/suggest")
+async def generate_suggestions_endpoint():
     """
-    Analyze the project and generate improvement suggestions.
-    This scans the codebase for issues, security vulnerabilities,
-    performance problems, and other improvements.
+    Generate AI-powered improvement suggestions.
 
-    Returns:
-        List of new suggestions generated from analysis
+    Analyzes the project (if not already done) and generates suggestions in categories:
+    - Security: validation, auth, injection prevention
+    - Performance: caching, optimization, lazy loading
+    - Quality: tests, docs, refactoring
+    - Feature: missing functionality
     """
-    try:
-        service = get_service()
-        suggestions = await service.analyze_project()
-        return {
-            "message": "Analysis complete",
-            "suggestions": suggestions,
-            "count": len(suggestions)
-        }
-    except Exception as e:
-        logger.error(f"Project analysis failed: {e}")
-        raise HTTPException(500, f"Analysis failed: {str(e)}")
+    storage = get_storage()
+    data = storage.get_data()
 
+    # Run analysis if not done
+    if not data.analysis:
+        project_path = _get_active_project_path()
+        data.analysis = await analyze_project(project_path)
 
-@router.post("/generate")
-async def generate_suggestions():
-    """
-    Generate creative suggestions for project improvements.
-    Uses AI to brainstorm new features, enhancements, and ideas.
-
-    Returns:
-        List of new suggestions
-    """
-    try:
-        service = get_service()
-        suggestions = await service.generate_suggestions()
-        return {
-            "message": "Suggestions generated",
-            "suggestions": suggestions,
-            "count": len(suggestions)
-        }
-    except Exception as e:
-        logger.error(f"Suggestion generation failed: {e}")
-        raise HTTPException(500, f"Generation failed: {str(e)}")
-
-
-@router.post("/suggestions/{suggestion_id}/dismiss")
-async def dismiss_suggestion(suggestion_id: str):
-    """
-    Dismiss a suggestion.
-    The suggestion will be hidden from the main list but not deleted.
-    """
-    service = get_service()
-    success = service.dismiss_suggestion(suggestion_id)
-
-    if not success:
-        raise HTTPException(404, "Suggestion not found")
-
-    return {"message": "Suggestion dismissed", "suggestion_id": suggestion_id}
-
-
-@router.delete("/suggestions")
-async def clear_all_suggestions():
-    """
-    Clear all suggestions.
-    """
-    service = get_service()
-    count = service.clear_suggestions()
-    return {"message": "All suggestions cleared", "count": count}
-
-
-@router.post("/suggestions/{suggestion_id}/to-task")
-async def convert_suggestion_to_task(suggestion_id: str):
-    """
-    Convert a suggestion to a task.
-    Creates a new task based on the suggestion details.
-    """
-    service = get_service()
-    suggestion = service.get_suggestion_by_id(suggestion_id)
-
-    if not suggestion:
-        raise HTTPException(404, "Suggestion not found")
-
-    if suggestion.task_id:
-        raise HTTPException(400, f"Suggestion already converted to task: {suggestion.task_id}")
-
-    # Import here to avoid circular imports
-    from backend.routers.tasks import create_new_task
-
-    # Build task description from suggestion
-    description = suggestion.description
-    if suggestion.file_path:
-        description += f"\n\nRelated file: {suggestion.file_path}"
-        if suggestion.line_number:
-            description += f" (line {suggestion.line_number})"
-
-    # Create the task
-    task_data = TaskCreate(
-        title=suggestion.title,
-        description=description
+    # Generate suggestions
+    new_suggestions = await generate_suggestions(
+        data.analysis,
+        _get_active_project_path()
     )
 
-    try:
-        task = await create_new_task(task_data)
-
-        # Mark suggestion as converted
-        service.mark_suggestion_as_task(suggestion_id, task.id)
-
-        return {
-            "message": "Task created from suggestion",
-            "task": task,
-            "suggestion_id": suggestion_id
-        }
-    except Exception as e:
-        logger.error(f"Failed to create task from suggestion: {e}")
-        raise HTTPException(500, f"Failed to create task: {str(e)}")
+    return {
+        "suggestions": [s.model_dump(mode="json") for s in new_suggestions],
+        "count": len(new_suggestions),
+        "message": f"Generated {len(new_suggestions)} suggestions"
+    }
 
 
-@router.post("/chat")
-async def chat_with_ideation(request: IdeationChatRequest):
+@router.get("/ideation/suggestions")
+async def list_suggestions():
+    """List all suggestions."""
+    storage = get_storage()
+    data = storage.get_data()
+
+    return {
+        "suggestions": [s.model_dump(mode="json") for s in data.suggestions],
+        "count": len(data.suggestions)
+    }
+
+
+@router.get("/ideation/suggestions/{suggestion_id}")
+async def get_suggestion(suggestion_id: str):
+    """Get a specific suggestion by ID."""
+    storage = get_storage()
+    suggestion = storage.get_suggestion(suggestion_id)
+
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+
+    return {"suggestion": suggestion.model_dump(mode="json")}
+
+
+@router.post("/ideation/suggestions/{suggestion_id}/accept")
+async def accept_suggestion(suggestion_id: str):
     """
-    Send a message to the ideation chat.
-    Non-streaming version for simple requests.
+    Accept a suggestion and convert it to a Kanban task.
+
+    Creates a new task in the backlog based on the suggestion.
     """
-    try:
-        service = get_service()
-        response = await service.chat(request.message)
-        return {
-            "response": response,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Ideation chat failed: {e}")
-        raise HTTPException(500, f"Chat failed: {str(e)}")
+    from backend.services.storage_manager import get_project_storage
+
+    storage = get_storage()
+    suggestion = storage.get_suggestion(suggestion_id)
+
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+
+    if suggestion.status == SuggestionStatus.ACCEPTED:
+        # Already accepted, return existing task
+        if suggestion.task_id:
+            task_storage = get_project_storage()
+            existing_task = task_storage.get_task(suggestion.task_id)
+            if existing_task:
+                return {
+                    "message": "Suggestion already accepted",
+                    "task_id": suggestion.task_id,
+                    "task": existing_task.model_dump(mode="json")
+                }
+
+    # Create task from suggestion
+    task_id = f"task-{uuid.uuid4().hex[:8]}"
+
+    # Map category to emoji for task title
+    category_emojis = {
+        "security": "🔒",
+        "performance": "⚡",
+        "quality": "📝",
+        "feature": "✨"
+    }
+    emoji = category_emojis.get(suggestion.category.value, "💡")
+
+    description = f"""## {emoji} {suggestion.title}
+
+{suggestion.description}
+
+### Details
+- **Category**: {suggestion.category.value}
+- **Priority**: {suggestion.priority}
+- **Source**: AI Ideation Suggestion
+
+---
+*Generated from ideation suggestion {suggestion.id}*
+"""
+
+    task = Task(
+        id=task_id,
+        title=f"{emoji} {suggestion.title}",
+        description=description,
+        status=TaskStatus.BACKLOG,
+        phases={
+            "planning": Phase(name="planning", config=PhaseConfig()),
+            "coding": Phase(name="coding", config=PhaseConfig()),
+            "validation": Phase(name="validation", config=PhaseConfig()),
+        },
+        created_at=datetime.now(),
+        updated_at=datetime.now()
+    )
+
+    # Save task
+    task_storage = get_project_storage()
+    task_storage.create_task(task)
+
+    # Update suggestion status
+    storage.update_suggestion(suggestion_id, {
+        "status": SuggestionStatus.ACCEPTED,
+        "task_id": task_id
+    })
+
+    return {
+        "message": "Suggestion accepted and converted to task",
+        "task_id": task_id,
+        "task": task.model_dump(mode="json")
+    }
 
 
-@router.get("/chat/history")
-async def get_chat_history():
+@router.post("/ideation/suggestions/{suggestion_id}/dismiss")
+async def dismiss_suggestion(suggestion_id: str):
+    """Dismiss a suggestion (mark as ignored)."""
+    storage = get_storage()
+    suggestion = storage.get_suggestion(suggestion_id)
+
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+
+    updated = storage.update_suggestion(suggestion_id, {
+        "status": SuggestionStatus.DISMISSED
+    })
+
+    return {
+        "message": "Suggestion dismissed",
+        "suggestion": updated.model_dump(mode="json") if updated else None
+    }
+
+
+@router.delete("/ideation/suggestions/{suggestion_id}")
+async def delete_suggestion(suggestion_id: str):
+    """Delete a suggestion permanently."""
+    storage = get_storage()
+
+    if not storage.delete_suggestion(suggestion_id):
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+
+    return {"message": "Suggestion deleted"}
+
+
+# ============== Chat Endpoint ==============
+
+@router.post("/ideation/chat")
+async def chat_endpoint(request: ChatRequest):
     """
-    Get chat history.
+    Brainstorm chat with AI assistant.
+
+    Have a conversation about ideas, improvements, and technical approaches.
+    The AI has context about the project analysis.
     """
-    service = get_service()
-    history = service.get_chat_history()
-    return {"history": history, "count": len(history)}
+    project_path = _get_active_project_path()
+
+    # Convert request context to ChatMessage objects
+    context = [
+        ChatMessage(
+            role=msg.role,
+            content=msg.content,
+            timestamp=msg.timestamp
+        )
+        for msg in request.context
+    ]
+
+    response, suggestions = await chat_ideation(
+        message=request.message,
+        context=context,
+        project_path=project_path
+    )
+
+    return ChatResponse(
+        response=response,
+        suggestions=suggestions
+    ).model_dump(mode="json")
 
 
-@router.delete("/chat/history")
-async def clear_chat_history():
-    """
-    Clear chat history.
-    """
-    service = get_service()
-    service.clear_chat_history()
-    return {"message": "Chat history cleared"}
+# ============== Utility Endpoints ==============
+
+@router.get("/ideation")
+async def get_ideation_data():
+    """Get all ideation data (analysis + suggestions)."""
+    storage = get_storage()
+    data = storage.get_data()
+
+    return {
+        "analysis": data.analysis.model_dump(mode="json") if data.analysis else None,
+        "suggestions": [s.model_dump(mode="json") for s in data.suggestions],
+        "suggestions_count": len(data.suggestions),
+        "pending_count": len([s for s in data.suggestions if s.status == SuggestionStatus.PENDING]),
+        "accepted_count": len([s for s in data.suggestions if s.status == SuggestionStatus.ACCEPTED]),
+        "dismissed_count": len([s for s in data.suggestions if s.status == SuggestionStatus.DISMISSED])
+    }
 
 
-# WebSocket for streaming chat
-class IdeationChatManager:
-    """Manager for ideation chat WebSocket connections."""
+@router.delete("/ideation")
+async def clear_ideation_data():
+    """Clear all ideation data (for testing/reset)."""
+    storage = get_storage()
 
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
+    # Remove files if they exist
+    if storage.analysis_file.exists():
+        storage.analysis_file.unlink()
+    if storage.suggestions_file.exists():
+        storage.suggestions_file.unlink()
 
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-        logger.info(f"Ideation chat connected, total: {len(self.active_connections)}")
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-        logger.info(f"Ideation chat disconnected, total: {len(self.active_connections)}")
-
-    async def send_message(self, websocket: WebSocket, message: dict):
-        try:
-            await websocket.send_json(message)
-        except Exception as e:
-            logger.warning(f"Failed to send message: {e}")
-            self.disconnect(websocket)
-
-
-# Global chat manager
-ideation_chat_manager = IdeationChatManager()
+    return {"message": "Ideation data cleared"}

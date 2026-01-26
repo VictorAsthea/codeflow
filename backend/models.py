@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
@@ -106,8 +106,8 @@ class Task(BaseModel):
     review_output: str | None = None
     archived: bool = False
     archived_at: datetime | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
     # v0.4 - Subtask workflow
     subtasks: list[Subtask] = Field(default_factory=list)
     current_phase: str | None = None  # "planning", "coding", "validation"
@@ -218,8 +218,8 @@ class Feature(BaseModel):
     impact: Impact
     status: FeatureStatus = FeatureStatus.UNDER_REVIEW
     task_id: str | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
 
 class ProjectAnalysis(BaseModel):
@@ -283,22 +283,8 @@ class RoadmapUpdate(BaseModel):
 class SuggestionCategory(str, Enum):
     SECURITY = "security"
     PERFORMANCE = "performance"
-    CODE_QUALITY = "code_quality"
-    QUALITY = "quality"  # Alias for code_quality
+    QUALITY = "quality"
     FEATURE = "feature"
-    BUG = "bug"
-    REFACTORING = "refactoring"
-    DOCUMENTATION = "documentation"
-    TESTING = "testing"
-    ACCESSIBILITY = "accessibility"
-    OTHER = "other"
-
-
-class SuggestionPriority(str, Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
 
 
 class SuggestionStatus(str, Enum):
@@ -312,33 +298,10 @@ class Suggestion(BaseModel):
     title: str
     description: str
     category: SuggestionCategory
-    priority: SuggestionPriority | str = SuggestionPriority.MEDIUM  # Support both enum and string
+    priority: str = "medium"  # low, medium, high
     status: SuggestionStatus = SuggestionStatus.PENDING
-    file_path: str | None = None  # Related file
-    line_number: int | None = None  # Related line
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    dismissed: bool = False  # Legacy field, can be mapped to status
     task_id: str | None = None  # If converted to task
-
-
-class IdeationChatMessage(BaseModel):
-    role: str  # "user" or "assistant"
-    content: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class IdeationState(BaseModel):
-    suggestions: list[Suggestion] = Field(default_factory=list)
-    chat_history: list[IdeationChatMessage] = Field(default_factory=list)
-    last_analysis_at: datetime | None = None
-
-
-class IdeationChatRequest(BaseModel):
-    message: str
-
-
-class SuggestionToTaskRequest(BaseModel):
-    suggestion_id: str
+    created_at: datetime = Field(default_factory=datetime.now)
 
 
 class IdeationAnalysis(BaseModel):
@@ -350,7 +313,7 @@ class IdeationAnalysis(BaseModel):
     lines_count: int = 0
     key_directories: list[str] = Field(default_factory=list)
     patterns_detected: list[str] = Field(default_factory=list)
-    analyzed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    analyzed_at: datetime = Field(default_factory=datetime.now)
 
 
 class IdeationData(BaseModel):
@@ -361,7 +324,7 @@ class IdeationData(BaseModel):
 class ChatMessage(BaseModel):
     role: str  # "user" or "assistant"
     content: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=datetime.now)
 
 
 class ChatRequest(BaseModel):

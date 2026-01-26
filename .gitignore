@@ -48,6 +48,7 @@ htmlcov/
 .codeflow/sessions/
 .codeflow/logs/
 .codeflow/project_context.json
+.codeflow/ideation/
 */.codeflow/
 
 # Backup files
