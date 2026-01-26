@@ -7,11 +7,10 @@ This relies on the user having already authenticated via `claude login`.
 
 import asyncio
 import logging
-import os
 import re
 import sys
-import time
-from datetime import datetime, timedelta
+import threading
+from datetime import datetime
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -21,7 +20,7 @@ class ClaudeUsageService:
     """Service to fetch Claude CLI usage data."""
 
     def __init__(self):
-        self.timeout = 30  # seconds
+        self.timeout = 20  # seconds
         self.is_windows = sys.platform == 'win32'
         self._cache = None
         self._cache_time = None
@@ -73,102 +72,128 @@ class ClaudeUsageService:
 
     async def _execute_usage_command(self) -> str:
         """Execute claude CLI and get /usage output."""
-
         if self.is_windows:
             return await self._execute_windows()
         else:
             return await self._execute_unix()
 
     async def _execute_windows(self) -> str:
-        """Windows implementation using pywinpty."""
+        """Windows implementation using pywinpty with cmd.exe wrapper."""
         try:
             import winpty
         except ImportError:
-            # Fallback to simple subprocess approach
-            return await self._execute_simple()
+            raise ImportError("pywinpty not installed. Run: pip install pywinpty")
 
+        import os
         loop = asyncio.get_event_loop()
+        result = {"output": "", "error": None}
+        cwd = os.getcwd()
 
         def run_pty():
-            output = []
+            import time
+            pty_process = None
 
             try:
-                # Create PTY
-                pty = winpty.PtyProcess.spawn('claude')
+                # Use cmd.exe wrapper for proper PTY handling
+                cmd = f'cmd.exe /c claude --add-dir "{cwd}"'
+                pty_process = winpty.PtyProcess.spawn(cmd)
+                logger.info("Claude CLI spawned via cmd.exe")
+
+                # Thread to read output
+                read_buffer = []
+                stop_reading = threading.Event()
+                got_repl = threading.Event()
+
+                def reader():
+                    while not stop_reading.is_set():
+                        try:
+                            if pty_process.isalive():
+                                data = pty_process.read(1024)
+                                if data:
+                                    read_buffer.append(data)
+                                    # Check for REPL ready
+                                    buf = ''.join(read_buffer)
+                                    if '?' in buf and 'shortcuts' in buf:
+                                        got_repl.set()
+                        except EOFError:
+                            break
+                        except Exception:
+                            break
+
+                reader_thread = threading.Thread(target=reader, daemon=True)
+                reader_thread.start()
 
                 # Wait for REPL to be ready
-                ready_patterns = ['❯', '? for shortcuts', 'Claude']
-                start_time = datetime.now()
-                buffer = ""
-
-                while (datetime.now() - start_time).total_seconds() < self.timeout:
-                    if pty.isalive():
-                        try:
-                            data = pty.read(1024, blocking=False)
-                            if data:
-                                buffer += data
-                                output.append(data)
-
-                                # Check if REPL is ready
-                                if any(p in buffer for p in ready_patterns):
-                                    break
-                        except Exception:
-                            pass
-                    time.sleep(0.1)
+                got_repl.wait(timeout=10)
+                time.sleep(1)
+                logger.info("REPL ready")
 
                 # Send /usage command
-                pty.write('/usage\r\n')
+                pty_process.write('/usage\r')
+                time.sleep(1.5)
+                # Send Enter to confirm autocomplete selection
+                pty_process.write('\r')
+                logger.info("Sent /usage command")
 
-                # Wait for usage output
-                usage_start = datetime.now()
-                while (datetime.now() - usage_start).total_seconds() < 10:
-                    if pty.isalive():
-                        try:
-                            data = pty.read(1024, blocking=False)
-                            if data:
-                                buffer += data
-                                output.append(data)
+                # Wait for usage data
+                start = time.time()
+                while time.time() - start < 8:
+                    buffer = ''.join(read_buffer)
+                    if 'Current session' in buffer and '% left' in buffer:
+                        logger.info("Usage data detected")
+                        time.sleep(2)  # Wait for complete output
+                        break
+                    time.sleep(0.3)
 
-                                # Check if we have usage data
-                                if 'Current session' in buffer and '% left' in buffer:
-                                    # Wait a bit more for full output
-                                    time.sleep(1)
-                                    # Read remaining
-                                    try:
-                                        data = pty.read(4096, blocking=False)
-                                        if data:
-                                            buffer += data
-                                            output.append(data)
-                                    except Exception:
-                                        pass
-                                    break
-                        except Exception:
-                            pass
-                    time.sleep(0.1)
+                # Stop reader and get final buffer
+                stop_reading.set()
+                time.sleep(0.3)
+                result["output"] = ''.join(read_buffer)
+                logger.info(f"Got {len(result['output'])} chars of output")
 
-                # Send escape to exit
-                pty.write('\x1b')
-                time.sleep(0.5)
-                pty.terminate()
+                # Exit CLI
+                try:
+                    pty_process.write('\x1b')  # ESC
+                    time.sleep(0.3)
+                    pty_process.terminate()
+                except Exception:
+                    pass
 
             except Exception as e:
+                result["error"] = str(e)
                 logger.error(f"PTY error: {e}")
-                raise
+            finally:
+                if pty_process:
+                    try:
+                        pty_process.terminate()
+                    except Exception:
+                        pass
 
-            return ''.join(output)
+        # Run in executor with timeout
+        try:
+            await asyncio.wait_for(
+                loop.run_in_executor(None, run_pty),
+                timeout=self.timeout
+            )
+        except asyncio.TimeoutError:
+            raise TimeoutError("Claude CLI timed out")
 
-        return await loop.run_in_executor(None, run_pty)
+        if result["error"]:
+            raise Exception(result["error"])
+
+        return result["output"]
 
     async def _execute_unix(self) -> str:
         """Unix implementation using pexpect."""
         try:
             import pexpect
         except ImportError:
-            return await self._execute_simple()
+            raise ImportError("pexpect not installed. Run: pip install pexpect")
 
         loop = asyncio.get_event_loop()
 
         def run_pexpect():
+            import time
             try:
                 child = pexpect.spawn('claude', timeout=self.timeout)
 
@@ -183,7 +208,6 @@ class ClaudeUsageService:
                 child.expect(['% left', '% used'], timeout=5)
 
                 # Wait for full output
-                import time
                 time.sleep(2)
 
                 # Get all output
@@ -208,27 +232,6 @@ class ClaudeUsageService:
                 raise
 
         return await loop.run_in_executor(None, run_pexpect)
-
-    async def _execute_simple(self) -> str:
-        """Simple fallback using subprocess with echo."""
-        # This won't work well because claude CLI needs a TTY
-        # But try anyway as a fallback
-
-        proc = await asyncio.create_subprocess_exec(
-            'claude', '--print', '-p', '/usage',
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(),
-                timeout=self.timeout
-            )
-            return stdout.decode('utf-8', errors='ignore')
-        except asyncio.TimeoutError:
-            proc.kill()
-            raise TimeoutError("Claude CLI timed out")
 
     def _parse_usage_output(self, raw_output: str) -> dict:
         """Parse Claude CLI usage output."""
