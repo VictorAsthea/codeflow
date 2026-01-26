@@ -119,6 +119,13 @@ export const API = {
             method: 'PATCH',
             body: JSON.stringify(data),
         }),
+
+        getParallel: () => fetchJSON(`${API_BASE}/settings/parallel`),
+
+        updateParallel: (maxParallelTasks) => fetchJSON(`${API_BASE}/settings/parallel`, {
+            method: 'PATCH',
+            body: JSON.stringify({ max_parallel_tasks: maxParallelTasks }),
+        }),
     },
 
     git: {
@@ -133,6 +140,32 @@ export const API = {
 
     queue: {
         status: () => fetchJSON(`${API_BASE}/queue/status`),
+
+        detailed: () => fetchJSON(`${API_BASE}/queue/detailed`),
+
+        batch: (tasks) => fetchJSON(`${API_BASE}/queue/batch`, {
+            method: 'POST',
+            body: JSON.stringify({ tasks }),
+        }),
+
+        reorder: (taskOrder) => fetchJSON(`${API_BASE}/queue/reorder`, {
+            method: 'PUT',
+            body: JSON.stringify({ task_order: taskOrder }),
+        }),
+
+        pause: () => fetchJSON(`${API_BASE}/queue/pause`, {
+            method: 'POST',
+        }),
+
+        resume: () => fetchJSON(`${API_BASE}/queue/resume`, {
+            method: 'POST',
+        }),
+
+        estimates: () => fetchJSON(`${API_BASE}/queue/estimates`),
+
+        optimize: () => fetchJSON(`${API_BASE}/queue/optimize`, {
+            method: 'POST',
+        }),
     },
 
     worktrees: {

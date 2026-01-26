@@ -249,15 +249,21 @@ const toast = new ToastManager();
 // Export for ES6 modules
 export default toast;
 
-// Also create global functions for easy access
-window.showToast = {
-    success: (message, options) => toast.success(message, options),
-    error: (message, options) => toast.error(message, options),
-    info: (message, options) => toast.info(message, options),
-    warning: (message, options) => toast.warning(message, options),
-    dismiss: (id) => toast.dismiss(id),
-    dismissAll: () => toast.dismissAll()
+// Create global function with method shortcuts
+// Supports both: window.showToast('message', 'error') and window.showToast.error('message')
+const showToastFn = (message, type = 'info', options = {}) => {
+    const method = toast[type] || toast.info;
+    return method.call(toast, message, options);
 };
+
+showToastFn.success = (message, options) => toast.success(message, options);
+showToastFn.error = (message, options) => toast.error(message, options);
+showToastFn.info = (message, options) => toast.info(message, options);
+showToastFn.warning = (message, options) => toast.warning(message, options);
+showToastFn.dismiss = (id) => toast.dismiss(id);
+showToastFn.dismissAll = () => toast.dismissAll();
+
+window.showToast = showToastFn;
 
 // Auto-initialize on DOM ready
 if (document.readyState === 'loading') {
