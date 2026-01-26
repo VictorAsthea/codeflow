@@ -9,9 +9,87 @@ import re
 import os
 import shutil
 import logging
-from typing import Callable
+from typing import Callable, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+def get_project_allowed_tools(project_path: str, base_tools: List[str]) -> List[str]:
+    """
+    Construit la liste des outils autorisés en combinant les outils de base
+    avec les commandes Bash autorisées depuis security.json.
+
+    Args:
+        project_path: Chemin du projet
+        base_tools: Outils de base (Edit, Write, Read, etc.)
+
+    Returns:
+        Liste complète des outils autorisés
+    """
+    from backend.services.project_config_service import get_project_config
+
+    try:
+        config = get_project_config(project_path)
+        allowed_commands = config.get_allowed_commands()
+
+        if not allowed_commands:
+            return base_tools
+
+        # Format: Bash(cmd1:*), Bash(cmd2:*), etc.
+        bash_tools = [f"Bash({cmd}:*)" for cmd in allowed_commands]
+
+        # Combiner les outils de base + commandes bash autorisées
+        return base_tools + bash_tools
+
+    except Exception as e:
+        logger.warning(f"Failed to load security config: {e}")
+        return base_tools
+
+
+def get_mcp_args(project_path: str) -> List[str]:
+    """
+    Construit les arguments MCP depuis mcp.json.
+
+    Converts Codeflow mcp.json format to Claude CLI format and passes as JSON string.
+
+    Returns:
+        Liste d'arguments pour --mcp-config
+    """
+    try:
+        # Load Codeflow mcp.json
+        mcp_config_path = os.path.join(project_path, ".codeflow", "mcp.json")
+        if not os.path.exists(mcp_config_path):
+            return []
+
+        with open(mcp_config_path, 'r', encoding='utf-8') as f:
+            codeflow_config = json.load(f)
+
+        servers = codeflow_config.get("servers", {})
+        if not servers:
+            return []
+
+        # Convert to Claude CLI format (only enabled servers)
+        claude_mcp_servers = {}
+        for name, server in servers.items():
+            if server.get("enabled", False):
+                claude_mcp_servers[name] = {
+                    "command": server.get("command", ""),
+                    "args": server.get("args", [])
+                }
+
+        if not claude_mcp_servers:
+            return []
+
+        # Build the JSON config string for --mcp-config
+        claude_config = {"mcpServers": claude_mcp_servers}
+        config_json = json.dumps(claude_config)
+
+        logger.info(f"MCP config: {len(claude_mcp_servers)} servers enabled")
+        return ["--mcp-config", config_json]
+
+    except Exception as e:
+        logger.warning(f"Failed to load MCP config: {e}")
+        return []
 
 
 def get_claude_command() -> str:
@@ -52,7 +130,8 @@ async def run_claude_cli(
     allowed_tools: list[str] | None = None,
     max_turns: int = 50,
     timeout: int = 600,
-    on_output: Callable[[str], None] | None = None
+    on_output: Callable[[str], None] | None = None,
+    use_project_config: bool = True
 ) -> tuple[bool, str]:
     """
     Execute Claude Code CLI with a prompt.
@@ -65,6 +144,7 @@ async def run_claude_cli(
         max_turns: Max turns
         timeout: Timeout in seconds
         on_output: Callback for each output line (streaming)
+        use_project_config: If True, load tools from security.json and MCPs from mcp.json
 
     Returns:
         Tuple (success: bool, output: str)
@@ -75,15 +155,30 @@ async def run_claude_cli(
     if output_format == "json":
         cmd.extend(["--output-format", "json"])
 
+    # Build allowed tools list
     if allowed_tools:
+        if use_project_config:
+            # Enhance with project-specific bash commands
+            allowed_tools = get_project_allowed_tools(cwd, allowed_tools)
         cmd.extend(["--allowedTools", ",".join(allowed_tools)])
+
+    # Add MCP servers from project config
+    mcp_count = 0
+    if use_project_config:
+        mcp_args = get_mcp_args(cwd)
+        cmd.extend(mcp_args)
+        mcp_count = len(mcp_args) // 2
 
     cmd.extend(["--max-turns", str(max_turns)])
 
     # Prompt will be passed via stdin (handles long prompts and special chars)
     cmd.append("-")  # Read from stdin
 
-    logger.info(f"Running Claude CLI: {claude_cmd} (max_turns={max_turns}, timeout={timeout}s)")
+    # Log configuration
+    logger.info(f"Running Claude CLI: {claude_cmd} (max_turns={max_turns}, timeout={timeout}s, mcps={mcp_count})")
+    if allowed_tools:
+        bash_count = sum(1 for t in allowed_tools if t.startswith("Bash("))
+        logger.debug(f"Allowed tools: {len(allowed_tools)} total, {bash_count} bash commands")
 
     # Prepare environment with npm path (Windows)
     env = os.environ.copy()
@@ -149,34 +244,57 @@ def extract_json_from_output(output: str) -> dict | list | None:
     Extract JSON from Claude CLI output.
     Handles cases where JSON is in markdown blocks or mixed with text.
     """
+    if not output or not output.strip():
+        logger.warning("extract_json_from_output: Empty output")
+        return None
+
     # Try to find a JSON markdown block
     json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', output)
     if json_match:
         try:
-            return json.loads(json_match.group(1))
-        except json.JSONDecodeError:
-            pass
+            result = json.loads(json_match.group(1))
+            logger.debug("JSON extracted from markdown block")
+            return result
+        except json.JSONDecodeError as e:
+            logger.debug(f"Failed to parse markdown JSON: {e}")
 
-    # Try to find a JSON array directly
-    array_match = re.search(r'\[\s*\{[\s\S]*\}\s*\]', output)
+    # Try to find a JSON array directly (more specific pattern)
+    array_match = re.search(r'\[\s*\{[\s\S]*?\}\s*(?:,\s*\{[\s\S]*?\}\s*)*\]', output)
     if array_match:
         try:
-            return json.loads(array_match.group(0))
-        except json.JSONDecodeError:
-            pass
+            result = json.loads(array_match.group(0))
+            logger.debug("JSON extracted as array")
+            return result
+        except json.JSONDecodeError as e:
+            logger.debug(f"Failed to parse array JSON: {e}")
+
+    # Try to find any JSON array
+    array_match2 = re.search(r'\[[\s\S]*\]', output)
+    if array_match2:
+        try:
+            result = json.loads(array_match2.group(0))
+            logger.debug("JSON extracted as simple array")
+            return result
+        except json.JSONDecodeError as e:
+            logger.debug(f"Failed to parse simple array JSON: {e}")
 
     # Try to find a JSON object
     object_match = re.search(r'\{[\s\S]*\}', output)
     if object_match:
         try:
-            return json.loads(object_match.group(0))
-        except json.JSONDecodeError:
-            pass
+            result = json.loads(object_match.group(0))
+            logger.debug("JSON extracted as object")
+            return result
+        except json.JSONDecodeError as e:
+            logger.debug(f"Failed to parse object JSON: {e}")
 
     # Last try: parse entire output
     try:
-        return json.loads(output.strip())
-    except json.JSONDecodeError:
+        result = json.loads(output.strip())
+        logger.debug("JSON parsed from entire output")
+        return result
+    except json.JSONDecodeError as e:
+        logger.warning(f"extract_json_from_output: All parsing methods failed. Output preview: {output[:500]}...")
         return None
 
 
@@ -199,21 +317,33 @@ async def run_claude_for_json(
 IMPORTANT: Your response must be ONLY valid JSON, no other text before or after.
 Do not use markdown code blocks, just raw JSON."""
 
+    logger.info("run_claude_for_json: Starting Claude CLI call for JSON response")
+
     success, output = await run_claude_cli(
         prompt=json_prompt,
         cwd=cwd,
-        output_format="text",  # We parse ourselves
+        output_format="text",  # Keep text to allow tool use during exploration
         allowed_tools=["Read", "Glob", "Grep"],  # Read-only for planning
-        max_turns=10,
+        max_turns=15,  # More turns to allow exploration + JSON generation
         timeout=timeout,
-        on_output=on_output
+        on_output=on_output,
+        use_project_config=False  # Disable MCPs for planning (faster, no timeout)
     )
 
     if not success:
+        logger.error(f"run_claude_for_json: Claude CLI failed. Output: {output[:500] if output else 'None'}...")
         return False, None
+
+    logger.info(f"run_claude_for_json: Claude CLI succeeded, output length: {len(output) if output else 0}")
 
     # Extract and parse JSON
     parsed = extract_json_from_output(output)
+
+    if parsed is None:
+        logger.error("run_claude_for_json: Failed to extract JSON from output")
+    else:
+        logger.info(f"run_claude_for_json: Successfully parsed JSON, type: {type(parsed).__name__}")
+
     return parsed is not None, parsed
 
 
