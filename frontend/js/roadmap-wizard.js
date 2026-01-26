@@ -130,7 +130,7 @@ function updateButtons() {
     // Step 2 (Discover) can be skipped
     if (currentStep === 2) {
         skipBtn.classList.remove('hidden');
-        skipBtn.textContent = 'Skip Competitors';
+        skipBtn.textContent = 'Passer';
     }
 }
 
@@ -187,7 +187,7 @@ async function startAnalyzePhase() {
     // Reset UI
     progressBar.style.width = '0%';
     resultDiv.classList.add('hidden');
-    statusText.textContent = 'Scanning project structure...';
+    statusText.textContent = 'Analyse de la structure du projet...';
 
     // Animate progress
     let progress = 0;
@@ -197,10 +197,10 @@ async function startAnalyzePhase() {
             progressBar.style.width = `${progress}%`;
         }
         // Update status text based on progress
-        if (progress === 15) statusText.textContent = 'Reading README and config files...';
-        if (progress === 30) statusText.textContent = 'Detecting tech stack...';
-        if (progress === 50) statusText.textContent = 'Analyzing project structure...';
-        if (progress === 70) statusText.textContent = 'Extracting project information...';
+        if (progress === 15) statusText.textContent = 'Lecture du README et des fichiers de config...';
+        if (progress === 30) statusText.textContent = 'Détection de la stack technique...';
+        if (progress === 50) statusText.textContent = 'Analyse de la structure du projet...';
+        if (progress === 70) statusText.textContent = 'Extraction des informations du projet...';
     }, 150);
 
     try {
@@ -209,7 +209,7 @@ async function startAnalyzePhase() {
 
         clearInterval(progressInterval);
         progressBar.style.width = '100%';
-        statusText.textContent = 'Analysis complete!';
+        statusText.textContent = 'Analyse terminée !';
 
         // Show results
         const analysis = response.analysis;
@@ -230,7 +230,7 @@ async function startAnalyzePhase() {
         clearInterval(progressInterval);
         console.error('Analysis failed:', error);
         progressBar.style.width = '100%';
-        statusText.textContent = 'Analysis completed with defaults';
+        statusText.textContent = 'Analyse terminée avec les valeurs par défaut';
 
         // Continue anyway
         setTimeout(() => goToStep(2), 1500);
@@ -248,7 +248,7 @@ async function startDiscoverPhase() {
     // Reset UI
     progressBar.style.width = '0%';
     resultDiv.classList.add('hidden');
-    statusText.textContent = 'Searching for similar products...';
+    statusText.textContent = 'Recherche de produits similaires...';
 
     // Animate progress
     let progress = 0;
@@ -257,9 +257,9 @@ async function startDiscoverPhase() {
         if (progress <= 85) {
             progressBar.style.width = `${progress}%`;
         }
-        if (progress === 20) statusText.textContent = 'Identifying market segment...';
-        if (progress === 40) statusText.textContent = 'Finding competitor products...';
-        if (progress === 60) statusText.textContent = 'Analyzing competitor features...';
+        if (progress === 20) statusText.textContent = 'Identification du segment de marché...';
+        if (progress === 40) statusText.textContent = 'Recherche des concurrents...';
+        if (progress === 60) statusText.textContent = 'Analyse des fonctionnalités concurrentes...';
     }, 200);
 
     try {
@@ -272,7 +272,7 @@ async function startDiscoverPhase() {
         const listEl = document.getElementById('competitors-list');
 
         if (competitors.length > 0) {
-            statusText.textContent = `Found ${competitors.length} competitors!`;
+            statusText.textContent = `${competitors.length} concurrent${competitors.length > 1 ? 's' : ''} trouvé${competitors.length > 1 ? 's' : ''} !`;
             listEl.innerHTML = competitors.map(comp => `
                 <div class="competitor-item">
                     <div class="competitor-name">${escapeHtml(comp.name)}</div>
@@ -282,8 +282,8 @@ async function startDiscoverPhase() {
             `).join('');
             useCompetitorAnalysis = true;
         } else {
-            statusText.textContent = 'No competitors found';
-            listEl.innerHTML = '<p class="no-results">No similar products identified</p>';
+            statusText.textContent = 'Aucun concurrent trouvé';
+            listEl.innerHTML = '<p class="no-results">Aucun produit similaire identifié</p>';
             useCompetitorAnalysis = false;
         }
 
@@ -296,7 +296,7 @@ async function startDiscoverPhase() {
         clearInterval(progressInterval);
         console.error('Discovery failed:', error);
         progressBar.style.width = '100%';
-        statusText.textContent = 'Skipping competitor analysis...';
+        statusText.textContent = 'Analyse concurrentielle ignorée...';
         useCompetitorAnalysis = false;
 
         setTimeout(() => goToStep(3), 1500);
@@ -316,7 +316,7 @@ async function startGeneratePhase() {
     progressBar.style.width = '0%';
     resultDiv.classList.add('hidden');
     finishBtn.classList.add('hidden');
-    statusText.textContent = 'Generating feature suggestions...';
+    statusText.textContent = 'Génération des suggestions de fonctionnalités...';
 
     // Animate progress
     let progress = 0;
@@ -325,10 +325,10 @@ async function startGeneratePhase() {
         if (progress <= 85) {
             progressBar.style.width = `${progress}%`;
         }
-        if (progress === 20) statusText.textContent = 'Analyzing project requirements...';
-        if (progress === 40) statusText.textContent = 'Prioritizing features by impact...';
-        if (progress === 60) statusText.textContent = 'Organizing into roadmap phases...';
-        if (progress === 80) statusText.textContent = 'Finalizing feature suggestions...';
+        if (progress === 20) statusText.textContent = 'Analyse des besoins du projet...';
+        if (progress === 40) statusText.textContent = 'Priorisation des fonctionnalités par impact...';
+        if (progress === 60) statusText.textContent = 'Organisation par phases de la roadmap...';
+        if (progress === 80) statusText.textContent = 'Finalisation des suggestions...';
     }, 300);
 
     try {
@@ -336,11 +336,11 @@ async function startGeneratePhase() {
 
         clearInterval(progressInterval);
         progressBar.style.width = '100%';
-        statusText.textContent = 'Features generated!';
+        statusText.textContent = 'Fonctionnalités générées !';
 
         const count = response.features_generated || 0;
         document.getElementById('generate-summary').textContent =
-            `${count} feature${count !== 1 ? 's' : ''} added to your roadmap`;
+            `${count} fonctionnalité${count !== 1 ? 's' : ''} ajoutée${count !== 1 ? 's' : ''} à votre roadmap`;
 
         // Show feature breakdown if available
         const features = response.features || [];
@@ -351,24 +351,24 @@ async function startGeneratePhase() {
                 could: features.filter(f => f.priority === 'could').length
             };
             document.getElementById('generate-breakdown').innerHTML = `
-                <span class="priority-must">${breakdown.must} Must Have</span>
-                <span class="priority-should">${breakdown.should} Should Have</span>
-                <span class="priority-could">${breakdown.could} Could Have</span>
+                <span class="priority-must">${breakdown.must} Indispensable${breakdown.must > 1 ? 's' : ''}</span>
+                <span class="priority-should">${breakdown.should} Important${breakdown.should > 1 ? 's' : ''}</span>
+                <span class="priority-could">${breakdown.could} Souhaitable${breakdown.could > 1 ? 's' : ''}</span>
             `;
         }
 
         resultDiv.classList.remove('hidden');
         finishBtn.classList.remove('hidden');
-        finishBtn.textContent = 'View Roadmap';
+        finishBtn.textContent = 'Voir la Roadmap';
 
     } catch (error) {
         clearInterval(progressInterval);
         console.error('Generation failed:', error);
         progressBar.style.width = '100%';
-        statusText.textContent = 'Generation failed: ' + error.message;
+        statusText.textContent = 'Échec de génération: ' + error.message;
 
         finishBtn.classList.remove('hidden');
-        finishBtn.textContent = 'Close';
+        finishBtn.textContent = 'Fermer';
     }
 }
 

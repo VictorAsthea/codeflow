@@ -213,23 +213,23 @@
                     <div class="view-header">
                         <div class="view-header-content">
                             <h1>Roadmap</h1>
-                            <p id="roadmap-subtitle">Plan and prioritize your product features</p>
+                            <p id="roadmap-subtitle">Planifiez et priorisez vos fonctionnalités produit</p>
                         </div>
                         <div class="view-header-actions">
                             <div class="roadmap-stats" id="roadmap-stats"></div>
-                            <button id="add-feature-btn" class="btn btn-primary">+ Add Feature</button>
+                            <button id="add-feature-btn" class="btn btn-primary">+ Ajouter</button>
                         </div>
                     </div>
 
                     <div class="roadmap-tabs">
-                        <button class="roadmap-tab active" data-tab="board">Board</button>
-                        <button class="roadmap-tab" data-tab="list">List</button>
+                        <button class="roadmap-tab active" data-tab="board">Tableau</button>
+                        <button class="roadmap-tab" data-tab="list">Liste</button>
                     </div>
 
                     <div class="roadmap-board" id="roadmap-board">
                         <div class="roadmap-column" data-status="under_review">
                             <div class="roadmap-column-header">
-                                <h3>Under Review</h3>
+                                <h3>À examiner</h3>
                                 <span class="roadmap-count" id="count-under_review">0</span>
                             </div>
                             <div class="roadmap-column-body" id="column-under_review"></div>
@@ -237,7 +237,7 @@
 
                         <div class="roadmap-column" data-status="planned">
                             <div class="roadmap-column-header">
-                                <h3>Planned</h3>
+                                <h3>Planifié</h3>
                                 <span class="roadmap-count" id="count-planned">0</span>
                             </div>
                             <div class="roadmap-column-body" id="column-planned"></div>
@@ -245,7 +245,7 @@
 
                         <div class="roadmap-column" data-status="in_progress">
                             <div class="roadmap-column-header">
-                                <h3>In Progress</h3>
+                                <h3>En cours</h3>
                                 <span class="roadmap-count" id="count-in_progress_rm">0</span>
                             </div>
                             <div class="roadmap-column-body" id="column-in_progress_rm"></div>
@@ -253,7 +253,7 @@
 
                         <div class="roadmap-column" data-status="done">
                             <div class="roadmap-column-header">
-                                <h3>Done</h3>
+                                <h3>Terminé</h3>
                                 <span class="roadmap-count" id="count-done_rm">0</span>
                             </div>
                             <div class="roadmap-column-body" id="column-done_rm"></div>
@@ -264,12 +264,12 @@
                         <table class="roadmap-table">
                             <thead>
                                 <tr>
-                                    <th>Feature</th>
+                                    <th>Fonctionnalité</th>
                                     <th>Phase</th>
-                                    <th>Priority</th>
-                                    <th>Complexity</th>
+                                    <th>Priorité</th>
+                                    <th>Complexité</th>
                                     <th>Impact</th>
-                                    <th>Status</th>
+                                    <th>Statut</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -759,66 +759,66 @@
         <div id="add-feature-modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>Add Feature</h2>
+                    <h2>Ajouter une fonctionnalité</h2>
                     <button class="btn-close">&times;</button>
                 </div>
                 <div class="modal-body">
                     <form id="add-feature-form">
                         <div class="form-group">
-                            <label for="feature-title">Title</label>
-                            <input type="text" id="feature-title" required placeholder="Feature name">
+                            <label for="feature-title">Titre</label>
+                            <input type="text" id="feature-title" required placeholder="Nom de la fonctionnalité">
                         </div>
                         <div class="form-group">
                             <label for="feature-description">Description</label>
-                            <textarea id="feature-description" rows="3" required placeholder="What does this feature do?"></textarea>
+                            <textarea id="feature-description" rows="3" required placeholder="Que fait cette fonctionnalité ?"></textarea>
                         </div>
                         <div class="form-group">
-                            <label for="feature-justification">Justification (optional)</label>
-                            <textarea id="feature-justification" rows="2" placeholder="Why is this feature important?"></textarea>
+                            <label for="feature-justification">Justification (optionnel)</label>
+                            <textarea id="feature-justification" rows="2" placeholder="Pourquoi cette fonctionnalité est-elle importante ?"></textarea>
                         </div>
                         <div class="form-row">
                             <div class="form-col">
                                 <label for="feature-phase">Phase</label>
                                 <select id="feature-phase">
-                                    <option value="foundation">Foundation</option>
-                                    <option value="core" selected>Core</option>
-                                    <option value="enhancement">Enhancement</option>
-                                    <option value="polish">Polish</option>
+                                    <option value="foundation">Fondation</option>
+                                    <option value="core" selected>Cœur</option>
+                                    <option value="enhancement">Amélioration</option>
+                                    <option value="polish">Finition</option>
                                 </select>
                             </div>
                             <div class="form-col">
-                                <label for="feature-priority">Priority</label>
+                                <label for="feature-priority">Priorité</label>
                                 <select id="feature-priority">
-                                    <option value="must">Must Have</option>
-                                    <option value="should" selected>Should Have</option>
-                                    <option value="could">Could Have</option>
-                                    <option value="wont">Won't Have</option>
+                                    <option value="must">Indispensable</option>
+                                    <option value="should" selected>Important</option>
+                                    <option value="could">Souhaitable</option>
+                                    <option value="wont">Exclu</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-col">
-                                <label for="feature-complexity">Complexity</label>
+                                <label for="feature-complexity">Complexité</label>
                                 <select id="feature-complexity">
-                                    <option value="low">Low</option>
-                                    <option value="medium" selected>Medium</option>
-                                    <option value="high">High</option>
+                                    <option value="low">Faible</option>
+                                    <option value="medium" selected>Moyenne</option>
+                                    <option value="high">Élevée</option>
                                 </select>
                             </div>
                             <div class="form-col">
                                 <label for="feature-impact">Impact</label>
                                 <select id="feature-impact">
-                                    <option value="low">Low</option>
-                                    <option value="medium" selected>Medium</option>
-                                    <option value="high">High</option>
+                                    <option value="low">Faible</option>
+                                    <option value="medium" selected>Moyen</option>
+                                    <option value="high">Élevé</option>
                                 </select>
                             </div>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary btn-close">Cancel</button>
-                    <button id="btn-save-feature" class="btn btn-primary">Add Feature</button>
+                    <button class="btn btn-secondary btn-close">Annuler</button>
+                    <button id="btn-save-feature" class="btn btn-primary">Ajouter</button>
                 </div>
             </div>
         </div>
@@ -834,8 +834,8 @@
                         <div class="wizard-icon analyzing">
                             <span class="icon-main">🔍</span>
                         </div>
-                        <h2 class="wizard-title">Analyzing</h2>
-                        <p class="wizard-subtitle" id="analyze-status">Scanning project structure...</p>
+                        <h2 class="wizard-title">Analyse</h2>
+                        <p class="wizard-subtitle" id="analyze-status">Analyse de la structure du projet...</p>
                         <div class="wizard-progress-bar">
                             <div class="wizard-progress-fill" id="analyze-progress"></div>
                         </div>
@@ -843,7 +843,7 @@
                             <div class="result-card-auto">
                                 <div class="result-row">
                                     <span class="result-icon">📦</span>
-                                    <span class="result-text" id="result-project-name">Project</span>
+                                    <span class="result-text" id="result-project-name">Projet</span>
                                 </div>
                                 <div class="result-row">
                                     <span class="result-icon">🛠️</span>
@@ -851,11 +851,11 @@
                                 </div>
                                 <div class="result-row">
                                     <span class="result-icon">📁</span>
-                                    <span class="result-text"><span id="result-files">0</span> files analyzed</span>
+                                    <span class="result-text"><span id="result-files">0</span> fichiers analysés</span>
                                 </div>
                                 <div class="result-row">
                                     <span class="result-icon">📝</span>
-                                    <span class="result-text result-summary" id="result-summary">Summary</span>
+                                    <span class="result-text result-summary" id="result-summary">Résumé</span>
                                 </div>
                             </div>
                         </div>
@@ -866,8 +866,8 @@
                         <div class="wizard-icon discovering">
                             <span class="icon-main">🌐</span>
                         </div>
-                        <h2 class="wizard-title">Discovering</h2>
-                        <p class="wizard-subtitle" id="discover-status">Searching for similar products...</p>
+                        <h2 class="wizard-title">Découverte</h2>
+                        <p class="wizard-subtitle" id="discover-status">Recherche de produits similaires...</p>
                         <div class="wizard-progress-bar">
                             <div class="wizard-progress-fill" id="discover-progress"></div>
                         </div>
@@ -881,13 +881,13 @@
                         <div class="wizard-icon generating">
                             <span class="icon-main">✨</span>
                         </div>
-                        <h2 class="wizard-title">Generating</h2>
-                        <p class="wizard-subtitle" id="generate-status">Creating feature suggestions...</p>
+                        <h2 class="wizard-title">Génération</h2>
+                        <p class="wizard-subtitle" id="generate-status">Création des suggestions...</p>
                         <div class="wizard-progress-bar">
                             <div class="wizard-progress-fill" id="generate-progress"></div>
                         </div>
                         <div class="wizard-result hidden" id="generate-result">
-                            <p class="result-summary-big" id="generate-summary">0 features generated</p>
+                            <p class="result-summary-big" id="generate-summary">0 fonctionnalités générées</p>
                             <div class="result-breakdown" id="generate-breakdown"></div>
                         </div>
                     </div>
@@ -896,22 +896,22 @@
                 <!-- Step Indicators -->
                 <div class="wizard-steps-indicator">
                     <div class="step-dot active" data-step="1">
-                        <span class="step-label">Analyze</span>
+                        <span class="step-label">Analyser</span>
                     </div>
                     <div class="step-line"></div>
                     <div class="step-dot" data-step="2">
-                        <span class="step-label">Discover</span>
+                        <span class="step-label">Découvrir</span>
                     </div>
                     <div class="step-line"></div>
                     <div class="step-dot" data-step="3">
-                        <span class="step-label">Generate</span>
+                        <span class="step-label">Générer</span>
                     </div>
                 </div>
 
                 <!-- Footer Buttons -->
                 <div class="wizard-footer">
-                    <button id="wizard-skip" class="btn btn-secondary hidden">Skip</button>
-                    <button id="wizard-finish" class="btn btn-success hidden">View Roadmap</button>
+                    <button id="wizard-skip" class="btn btn-secondary hidden">Passer</button>
+                    <button id="wizard-finish" class="btn btn-success hidden">Voir la Roadmap</button>
                 </div>
             </div>
         </div>
@@ -920,26 +920,26 @@
         <div id="competitor-options-modal" class="modal hidden">
             <div class="modal-content modal-small">
                 <div class="modal-header">
-                    <h2>Existing Analysis Found</h2>
+                    <h2>Analyse existante trouvée</h2>
                     <button class="btn-close">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p>You already have competitor analysis data. What would you like to do?</p>
+                    <p>Vous avez déjà une analyse concurrentielle. Que souhaitez-vous faire ?</p>
                     <div class="option-cards">
                         <button class="option-card" data-option="reuse">
                             <span class="option-icon">♻️</span>
-                            <span class="option-title">Reuse Existing</span>
-                            <span class="option-desc">Keep your current competitor data</span>
+                            <span class="option-title">Réutiliser</span>
+                            <span class="option-desc">Garder les données actuelles</span>
                         </button>
                         <button class="option-card" data-option="refresh">
                             <span class="option-icon">🔄</span>
-                            <span class="option-title">Refresh</span>
-                            <span class="option-desc">Re-discover competitors</span>
+                            <span class="option-title">Actualiser</span>
+                            <span class="option-desc">Relancer la découverte</span>
                         </button>
                         <button class="option-card" data-option="skip">
                             <span class="option-icon">⏭️</span>
-                            <span class="option-title">Skip</span>
-                            <span class="option-desc">Generate without competitor data</span>
+                            <span class="option-title">Passer</span>
+                            <span class="option-desc">Générer sans données concurrentielles</span>
                         </button>
                     </div>
                 </div>
@@ -950,7 +950,7 @@
         <div id="feature-detail-modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2 id="feature-detail-title">Feature Details</h2>
+                    <h2 id="feature-detail-title">Détails de la fonctionnalité</h2>
                     <button class="btn-close">&times;</button>
                 </div>
                 <div class="modal-body">
@@ -970,16 +970,16 @@
                             <p id="detail-justification">-</p>
                         </div>
                         <div class="feature-section" id="detail-task-section" style="display:none;">
-                            <h4>Linked Task</h4>
-                            <a href="#" id="detail-task-link" class="task-link">View Task</a>
+                            <h4>Tâche liée</h4>
+                            <a href="#" id="detail-task-link" class="task-link">Voir la tâche</a>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button id="btn-delete-feature" class="btn btn-danger">Delete</button>
+                    <button id="btn-delete-feature" class="btn btn-danger">Supprimer</button>
                     <div class="modal-actions">
-                        <button id="btn-expand-feature" class="btn btn-secondary">Expand with AI</button>
-                        <button id="btn-build-feature" class="btn btn-success">Build Feature</button>
+                        <button id="btn-expand-feature" class="btn btn-secondary">Enrichir avec l'IA</button>
+                        <button id="btn-build-feature" class="btn btn-success">Créer la tâche</button>
                     </div>
                 </div>
             </div>
