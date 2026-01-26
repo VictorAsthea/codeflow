@@ -66,10 +66,10 @@
                         <kbd class="nav-kbd">D</kbd>
                     </a>
 
-                    <a href="#ideation" class="nav-item disabled">
+                    <a href="#ideation" class="nav-item" data-shortcut="I" data-view="ideation">
                         <span class="nav-icon">💡</span>
                         <span class="nav-label">Idéation</span>
-                        <span class="coming-soon">Coming soon</span>
+                        <kbd class="nav-kbd">I</kbd>
                     </a>
 
                     <a href="#changelog" class="nav-item" data-shortcut="L" data-view="changelog">
@@ -317,6 +317,67 @@
                             <p class="mcp-section-hint">Commandes Bash que Claude peut exécuter (depuis security.json)</p>
                             <div id="mcp-commands-summary" class="mcp-commands-summary">
                                 <div class="loading">Chargement...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ideation View -->
+                <div id="ideation-view" class="view hidden">
+                    <div class="view-header">
+                        <div class="view-header-content">
+                            <h1>💡 Idéation</h1>
+                            <p>Analysez votre projet et générez des suggestions d'amélioration avec l'IA</p>
+                        </div>
+                        <div class="view-header-actions">
+                            <button id="ideation-analyze-btn" class="btn btn-secondary">🔍 Analyser</button>
+                            <button id="ideation-suggest-btn" class="btn btn-primary">✨ Générer suggestions</button>
+                        </div>
+                    </div>
+
+                    <div class="ideation-container">
+                        <!-- Analysis Section -->
+                        <div class="ideation-section ideation-analysis">
+                            <h3>📊 Analyse du projet</h3>
+                            <div id="ideation-analysis-content" class="ideation-analysis-content">
+                                <p class="ideation-placeholder">Cliquez sur "Analyser" pour scanner votre projet</p>
+                            </div>
+                        </div>
+
+                        <!-- Suggestions Section -->
+                        <div class="ideation-section ideation-suggestions">
+                            <div class="ideation-section-header">
+                                <h3>💡 Suggestions</h3>
+                                <div class="ideation-filters">
+                                    <select id="ideation-filter-category">
+                                        <option value="all">Toutes catégories</option>
+                                        <option value="security">🔒 Sécurité</option>
+                                        <option value="performance">⚡ Performance</option>
+                                        <option value="quality">📝 Qualité</option>
+                                        <option value="feature">✨ Fonctionnalité</option>
+                                    </select>
+                                    <select id="ideation-filter-status">
+                                        <option value="pending">En attente</option>
+                                        <option value="all">Tous statuts</option>
+                                        <option value="accepted">Acceptées</option>
+                                        <option value="dismissed">Ignorées</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="ideation-suggestions-list" class="ideation-suggestions-list">
+                                <p class="ideation-placeholder">Aucune suggestion. Cliquez sur "Générer suggestions" pour commencer.</p>
+                            </div>
+                        </div>
+
+                        <!-- Chat Section -->
+                        <div class="ideation-section ideation-chat">
+                            <h3>💬 Brainstorm avec l'IA</h3>
+                            <div id="ideation-chat-messages" class="ideation-chat-messages">
+                                <p class="ideation-placeholder">Posez des questions sur votre projet ou demandez des idées...</p>
+                            </div>
+                            <div class="ideation-chat-input">
+                                <input type="text" id="ideation-chat-input" placeholder="Posez une question ou demandez une idée...">
+                                <button id="ideation-chat-send" class="btn btn-primary">Envoyer</button>
                             </div>
                         </div>
                     </div>
@@ -902,6 +963,7 @@
     <script type="module" src="/js/changelog.js"></script>
     <script type="module" src="/js/mcp.js"></script>
     <script type="module" src="/js/settings-github.js"></script>
+    <script type="module" src="/js/ideation.js"></script>
     <script type="module" src="/js/app.js"></script>
     <script src="/js/project-init.js"></script>
     <script src="/js/workspace.js"></script>

@@ -188,6 +188,43 @@ export const API = {
         },
     },
 
+    ideation: {
+        getData: () => fetchJSON(`${API_BASE}/ideation`),
+
+        analyze: () => fetchJSON(`${API_BASE}/ideation/analyze`, {
+            method: 'POST',
+        }),
+
+        getAnalysis: () => fetchJSON(`${API_BASE}/ideation/analysis`),
+
+        suggest: () => fetchJSON(`${API_BASE}/ideation/suggest`, {
+            method: 'POST',
+        }),
+
+        getSuggestions: () => fetchJSON(`${API_BASE}/ideation/suggestions`),
+
+        acceptSuggestion: (id) => fetchJSON(`${API_BASE}/ideation/suggestions/${id}/accept`, {
+            method: 'POST',
+        }),
+
+        dismissSuggestion: (id) => fetchJSON(`${API_BASE}/ideation/suggestions/${id}/dismiss`, {
+            method: 'POST',
+        }),
+
+        deleteSuggestion: (id) => fetchJSON(`${API_BASE}/ideation/suggestions/${id}`, {
+            method: 'DELETE',
+        }),
+
+        chat: (message, context = []) => fetchJSON(`${API_BASE}/ideation/chat`, {
+            method: 'POST',
+            body: JSON.stringify({ message, context }),
+        }),
+
+        clear: () => fetchJSON(`${API_BASE}/ideation`, {
+            method: 'DELETE',
+        }),
+    },
+
     roadmap: {
         get: () => fetchJSON(`${API_BASE}/roadmap`),
 
