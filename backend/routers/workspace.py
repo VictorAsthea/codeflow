@@ -65,10 +65,8 @@ async def get_recent_projects():
 
 @router.get("/browse")
 async def browse_folders(
-    path: Optional[str] = Query(
+    path: str | None = Query(
         default=None,
-        max_length=500,
-        pattern=r"^(?!.*\.\.).*$",  # Rejette les chemins contenant ..
         description="Directory path to browse"
     )
 ):
@@ -85,6 +83,10 @@ async def browse_folders(
         home / "Documents" / "DEV",
         home / "Documents",
     ]
+
+    # Reject path traversal attempts
+    if path and ".." in path:
+        raise HTTPException(status_code=400, detail="Invalid path")
 
     if path is None:
         # Démarrer dans Documents/DEV si existe, sinon Home
