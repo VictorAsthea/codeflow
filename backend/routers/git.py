@@ -72,18 +72,55 @@ async def sync_main():
         )
         current_branch = current_branch_result.stdout.strip()
 
-        # Checkout main
-        subprocess.run(
-            ["git", "checkout", "main"],
+        # Detect default branch (main or master)
+        default_branch = "main"
+        branch_list = subprocess.run(
+            ["git", "branch", "-a"],
             cwd=project_path,
             capture_output=True,
-            text=True,
-            check=True
+            text=True
         )
+        branches = branch_list.stdout
+        if "main" not in branches and "master" in branches:
+            default_branch = "master"
 
-        # Pull from develop
-        pull_result = subprocess.run(
-            ["git", "pull", "origin", "develop"],
+        # Check if default branch exists locally, if not create it
+        local_branches = subprocess.run(
+            ["git", "branch", "--list", default_branch],
+            cwd=project_path,
+            capture_output=True,
+            text=True
+        )
+        if not local_branches.stdout.strip():
+            # Try to checkout from remote
+            checkout_result = subprocess.run(
+                ["git", "checkout", "-b", default_branch, f"origin/{default_branch}"],
+                cwd=project_path,
+                capture_output=True,
+                text=True
+            )
+            if checkout_result.returncode != 0:
+                # Create new branch from develop
+                subprocess.run(
+                    ["git", "checkout", "-b", default_branch],
+                    cwd=project_path,
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+        else:
+            # Checkout existing branch
+            subprocess.run(
+                ["git", "checkout", default_branch],
+                cwd=project_path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+        # Merge develop into main/master
+        merge_result = subprocess.run(
+            ["git", "merge", "develop", "-m", f"Merge develop into {default_branch}"],
             cwd=project_path,
             capture_output=True,
             text=True,
@@ -92,15 +129,15 @@ async def sync_main():
 
         # Push to origin
         push_result = subprocess.run(
-            ["git", "push", "origin", "main"],
+            ["git", "push", "origin", default_branch],
             cwd=project_path,
             capture_output=True,
             text=True,
             check=True
         )
 
-        # Go back to original branch if it wasn't main
-        if current_branch != "main":
+        # Go back to original branch if it wasn't the default branch
+        if current_branch != default_branch:
             subprocess.run(
                 ["git", "checkout", current_branch],
                 cwd=project_path,
@@ -111,13 +148,24 @@ async def sync_main():
 
         return {
             "success": True,
-            "message": "Main synced with develop successfully",
-            "pull_output": pull_result.stdout,
-            "push_output": push_result.stdout
+            "message": f"{default_branch.capitalize()} synced with develop successfully",
+            "merge_output": merge_result.stdout,
+            "push_output": push_result.stdout,
+            "branch": default_branch
         }
 
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.strip() if e.stderr else str(e)
+        # Try to go back to original branch on error
+        try:
+            subprocess.run(
+                ["git", "checkout", current_branch],
+                cwd=project_path,
+                capture_output=True,
+                text=True
+            )
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=f"Git sync failed: {error_msg}")
 
 

@@ -366,6 +366,9 @@ function setupEventListeners() {
     // Add feature button
     document.getElementById('add-feature-btn')?.addEventListener('click', openAddFeatureModal);
 
+    // Regenerate roadmap button
+    document.getElementById('regenerate-roadmap-btn')?.addEventListener('click', regenerateRoadmap);
+
     // Add feature modal
     setupAddFeatureModal();
 
@@ -653,6 +656,44 @@ async function buildFeature(featureId) {
     } catch (error) {
         console.error('Failed to build feature:', error);
         alert('Échec de création de la tâche: ' + error.message);
+    }
+}
+
+/**
+ * Regenerate roadmap - clear all features and start wizard
+ */
+async function regenerateRoadmap() {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer toutes les fonctionnalités et régénérer la roadmap ?\n\nCette action est irréversible.')) {
+        return;
+    }
+
+    const btn = document.getElementById('regenerate-roadmap-btn');
+    const originalText = btn.textContent;
+
+    try {
+        btn.textContent = '⏳ Suppression...';
+        btn.disabled = true;
+
+        // Clear roadmap via API
+        await API.roadmap.clear();
+
+        // Reset local state
+        roadmapData = null;
+
+        btn.textContent = '✓ Supprimé';
+
+        // Open wizard to regenerate
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+            window.dispatchEvent(new CustomEvent('open-roadmap-wizard'));
+        }, 500);
+
+    } catch (error) {
+        console.error('Failed to clear roadmap:', error);
+        alert('Échec de la suppression: ' + error.message);
+        btn.textContent = originalText;
+        btn.disabled = false;
     }
 }
 
