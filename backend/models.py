@@ -284,6 +284,7 @@ class SuggestionCategory(str, Enum):
     SECURITY = "security"
     PERFORMANCE = "performance"
     CODE_QUALITY = "code_quality"
+    QUALITY = "quality"  # Alias for code_quality
     FEATURE = "feature"
     BUG = "bug"
     REFACTORING = "refactoring"
@@ -300,16 +301,23 @@ class SuggestionPriority(str, Enum):
     CRITICAL = "critical"
 
 
+class SuggestionStatus(str, Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DISMISSED = "dismissed"
+
+
 class Suggestion(BaseModel):
     id: str
     title: str
     description: str
     category: SuggestionCategory
-    priority: SuggestionPriority
+    priority: SuggestionPriority | str = SuggestionPriority.MEDIUM  # Support both enum and string
+    status: SuggestionStatus = SuggestionStatus.PENDING
     file_path: str | None = None  # Related file
     line_number: int | None = None  # Related line
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    dismissed: bool = False
+    dismissed: bool = False  # Legacy field, can be mapped to status
     task_id: str | None = None  # If converted to task
 
 
@@ -331,3 +339,36 @@ class IdeationChatRequest(BaseModel):
 
 class SuggestionToTaskRequest(BaseModel):
     suggestion_id: str
+
+
+class IdeationAnalysis(BaseModel):
+    project_path: str
+    project_name: str
+    stack: list[str] = Field(default_factory=list)
+    frameworks: list[str] = Field(default_factory=list)
+    files_count: int = 0
+    lines_count: int = 0
+    key_directories: list[str] = Field(default_factory=list)
+    patterns_detected: list[str] = Field(default_factory=list)
+    analyzed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class IdeationData(BaseModel):
+    analysis: IdeationAnalysis | None = None
+    suggestions: list[Suggestion] = Field(default_factory=list)
+
+
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ChatRequest(BaseModel):
+    message: str
+    context: list[ChatMessage] = Field(default_factory=list)
+
+
+class ChatResponse(BaseModel):
+    response: str
+    suggestions: list[str] = Field(default_factory=list)

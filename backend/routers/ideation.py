@@ -11,7 +11,8 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from backend.config import settings
 from backend.models import (
     Suggestion, IdeationChatRequest, SuggestionToTaskRequest,
-    TaskCreate, SuggestionCategory, IdeationChatMessage
+    TaskCreate, SuggestionCategory, IdeationChatMessage,
+    IdeationAnalysis, SuggestionStatus, ChatRequest, ChatResponse
 )
 from backend.services.ideation_service import get_ideation_service
 

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 from backend.models import (
-    Suggestion, SuggestionCategory, SuggestionPriority,
+    Suggestion, SuggestionCategory, SuggestionPriority, SuggestionStatus,
     IdeationState, IdeationChatMessage
 )
 from backend.services.claude_cli import run_claude_cli, extract_json_from_output
@@ -141,6 +141,7 @@ class IdeationService:
         for suggestion in state.suggestions:
             if suggestion.id == suggestion_id:
                 suggestion.dismissed = True
+                suggestion.status = SuggestionStatus.DISMISSED
                 self._save_state()
                 return True
         return False
@@ -159,6 +160,17 @@ class IdeationService:
         for suggestion in state.suggestions:
             if suggestion.id == suggestion_id:
                 suggestion.task_id = task_id
+                suggestion.status = SuggestionStatus.ACCEPTED
+                self._save_state()
+                return True
+        return False
+
+    def accept_suggestion(self, suggestion_id: str) -> bool:
+        """Accept a suggestion (mark as accepted)."""
+        state = self._load_state()
+        for suggestion in state.suggestions:
+            if suggestion.id == suggestion_id:
+                suggestion.status = SuggestionStatus.ACCEPTED
                 self._save_state()
                 return True
         return False
@@ -224,6 +236,7 @@ class IdeationService:
                     description=item.get("description", ""),
                     category=SuggestionCategory(item.get("category", "other")),
                     priority=SuggestionPriority(item.get("priority", "medium")),
+                    status=SuggestionStatus.PENDING,
                     file_path=item.get("file_path"),
                     line_number=item.get("line_number"),
                     created_at=datetime.now(timezone.utc)
@@ -292,6 +305,7 @@ class IdeationService:
                     description=item.get("description", ""),
                     category=SuggestionCategory(item.get("category", "feature")),
                     priority=SuggestionPriority(item.get("priority", "medium")),
+                    status=SuggestionStatus.PENDING,
                     file_path=item.get("file_path"),
                     line_number=item.get("line_number"),
                     created_at=datetime.now(timezone.utc)
