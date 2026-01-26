@@ -3,6 +3,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
 from pathlib import Path
+from datetime import datetime, timezone
+import asyncio
 import logging
 from typing import Callable, Awaitable, Dict, Any, Optional
 
@@ -127,7 +129,8 @@ from backend.services.migration import run_migration_if_needed
 from backend.routers import tasks, settings, git, webhooks, worktrees, roadmap, context, changelog, project, workspace, memory, ideation, auth
 from backend.services.task_queue import task_queue
 from backend.services.pr_monitor import PRMonitor
-from backend.websocket_manager import manager, kanban_manager
+from backend.services.worktree_service import cleanup_stale_worktrees
+from backend.websocket_manager import manager, kanban_manager, parallel_manager
 from backend.config import settings as app_settings
 
 # Configure logging
@@ -138,8 +141,43 @@ logging.basicConfig(
 )
 
 pr_monitor_instance = None
+worktree_cleanup_task = None
 
 logger = logging.getLogger(__name__)
+
+
+async def worktree_cleanup_background_task():
+    """
+    Background task that runs worktree cleanup every hour.
+    Removes stale worktrees that have been inactive for more than 72 hours.
+    """
+    cleanup_interval_seconds = 3600  # 1 hour
+    max_age_hours = 72  # 3 days
+
+    while True:
+        try:
+            await asyncio.sleep(cleanup_interval_seconds)
+
+            project_path = app_settings.project_path
+            logger.info(f"Running scheduled worktree cleanup for {project_path}")
+
+            result = await cleanup_stale_worktrees(project_path, max_age_hours)
+
+            if result['cleaned'] > 0:
+                logger.info(
+                    f"Worktree cleanup: removed {result['cleaned']} stale worktrees, "
+                    f"skipped {result['skipped']}"
+                )
+
+            if result['errors']:
+                for error in result['errors']:
+                    logger.warning(f"Worktree cleanup error: {error}")
+
+        except asyncio.CancelledError:
+            logger.info("Worktree cleanup background task cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Error in worktree cleanup task: {e}")
 
 # Global storage instance
 storage = JSONStorage()
@@ -147,7 +185,7 @@ storage = JSONStorage()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global pr_monitor_instance
+    global pr_monitor_instance, worktree_cleanup_task
 
     # Run migration if needed (SQLite to JSON)
     db_path = Path("./data/codeflow.db")
@@ -170,6 +208,10 @@ async def lifespan(app: FastAPI):
         )
         await pr_monitor_instance.start()
 
+    # Start worktree cleanup background task
+    worktree_cleanup_task = asyncio.create_task(worktree_cleanup_background_task())
+    logger.info("Started worktree cleanup background task (runs every hour)")
+
     # Ensure workspace has at least one project
     from backend.services.workspace_service import get_workspace_service
     ws = get_workspace_service()
@@ -181,6 +223,12 @@ async def lifespan(app: FastAPI):
     await task_queue.stop_all()
     if pr_monitor_instance:
         await pr_monitor_instance.stop()
+    if worktree_cleanup_task:
+        worktree_cleanup_task.cancel()
+        try:
+            await worktree_cleanup_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="Codeflow", version="0.1.0", lifespan=lifespan)
@@ -235,6 +283,48 @@ async def kanban_websocket_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         kanban_manager.disconnect(websocket)
+
+
+@app.websocket("/ws/parallel-status")
+async def parallel_status_websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for parallel execution monitoring.
+    Provides aggregate updates about all running tasks across worktrees.
+
+    Clients receive:
+    - initial_state: Current running tasks and aggregate progress on connect
+    - task_started: When a new task begins execution
+    - task_completed: When a task finishes successfully
+    - task_failed: When a task fails
+    - phase_changed: When a task changes phase (planning -> coding -> validation)
+    - subtask_progress: Progress updates for subtask execution
+    - queue_changed: When the task queue status changes
+    """
+    await parallel_manager.connect(websocket)
+    try:
+        while True:
+            # Handle incoming messages (ping/pong, requests for refresh, etc.)
+            data = await websocket.receive_text()
+            try:
+                import json
+                message = json.loads(data)
+
+                # Handle refresh request
+                if message.get("type") == "refresh":
+                    state = {
+                        "type": "refresh_response",
+                        "running_tasks": parallel_manager.get_all_running_tasks(),
+                        "aggregate_progress": parallel_manager.get_aggregate_progress(),
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                    from backend.websocket_manager import DateTimeEncoder
+                    await websocket.send_text(json.dumps(state, cls=DateTimeEncoder))
+
+            except json.JSONDecodeError:
+                # Ignore malformed messages
+                pass
+    except WebSocketDisconnect:
+        parallel_manager.disconnect(websocket)
 
 
 @app.websocket("/ws/ideation")

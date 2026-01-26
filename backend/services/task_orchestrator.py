@@ -34,6 +34,12 @@ from backend.services.git_service import commit_changes, push_branch
 logger = logging.getLogger(__name__)
 
 
+def get_parallel_manager():
+    """Get parallel manager instance (lazy import to avoid circular dependency)"""
+    from backend.websocket_manager import parallel_manager
+    return parallel_manager
+
+
 def get_storage():
     """Get storage instance (lazy import to avoid circular dependency)"""
     from backend.main import storage
@@ -60,11 +66,82 @@ class TaskOrchestrator:
         self.task = task
         self.project_path = project_path
         self.worktree_path = worktree_path
-        self.emit = emit_event or (lambda event, data: None)
+        self._original_emit = emit_event or (lambda event, data: None)
         self.log_callback = log_callback
 
         # Initialize phases if needed
         self._ensure_phases()
+
+    def emit(self, event: str, data: dict):
+        """
+        Emit an event to both the original callback and the parallel manager.
+        This ensures all parallel execution clients receive real-time updates.
+        """
+        # Call original emit callback
+        self._original_emit(event, data)
+
+        # Notify parallel manager asynchronously
+        asyncio.create_task(self._notify_parallel_manager(event, data))
+
+    async def _notify_parallel_manager(self, event: str, data: dict):
+        """Notify the parallel execution manager about task events."""
+        try:
+            pm = get_parallel_manager()
+
+            if event == "phase:started":
+                await pm.notify_phase_changed(
+                    task_id=data.get("task_id"),
+                    phase=data.get("phase"),
+                    metrics={}
+                )
+            elif event == "phase:completed":
+                await pm.notify_phase_changed(
+                    task_id=data.get("task_id"),
+                    phase=data.get("phase"),
+                    metrics=data.get("result", {})
+                )
+            elif event == "subtask:started":
+                subtask = data.get("subtask", {})
+                await pm.notify_subtask_progress(
+                    task_id=data.get("task_id"),
+                    subtask_info=subtask,
+                    progress={"percentage": 0, "status": "started"}
+                )
+            elif event == "subtask:completed":
+                subtask = data.get("subtask", {})
+                progress = data.get("progress", {})
+                await pm.notify_subtask_progress(
+                    task_id=data.get("task_id"),
+                    subtask_info=subtask,
+                    progress=progress
+                )
+            elif event == "subtask:failed":
+                subtask = data.get("subtask", {})
+                await pm.notify_subtask_progress(
+                    task_id=data.get("task_id"),
+                    subtask_info=subtask,
+                    progress={"percentage": 0, "status": "failed", "error": data.get("error")}
+                )
+            elif event == "task:failed":
+                await pm.notify_task_failed(
+                    task_id=data.get("task_id"),
+                    error=data.get("error")
+                )
+            elif event == "task:status_changed":
+                pm.update_task_progress(data.get("task_id"), {
+                    "status": data.get("status")
+                })
+                await pm.broadcast_queue_update("task_status_changed", data)
+            elif event == "subtasks:generated":
+                pm.update_task_progress(data.get("task_id"), {
+                    "total_subtasks": len(data.get("subtasks", []))
+                })
+                await pm.broadcast_queue_update("subtasks_generated", {
+                    "task_id": data.get("task_id"),
+                    "count": len(data.get("subtasks", []))
+                })
+        except Exception as e:
+            logger.warning(f"Failed to notify parallel manager: {e}")
 
     def _ensure_phases(self):
         """Ensure task has all phase objects initialized."""
@@ -99,6 +176,18 @@ class TaskOrchestrator:
 
     async def run(self) -> dict:
         """Execute the full workflow (Planning + Coding + Validation)."""
+        # Register task with parallel manager at start
+        try:
+            pm = get_parallel_manager()
+            await pm.notify_task_started(self.task.id, {
+                "title": self.task.title,
+                "worktree_path": self.worktree_path,
+                "current_phase": "planning",
+                "status": "running"
+            })
+        except Exception as e:
+            logger.warning(f"Failed to register task with parallel manager: {e}")
+
         try:
             # Phase 1: Planning
             await self.run_planning_phase()
@@ -108,6 +197,13 @@ class TaskOrchestrator:
 
             # Phase 3: Validation (automatic after coding)
             await self.run_validation_phase()
+
+            # Notify parallel manager of completion
+            try:
+                pm = get_parallel_manager()
+                await pm.notify_task_completed(self.task.id, {"status": "completed"})
+            except Exception as e:
+                logger.warning(f"Failed to notify parallel manager of completion: {e}")
 
             return {"success": True}
 

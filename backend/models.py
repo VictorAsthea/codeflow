@@ -278,6 +278,14 @@ class Task(BaseModel):
     subtasks: list[Subtask] = Field(default_factory=list)
     current_phase: str | None = None  # "planning", "coding", "validation"
     current_subtask_id: str | None = None
+    # Execution metrics for smart scheduling
+    execution_started_at: datetime | None = None
+    execution_completed_at: datetime | None = None
+    execution_duration_seconds: float | None = Field(
+        default=None,
+        ge=0,
+        description="Total execution duration in seconds"
+    )
 
     @field_validator("title", "description")
     @classmethod

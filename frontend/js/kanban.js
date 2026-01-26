@@ -11,6 +11,10 @@ let filePicker = null;
 const fileReferences = new Set();
 const screenshots = [];
 
+// Multi-select state for batch queuing
+let multiSelectMode = false;
+let selectedTaskIds = new Set();
+
 /**
  * Maps task status to the correct column identifier
  * @param {string} status - The task status
@@ -34,6 +38,7 @@ export async function initKanban() {
     setupNewTaskButton();
     setupDragAndDrop();
     setupArchivedIndicator();
+    setupBatchQueueControls();
     await updateQueueStatus();
     await updateArchivedCount();
 
@@ -53,6 +58,205 @@ function setupArchivedIndicator() {
         const event = new CustomEvent('open-archived-tasks');
         window.dispatchEvent(event);
     });
+}
+
+/**
+ * Set up batch queue controls for multi-select functionality
+ */
+function setupBatchQueueControls() {
+    // Create the batch queue toolbar if it doesn't exist
+    let toolbar = document.getElementById('batch-queue-toolbar');
+    if (!toolbar) {
+        toolbar = document.createElement('div');
+        toolbar.id = 'batch-queue-toolbar';
+        toolbar.className = 'batch-queue-toolbar hidden';
+        toolbar.innerHTML = `
+            <div class="batch-toolbar-left">
+                <button class="btn-toggle-multiselect" id="btn-toggle-multiselect" title="Toggle multi-select mode">
+                    <span class="multiselect-icon">☐</span>
+                    <span class="multiselect-text">Multi-Select</span>
+                </button>
+                <span class="selected-count hidden" id="selected-count">0 selected</span>
+            </div>
+            <div class="batch-toolbar-right hidden" id="batch-actions">
+                <select class="batch-priority-select" id="batch-priority">
+                    <option value="high">High Priority</option>
+                    <option value="normal" selected>Normal Priority</option>
+                    <option value="low">Low Priority</option>
+                </select>
+                <button class="btn btn-primary btn-queue-selected" id="btn-queue-selected" disabled>
+                    ⚡ Queue Selected
+                </button>
+                <button class="btn btn-secondary btn-clear-selection" id="btn-clear-selection">
+                    Clear
+                </button>
+            </div>
+        `;
+
+        // Insert after the kanban board header or at the top of kanban view
+        const kanbanView = document.getElementById('kanban-view');
+        const kanbanBoard = kanbanView?.querySelector('.kanban-board');
+        if (kanbanBoard) {
+            kanbanView.insertBefore(toolbar, kanbanBoard);
+        }
+    }
+
+    // Attach event listeners
+    const toggleBtn = document.getElementById('btn-toggle-multiselect');
+    const queueBtn = document.getElementById('btn-queue-selected');
+    const clearBtn = document.getElementById('btn-clear-selection');
+
+    toggleBtn?.addEventListener('click', toggleMultiSelectMode);
+    queueBtn?.addEventListener('click', queueSelectedTasks);
+    clearBtn?.addEventListener('click', clearTaskSelection);
+
+    // Show the toolbar (but keep batch actions hidden until multi-select is enabled)
+    toolbar.classList.remove('hidden');
+}
+
+/**
+ * Toggle multi-select mode on/off
+ */
+function toggleMultiSelectMode() {
+    multiSelectMode = !multiSelectMode;
+
+    const toggleBtn = document.getElementById('btn-toggle-multiselect');
+    const batchActions = document.getElementById('batch-actions');
+    const selectedCountEl = document.getElementById('selected-count');
+
+    if (multiSelectMode) {
+        toggleBtn?.classList.add('active');
+        batchActions?.classList.remove('hidden');
+        selectedCountEl?.classList.remove('hidden');
+        document.body.classList.add('multiselect-mode');
+    } else {
+        toggleBtn?.classList.remove('active');
+        batchActions?.classList.add('hidden');
+        selectedCountEl?.classList.add('hidden');
+        document.body.classList.remove('multiselect-mode');
+        clearTaskSelection();
+    }
+
+    // Re-render task cards to show/hide checkboxes
+    renderAllTasks();
+}
+
+/**
+ * Toggle task selection
+ */
+export function toggleTaskSelection(taskId, event) {
+    if (!multiSelectMode) return;
+
+    // Prevent the click from opening the task modal
+    if (event) {
+        event.stopPropagation();
+    }
+
+    if (selectedTaskIds.has(taskId)) {
+        selectedTaskIds.delete(taskId);
+    } else {
+        selectedTaskIds.add(taskId);
+    }
+
+    updateTaskSelectionUI(taskId);
+    updateBatchQueueButton();
+}
+
+/**
+ * Update the visual selection state of a task card
+ */
+function updateTaskSelectionUI(taskId) {
+    const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+    if (!card) return;
+
+    const checkbox = card.querySelector('.task-select-checkbox');
+    const isSelected = selectedTaskIds.has(taskId);
+
+    card.classList.toggle('selected', isSelected);
+    if (checkbox) {
+        checkbox.checked = isSelected;
+    }
+}
+
+/**
+ * Update the batch queue button state
+ */
+function updateBatchQueueButton() {
+    const queueBtn = document.getElementById('btn-queue-selected');
+    const selectedCountEl = document.getElementById('selected-count');
+
+    const count = selectedTaskIds.size;
+
+    if (queueBtn) {
+        queueBtn.disabled = count === 0;
+        queueBtn.textContent = count > 0 ? `⚡ Queue Selected (${count})` : '⚡ Queue Selected';
+    }
+
+    if (selectedCountEl) {
+        selectedCountEl.textContent = `${count} selected`;
+    }
+}
+
+/**
+ * Clear all task selections
+ */
+function clearTaskSelection() {
+    selectedTaskIds.forEach(taskId => {
+        const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+        if (card) {
+            card.classList.remove('selected');
+            const checkbox = card.querySelector('.task-select-checkbox');
+            if (checkbox) {
+                checkbox.checked = false;
+            }
+        }
+    });
+
+    selectedTaskIds.clear();
+    updateBatchQueueButton();
+}
+
+/**
+ * Queue all selected tasks for batch execution
+ */
+async function queueSelectedTasks() {
+    if (selectedTaskIds.size === 0) return;
+
+    const priority = document.getElementById('batch-priority')?.value || 'normal';
+
+    const tasksToQueue = Array.from(selectedTaskIds).map(taskId => ({
+        task_id: taskId,
+        priority: priority
+    }));
+
+    try {
+        const response = await API.queue.batch(tasksToQueue);
+
+        if (response.results) {
+            const successCount = response.results.filter(r => r.success).length;
+            const failCount = response.results.filter(r => !r.success).length;
+
+            if (failCount > 0) {
+                window.showToast?.(`Queued ${successCount} tasks, ${failCount} failed`, 'warning');
+            } else {
+                window.showToast?.(`Queued ${successCount} tasks successfully`, 'success');
+            }
+        }
+
+        // Clear selection and reload
+        clearTaskSelection();
+        await loadTasks();
+        await updateQueueStatus();
+
+        // Dispatch event for parallel dashboard
+        window.dispatchEvent(new CustomEvent('tasks-batch-queued', {
+            detail: { tasks: tasksToQueue, results: response.results }
+        }));
+
+    } catch (error) {
+        console.error('Failed to batch queue tasks:', error);
+        window.showToast?.('Failed to queue tasks: ' + error.message, 'error');
+    }
 }
 
 /**
@@ -135,6 +339,11 @@ function createTaskCard(task) {
     card.draggable = true;
     card.dataset.taskId = task.id;
 
+    // Add selected class if task is selected
+    if (selectedTaskIds.has(task.id)) {
+        card.classList.add('selected');
+    }
+
     // Phase steps (compact view)
     const phaseSteps = renderPhaseSteps(task);
 
@@ -155,6 +364,12 @@ function createTaskCard(task) {
         statusBadge = `<span class="badge-reviewing">${reviewText}</span>`;
     }
 
+    // Multi-select checkbox (only for backlog tasks, shown in multi-select mode)
+    const canBeQueued = task.status === 'backlog';
+    const checkboxHtml = canBeQueued && multiSelectMode
+        ? `<input type="checkbox" class="task-select-checkbox" ${selectedTaskIds.has(task.id) ? 'checked' : ''} />`
+        : '';
+
     // Action buttons (only for backlog tasks)
     let actionButtons = '';
     if (task.status === 'backlog') {
@@ -171,7 +386,10 @@ function createTaskCard(task) {
         : task.description;
 
     card.innerHTML = `
-        <h3>${task.title} ${skipBadge} ${statusBadge}</h3>
+        <div class="task-card-header-row">
+            ${checkboxHtml}
+            <h3>${task.title} ${skipBadge} ${statusBadge}</h3>
+        </div>
         <p>${truncatedDesc}</p>
         ${subtaskProgress}
         <div class="task-card-phases">
@@ -183,6 +401,15 @@ function createTaskCard(task) {
             <span>${task.id}</span>
         </div>
     `;
+
+    // Multi-select checkbox handler
+    const checkbox = card.querySelector('.task-select-checkbox');
+    if (checkbox) {
+        checkbox.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleTaskSelection(task.id, e);
+        });
+    }
 
     // Action button handler
     const startBtn = card.querySelector('[data-action="start"]');
@@ -201,8 +428,13 @@ function createTaskCard(task) {
         });
     }
 
-    card.addEventListener('click', () => {
-        openTaskModal(task.id);
+    card.addEventListener('click', (e) => {
+        // In multi-select mode, clicking the card toggles selection for backlog tasks
+        if (multiSelectMode && canBeQueued) {
+            toggleTaskSelection(task.id, e);
+        } else {
+            openTaskModal(task.id);
+        }
     });
 
     return card;

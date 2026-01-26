@@ -25,8 +25,10 @@ class KeyboardManager {
    */
   registerDefaults() {
     this.register('k', () => this.navigate('kanban'), 'Go to Kanban board');
+    this.register('p', () => this.navigate('parallel'), 'Go to Parallel Execution view');
     this.register('w', () => this.navigate('worktrees'), 'Go to Worktrees view');
     this.register('d', () => this.navigate('roadmap'), 'Go to Roadmap view');
+    this.register('i', () => this.navigate('ideation'), 'Go to Ideation view');
     this.register('c', () => this.navigate('context'), 'Go to Context view');
     this.register('l', () => this.navigate('changelog'), 'Go to Changelog view');
     this.register('m', () => this.navigate('mcp'), 'Go to MCP Servers view');
