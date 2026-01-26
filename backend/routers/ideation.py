@@ -248,16 +248,9 @@ async def dismiss_suggestion(suggestion_id: str):
 async def delete_suggestion(suggestion_id: str):
     """Delete a suggestion permanently."""
     storage = get_storage()
-    data = storage.get_data()
 
-    # Filter out the suggestion
-    original_count = len(data.suggestions)
-    data.suggestions = [s for s in data.suggestions if s.id != suggestion_id]
-
-    if len(data.suggestions) == original_count:
+    if not storage.delete_suggestion(suggestion_id):
         raise HTTPException(status_code=404, detail="Suggestion not found")
-
-    storage.save_suggestions(data.suggestions)
 
     return {"message": "Suggestion deleted"}
 

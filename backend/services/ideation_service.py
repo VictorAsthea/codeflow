@@ -10,6 +10,7 @@ Provides functionality to:
 import json
 import uuid
 import logging
+import fcntl
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -43,6 +44,33 @@ class IdeationStorage:
         self.ideation_dir.mkdir(parents=True, exist_ok=True)
         self.ideas_dir.mkdir(parents=True, exist_ok=True)
 
+    def _atomic_write_suggestions(self, suggestions: list[Suggestion]):
+        """Atomically write suggestions with file locking."""
+        self._ensure_dirs()
+
+        # Create lock file
+        lock_file = self.suggestions_file.with_suffix('.lock')
+
+        try:
+            # Open lock file and acquire exclusive lock
+            with open(lock_file, 'w') as lock_fd:
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+
+                # Write to temporary file first
+                temp_file = self.suggestions_file.with_suffix('.tmp')
+                temp_file.write_text(
+                    json.dumps([s.model_dump(mode="json") for s in suggestions], indent=2, default=str),
+                    encoding="utf-8"
+                )
+
+                # Atomic move
+                temp_file.replace(self.suggestions_file)
+
+        finally:
+            # Clean up lock file
+            if lock_file.exists():
+                lock_file.unlink()
+
     def get_data(self) -> IdeationData:
         """Load all ideation data."""
         analysis = None
@@ -74,11 +102,7 @@ class IdeationStorage:
 
     def save_suggestions(self, suggestions: list[Suggestion]):
         """Save suggestions data."""
-        self._ensure_dirs()
-        self.suggestions_file.write_text(
-            json.dumps([s.model_dump(mode="json") for s in suggestions], indent=2, default=str),
-            encoding="utf-8"
-        )
+        self._atomic_write_suggestions(suggestions)
 
     def get_suggestion(self, suggestion_id: str) -> Optional[Suggestion]:
         """Get a specific suggestion by ID."""
@@ -89,15 +113,27 @@ class IdeationStorage:
         return None
 
     def update_suggestion(self, suggestion_id: str, updates: dict) -> Optional[Suggestion]:
-        """Update a suggestion."""
+        """Update a suggestion atomically."""
         data = self.get_data()
         for i, s in enumerate(data.suggestions):
             if s.id == suggestion_id:
                 updated = s.model_copy(update=updates)
                 data.suggestions[i] = updated
-                self.save_suggestions(data.suggestions)
+                self._atomic_write_suggestions(data.suggestions)
                 return updated
         return None
+
+    def delete_suggestion(self, suggestion_id: str) -> bool:
+        """Delete a suggestion atomically."""
+        data = self.get_data()
+        original_count = len(data.suggestions)
+        data.suggestions = [s for s in data.suggestions if s.id != suggestion_id]
+
+        if len(data.suggestions) == original_count:
+            return False  # Suggestion not found
+
+        self._atomic_write_suggestions(data.suggestions)
+        return True
 
 
 def generate_suggestion_id() -> str:
@@ -448,6 +484,48 @@ def _generate_fallback_suggestions(analysis: IdeationAnalysis) -> list[Suggestio
     return suggestions
 
 
+def _extract_suggestions_from_text(text: str) -> list[str]:
+    """Extract actionable suggestions from AI response text."""
+    suggestions = []
+    lines = text.split('\n')
+
+    # Look for common suggestion patterns
+    suggestion_patterns = [
+        "I suggest",
+        "Consider",
+        "You should",
+        "You could",
+        "I recommend",
+        "Try",
+        "Add",
+        "Implement",
+        "Create",
+        "Update",
+        "Use",
+        "Set up",
+        "Configure"
+    ]
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        # Check if line starts with bullet points or numbers
+        if line.startswith(('-', '*', '•')) or (len(line) > 2 and line[0].isdigit() and line[1] in '.):'):
+            # Extract the content after the marker
+            content = line[2:].strip() if line.startswith(('-', '*', '•')) else line[line.index('.') + 1:].strip()
+            if len(content) > 10:  # Reasonable length check
+                suggestions.append(content)
+
+        # Check for suggestion patterns at start of line
+        elif any(line.startswith(pattern) for pattern in suggestion_patterns):
+            if len(line) > 15:  # Reasonable length check
+                suggestions.append(line)
+
+    return suggestions[:5]  # Limit to 5 suggestions to avoid noise
+
+
 async def chat_ideation(
     message: str,
     context: list[ChatMessage],
@@ -508,6 +586,10 @@ Please respond helpfully. If you have specific actionable suggestions, format th
     if success and output:
         response = output
         logger.info(f"Chat response: {len(response)} chars")
+
+        # Extract suggestions from the response
+        extracted_suggestions = _extract_suggestions_from_text(response)
+
     else:
         logger.warning(f"Chat Claude call failed: {stderr}")
         response = "I'm having trouble connecting to the AI service. Please try again in a moment."
