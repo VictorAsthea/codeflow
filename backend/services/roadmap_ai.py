@@ -164,14 +164,11 @@ def call_claude(
         if system_prompt:
             cmd.extend(["--system-prompt", system_prompt])
 
-        # For short prompts, pass as argument; for long ones, use stdin
-        use_stdin = len(prompt) > 2000
+        # Tell Claude CLI to read prompt from stdin
+        cmd.append("-")
 
-        if not use_stdin:
-            cmd.append(prompt)
-
-        logger.info(f"Calling Claude CLI: {claude_cmd} (timeout={timeout}s, json={json_output}, stdin={use_stdin})...")
-        logger.debug(f"Command: {' '.join(cmd[:4])}... [{'stdin' if use_stdin else 'arg'}]")
+        logger.info(f"Calling Claude CLI: {claude_cmd} (timeout={timeout}s, json={json_output})...")
+        logger.debug(f"Command: {' '.join(cmd[:4])}... [stdin]")
 
         # Prepare environment with npm path
         env = os.environ.copy()
@@ -181,9 +178,11 @@ def call_claude(
 
         result = subprocess.run(
             cmd,
-            input=prompt if use_stdin else None,
+            input=prompt,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             cwd=settings.project_path,
             timeout=timeout,
             env=env

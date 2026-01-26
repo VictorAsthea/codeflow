@@ -330,6 +330,11 @@ class WorkspaceManager {
         if (typeof loadSettings === 'function') {
             await loadSettings();
         }
+
+        // Reload roadmap if the function exists
+        if (typeof window.loadRoadmap === 'function') {
+            await window.loadRoadmap();
+        }
     }
 
     closeModal() {

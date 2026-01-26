@@ -327,13 +327,24 @@ body {
   color: var(--text-secondary);
 }
 
-.usage-last-updated {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  text-align: center;
+.usage-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding-top: 0.5rem;
   border-top: 1px solid var(--border);
   margin-top: 0.5rem;
+}
+
+.usage-last-updated {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.usage-footer .btn-icon {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  min-width: auto;
 }
 
 .kanban-board {

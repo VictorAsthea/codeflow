@@ -724,5 +724,8 @@ function setupGlobalListeners() {
 // Setup global listeners immediately
 setupGlobalListeners();
 
+// Expose loadRoadmap globally for workspace switching
+window.loadRoadmap = loadRoadmap;
+
 // Export for other modules
 export { roadmapData };

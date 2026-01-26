@@ -30,16 +30,11 @@ from pathlib import Path
 
 router = APIRouter()
 
-# Storage instance
-_storage: RoadmapStorage | None = None
-
 
 def get_storage() -> RoadmapStorage:
-    """Get or create storage instance."""
-    global _storage
-    if _storage is None:
-        _storage = RoadmapStorage()
-    return _storage
+    """Get storage instance for active project."""
+    project_path = Path(get_active_project_path())
+    return RoadmapStorage(base_path=project_path)
 
 
 # ============== Roadmap CRUD ==============

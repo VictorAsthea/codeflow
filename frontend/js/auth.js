@@ -463,6 +463,7 @@ class AuthManager {
         const wrapper = document.getElementById('rate-limit-wrapper');
         const indicator = document.getElementById('rate-limit-indicator');
         const dropdown = document.getElementById('rate-limit-dropdown');
+        const refreshBtn = document.getElementById('usage-refresh-btn');
 
         if (!wrapper || !indicator || !dropdown) return;
 
@@ -471,12 +472,23 @@ class AuthManager {
             e.stopPropagation();
             wrapper.classList.toggle('open');
             dropdown.classList.toggle('hidden');
-
-            // Refresh usage data when opening
-            if (!dropdown.classList.contains('hidden')) {
-                this.loadUsageData();
-            }
+            // No auto-refresh on open - user must click refresh button
         });
+
+        // Manual refresh button
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = '⏳';
+                try {
+                    await this.loadUsageData();
+                } finally {
+                    refreshBtn.disabled = false;
+                    refreshBtn.textContent = '🔄';
+                }
+            });
+        }
 
         // Close on click outside
         document.addEventListener('click', (e) => {
@@ -488,27 +500,21 @@ class AuthManager {
     }
 
     /**
-     * Start periodic rate limit check
+     * Initialize rate limit display (no auto-refresh)
      */
     startRateLimitRefresh() {
-        // Setup dropdown
+        // Setup dropdown with manual refresh button
         this.setupUsageDropdown();
-        // Initial load
+        // Initial load only - no periodic refresh
+        // User can click refresh button to update
         this.loadRateLimitStatus();
-        // Refresh every 60 seconds (usage data is cached)
-        this.rateLimitInterval = setInterval(() => {
-            this.loadRateLimitStatus();
-        }, 60000);
     }
 
     /**
-     * Stop rate limit refresh
+     * Stop rate limit refresh (kept for compatibility)
      */
     stopRateLimitRefresh() {
-        if (this.rateLimitInterval) {
-            clearInterval(this.rateLimitInterval);
-            this.rateLimitInterval = null;
-        }
+        // No interval to clear anymore
     }
 }
 
