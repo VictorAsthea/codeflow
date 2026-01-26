@@ -11,7 +11,7 @@ from typing import Callable, Any
 
 from backend.models import (
     Task, TaskStatus, Subtask, SubtaskStatus,
-    Phase, PhaseStatus, PhaseConfig, PhaseMetrics
+    Phase, PhaseStatus, PhaseConfig, PhaseMetrics, RetryState
 )
 from backend.config import settings
 from backend.services.planning_service import generate_subtasks
@@ -52,6 +52,57 @@ async def update_task(task: Task):
     get_storage().update_task(task)
 
 
+def save_retry_state(task: Task, retry_state: RetryState) -> None:
+    """
+    Save retry state to task for persistence.
+
+    This ensures retry state survives server restarts. The state is
+    automatically persisted when update_task() is called.
+
+    Args:
+        task: The task to save retry state for
+        retry_state: The current retry state to persist
+    """
+    task.retry_state = retry_state
+    task.updated_at = datetime.now()
+    get_storage().update_task(task)
+    logger.debug(f"Saved retry state for task {task.id}: attempt {retry_state.attempt}/{retry_state.max_attempts}")
+
+
+def restore_retry_state(task: Task) -> RetryState | None:
+    """
+    Restore retry state from a task after server restart.
+
+    This allows resuming retry operations from where they left off.
+    Returns None if no retry state was previously saved.
+
+    Args:
+        task: The task to restore retry state from
+
+    Returns:
+        RetryState if one was saved, None otherwise
+    """
+    if task.retry_state is not None:
+        logger.info(
+            f"Restored retry state for task {task.id}: "
+            f"attempt {task.retry_state.attempt}/{task.retry_state.max_attempts}"
+        )
+    return task.retry_state
+
+
+def clear_retry_state(task: Task) -> None:
+    """
+    Clear retry state from a task after successful completion or final failure.
+
+    Args:
+        task: The task to clear retry state from
+    """
+    task.retry_state = None
+    task.updated_at = datetime.now()
+    get_storage().update_task(task)
+    logger.debug(f"Cleared retry state for task {task.id}")
+
+
 class TaskOrchestrator:
     """Orchestrates the complete workflow of a task."""
 
@@ -82,6 +133,27 @@ class TaskOrchestrator:
 
         # Notify parallel manager asynchronously
         asyncio.create_task(self._notify_parallel_manager(event, data))
+
+    async def _send_task_retry_notification(self, event_type: str, data: dict):
+        """
+        Send retry notification to task-specific WebSocket connections.
+
+        This complements the parallel manager notifications by sending
+        retry events directly to clients connected to the specific task.
+
+        Args:
+            event_type: Retry event type (retry_started, retry_waiting, retry_succeeded, retry_failed)
+            data: Event data from the emit call
+        """
+        try:
+            from backend.websocket_manager import manager
+            await manager.send_retry_notification(
+                task_id=self.task.id,
+                event_type=event_type,
+                data=data
+            )
+        except Exception as e:
+            logger.warning(f"Failed to send task retry notification: {e}")
 
     async def _notify_parallel_manager(self, event: str, data: dict):
         """Notify the parallel execution manager about task events."""
@@ -140,6 +212,56 @@ class TaskOrchestrator:
                     "task_id": data.get("task_id"),
                     "count": len(data.get("subtasks", []))
                 })
+            # Retry events for real-time notification - use dedicated methods
+            elif event == "retry:started":
+                await pm.notify_retry_started(
+                    task_id=data.get("task_id"),
+                    attempt=data.get("attempt", 0),
+                    max_attempts=data.get("max_attempts", 0),
+                    delay=data.get("delay", 0),
+                    next_retry_at=data.get("next_retry_at"),
+                    error_type=data.get("error_type", "unknown"),
+                    error_message=data.get("error_message")
+                )
+                # Also send to the task-specific WebSocket for clients connected to that task
+                await self._send_task_retry_notification(
+                    event_type="retry_started",
+                    data=data
+                )
+            elif event == "retry:waiting":
+                await pm.notify_retry_waiting(
+                    task_id=data.get("task_id"),
+                    attempt=data.get("attempt", 0),
+                    max_attempts=data.get("max_attempts", 0),
+                    delay_remaining=data.get("delay_remaining", 0),
+                    error_type=data.get("error_type", "unknown")
+                )
+                await self._send_task_retry_notification(
+                    event_type="retry_waiting",
+                    data=data
+                )
+            elif event == "retry:succeeded":
+                await pm.notify_retry_succeeded(
+                    task_id=data.get("task_id"),
+                    total_attempts=data.get("total_attempts", 0),
+                    total_retry_time=data.get("total_retry_time", 0)
+                )
+                await self._send_task_retry_notification(
+                    event_type="retry_succeeded",
+                    data=data
+                )
+            elif event == "retry:failed":
+                await pm.notify_retry_failed(
+                    task_id=data.get("task_id"),
+                    total_attempts=data.get("total_attempts", 0),
+                    last_error_type=data.get("last_error_type", "unknown"),
+                    last_error_message=data.get("last_error_message"),
+                    error_history=data.get("error_history", [])
+                )
+                await self._send_task_retry_notification(
+                    event_type="retry_failed",
+                    data=data
+                )
         except Exception as e:
             logger.warning(f"Failed to notify parallel manager: {e}")
 
@@ -173,6 +295,121 @@ class TaskOrchestrator:
 
         if phase and phase in self.task.phases:
             self.task.phases[phase].logs.append(message.rstrip())
+
+    def emit_retry_started(
+        self,
+        attempt: int,
+        max_attempts: int,
+        delay: float,
+        next_retry_at: datetime | None,
+        error_type: str,
+        error_message: str
+    ):
+        """
+        Emit retry:started event when a retry is about to begin.
+
+        Args:
+            attempt: Current attempt number (1-indexed)
+            max_attempts: Maximum number of attempts
+            delay: Delay in seconds before retry
+            next_retry_at: Scheduled time for the next retry
+            error_type: Type of error that triggered the retry
+            error_message: Error message from the failed attempt
+        """
+        self.emit("retry:started", {
+            "task_id": self.task.id,
+            "attempt": attempt,
+            "max_attempts": max_attempts,
+            "delay": delay,
+            "next_retry_at": next_retry_at.isoformat() if next_retry_at else None,
+            "error_type": error_type,
+            "error_message": error_message[:500] if error_message else None  # Truncate for UI
+        })
+        logger.info(
+            f"Retry started for task {self.task.id}: "
+            f"attempt {attempt}/{max_attempts}, delay {delay:.1f}s, error: {error_type}"
+        )
+
+    def emit_retry_succeeded(
+        self,
+        total_attempts: int,
+        total_retry_time: float
+    ):
+        """
+        Emit retry:succeeded event when operation succeeds after retries.
+
+        Args:
+            total_attempts: Total number of attempts made (including initial)
+            total_retry_time: Total time spent on retries in seconds
+        """
+        self.emit("retry:succeeded", {
+            "task_id": self.task.id,
+            "total_attempts": total_attempts,
+            "total_retry_time": total_retry_time
+        })
+        logger.info(
+            f"Retry succeeded for task {self.task.id}: "
+            f"{total_attempts} attempts, {total_retry_time:.1f}s total retry time"
+        )
+
+    def emit_retry_failed(
+        self,
+        total_attempts: int,
+        last_error_type: str,
+        last_error_message: str,
+        error_history: list[dict]
+    ):
+        """
+        Emit retry:failed event when all retry attempts are exhausted.
+
+        Args:
+            total_attempts: Total number of attempts made
+            last_error_type: Type of the final error
+            last_error_message: Message from the final error
+            error_history: List of all errors encountered during retries
+        """
+        self.emit("retry:failed", {
+            "task_id": self.task.id,
+            "total_attempts": total_attempts,
+            "last_error_type": last_error_type,
+            "last_error_message": last_error_message[:500] if last_error_message else None,
+            "error_history": error_history[-5:] if error_history else []  # Last 5 errors only
+        })
+        logger.error(
+            f"Retry failed for task {self.task.id}: "
+            f"{total_attempts} attempts exhausted, last error: {last_error_type}"
+        )
+
+    def emit_retry_waiting(
+        self,
+        attempt: int,
+        max_attempts: int,
+        delay_remaining: float,
+        error_type: str
+    ):
+        """
+        Emit retry:waiting event when waiting for backoff delay.
+
+        This event can be emitted periodically during the backoff wait
+        to keep the UI updated with countdown information.
+
+        Args:
+            attempt: Current attempt number (1-indexed)
+            max_attempts: Maximum number of attempts
+            delay_remaining: Remaining delay in seconds before retry
+            error_type: Type of error that triggered the retry
+        """
+        self.emit("retry:waiting", {
+            "task_id": self.task.id,
+            "attempt": attempt,
+            "max_attempts": max_attempts,
+            "delay_remaining": delay_remaining,
+            "error_type": error_type
+        })
+        logger.debug(
+            f"Retry waiting for task {self.task.id}: "
+            f"{delay_remaining:.1f}s remaining before attempt {attempt}/{max_attempts}"
+        )
 
     async def run(self) -> dict:
         """Execute the full workflow (Planning + Coding + Validation)."""

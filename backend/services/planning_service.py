@@ -129,13 +129,20 @@ async def generate_subtasks(
             if on_output:
                 on_output(f"\n[Planning] Retry attempt {attempt}/{max_retries}...\n")
 
-        # Call Claude CLI
-        success, result = await run_claude_for_json(
+        # Call Claude CLI (with retry support)
+        success, result, retry_metadata = await run_claude_for_json(
             prompt=prompt,
             cwd=project_path,
             timeout=300,  # 5 min max for planning
-            on_output=on_output
+            on_output=on_output,
+            task_id=f"{task.id}:planning",  # Task ID for metrics tracking
         )
+
+        if retry_metadata and retry_metadata.had_retries:
+            logger.info(
+                f"Planning completed after {retry_metadata.total_attempts} attempts "
+                f"(retry time: {retry_metadata.total_retry_time:.1f}s)"
+            )
 
         if success and result is not None:
             # Parse into list of Subtask

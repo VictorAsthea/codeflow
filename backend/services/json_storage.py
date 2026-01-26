@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Any
 from contextlib import contextmanager
 
-from backend.models import Task, TaskStatus, Phase, PhaseStatus
+from backend.models import Task, TaskStatus, Phase, PhaseStatus, RetryState
 
 # Import fcntl only on Unix-like systems
 if sys.platform != 'win32':
@@ -171,6 +171,15 @@ class JSONStorage:
                     phase_data["started_at"] = datetime.fromisoformat(phase_data["started_at"])
                 if isinstance(phase_data.get("completed_at"), str):
                     phase_data["completed_at"] = datetime.fromisoformat(phase_data["completed_at"])
+
+            # Convert retry_state datetime strings if present
+            retry_state_data = task_data.get("retry_state")
+            if retry_state_data is not None:
+                if isinstance(retry_state_data.get("next_retry_at"), str):
+                    retry_state_data["next_retry_at"] = datetime.fromisoformat(retry_state_data["next_retry_at"])
+                if isinstance(retry_state_data.get("started_at"), str):
+                    retry_state_data["started_at"] = datetime.fromisoformat(retry_state_data["started_at"])
+                task_data["retry_state"] = RetryState(**retry_state_data)
 
             tasks.append(Task(**task_data))
 
