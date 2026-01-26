@@ -335,3 +335,63 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     suggestions: list[str] = Field(default_factory=list)
+
+
+# ============== Memory/Session Models ==============
+
+class SessionStatus(str, Enum):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class Session(BaseModel):
+    """Session metadata for list views."""
+    session_id: str
+    task_id: str | None = None
+    task_title: str | None = None
+    worktree: str | None = None
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    status: SessionStatus = SessionStatus.COMPLETED
+    messages_count: int = 0
+    tokens_used: int = 0
+    claude_session_id: str | None = None
+
+
+class SessionMessage(BaseModel):
+    """A single message in a session conversation."""
+    role: str  # "user", "assistant", "system"
+    content: str
+    timestamp: datetime | None = None
+
+
+class SessionDetail(Session):
+    """Full session details including conversation."""
+    messages: list[SessionMessage] = Field(default_factory=list)
+    raw_output: str | None = None
+    error: str | None = None
+
+
+class SessionCreate(BaseModel):
+    """Data for creating a new session."""
+    task_title: str | None = None
+    worktree: str | None = None
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    status: SessionStatus = SessionStatus.COMPLETED
+    messages_count: int = 0
+    tokens_used: int = 0
+    claude_session_id: str | None = None
+    messages: list[dict] = Field(default_factory=list)
+    raw_output: str | None = None
+    error: str | None = None
+
+
+class ResumeInfo(BaseModel):
+    """Information needed to resume a session."""
+    claude_session_id: str
+    project_path: str | None = None
+    worktree_path: str | None = None
+    last_message: str | None = None
