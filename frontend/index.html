@@ -31,7 +31,6 @@
                     <button id="sync-develop-btn" class="btn-icon btn-small">Sync</button>
                 </div>
                 <button id="sync-btn" class="btn-icon">🔄 Sync Main</button>
-                <button id="settings-btn" class="btn-icon">⚙️ Settings</button>
             </div>
         </header>
 
@@ -100,7 +99,7 @@
 
                     <div class="nav-divider"></div>
 
-                    <a href="#settings" class="nav-item" data-shortcut="S">
+                    <a href="#settings" class="nav-item" data-shortcut="S" data-view="settings">
                         <span class="nav-icon">⚙️</span>
                         <span class="nav-label">Settings</span>
                         <kbd class="nav-kbd">S</kbd>
@@ -378,6 +377,87 @@
                             <div class="ideation-chat-input">
                                 <input type="text" id="ideation-chat-input" placeholder="Posez une question ou demandez une idée...">
                                 <button id="ideation-chat-send" class="btn btn-primary">Envoyer</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings View -->
+                <div id="settings-view" class="view hidden">
+                    <div class="view-header">
+                        <div class="view-header-content">
+                            <h1>Settings</h1>
+                            <p>Configuration de Codeflow et du projet</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-page">
+                        <div class="settings-sidebar">
+                            <button class="settings-nav-item active" data-settings-tab="general">General</button>
+                            <button class="settings-nav-item" data-settings-tab="auth">Authentification</button>
+                            <button class="settings-nav-item" data-settings-tab="branches">Branches</button>
+                            <button class="settings-nav-item" data-settings-tab="github">GitHub</button>
+                        </div>
+
+                        <div class="settings-main">
+                            <!-- General Settings -->
+                            <div id="settings-page-general" class="settings-page-panel active">
+                                <h2>General</h2>
+                                <form id="settings-page-form">
+                                    <div class="form-group">
+                                        <label for="settings-default-model">Default Model</label>
+                                        <select id="settings-default-model">
+                                            <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                                            <option value="claude-opus-4-20250514">Claude Opus 4</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="settings-default-intensity">Default Intensity</label>
+                                        <select id="settings-default-intensity">
+                                            <option value="low">Low</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="high">High</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="settings-project-path">Project Path</label>
+                                        <input type="text" id="settings-project-path" class="input" required>
+                                    </div>
+                                    <div class="form-group checkbox-group">
+                                        <label>
+                                            <input type="checkbox" id="settings-auto-review">
+                                            Auto Review
+                                        </label>
+                                    </div>
+                                    <button type="button" id="btn-save-settings-page" class="btn btn-primary">Save Settings</button>
+                                </form>
+                            </div>
+
+                            <!-- Auth Settings -->
+                            <div id="settings-page-auth" class="settings-page-panel hidden">
+                                <h2>Authentification</h2>
+                                <p class="settings-description">Comment Codeflow accede a Claude</p>
+                                <div id="settings-page-auth-content">
+                                    <div class="loading">Chargement...</div>
+                                </div>
+                            </div>
+
+                            <!-- Branches Settings -->
+                            <div id="settings-page-branches" class="settings-page-panel hidden">
+                                <h2>Gestion des branches</h2>
+                                <p class="settings-description">Nettoyer les branches mergees du projet actif</p>
+                                <div id="settings-page-branches-content">
+                                    <div class="loading">Chargement...</div>
+                                </div>
+                            </div>
+
+                            <!-- GitHub Settings -->
+                            <div id="settings-page-github" class="settings-page-panel hidden">
+                                <h2>Integration GitHub</h2>
+                                <p class="settings-description">Configuration du repository pour ce projet</p>
+                                <div id="settings-page-github-content">
+                                    <div class="loading">Chargement...</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -881,91 +961,6 @@
             </div>
         </div>
 
-        <!-- Settings Modal -->
-        <div id="settings-modal" class="modal hidden">
-            <div class="modal-content modal-large">
-                <div class="modal-header">
-                    <h2>⚙️ Paramètres</h2>
-                    <button class="btn-close">&times;</button>
-                </div>
-                <div class="modal-body settings-body">
-                    <div class="settings-tabs">
-                        <button class="settings-tab active" data-tab="general">Général</button>
-                        <button class="settings-tab" data-tab="auth">Authentification</button>
-                        <button class="settings-tab" data-tab="branches">Branches</button>
-                        <button class="settings-tab" data-tab="github">GitHub</button>
-                    </div>
-
-                    <div class="settings-content">
-                        <!-- General Tab -->
-                        <div id="settings-tab-general" class="settings-panel active">
-                            <form id="settings-form">
-                                <div class="form-group">
-                                    <label for="default-model">Default Model</label>
-                                    <select id="default-model">
-                                        <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
-                                        <option value="claude-opus-4-20250514">Claude Opus 4</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="default-intensity">Default Intensity</label>
-                                    <select id="default-intensity">
-                                        <option value="low">Low</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="high">High</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="project-path">Project Path</label>
-                                    <input type="text" id="project-path" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>
-                                        <input type="checkbox" id="auto-review">
-                                        Auto Review
-                                    </label>
-                                </div>
-                            </form>
-                        </div>
-
-                        <!-- Auth Tab -->
-                        <div id="settings-tab-auth" class="settings-panel hidden">
-                            <h3 class="settings-section-title">Methode de connexion</h3>
-                            <p class="settings-section-hint">Comment Codeflow accede a Claude</p>
-
-                            <div id="settings-auth-content" class="settings-auth-content">
-                                <div class="loading">Chargement...</div>
-                            </div>
-                        </div>
-
-                        <!-- Branches Tab -->
-                        <div id="settings-tab-branches" class="settings-panel hidden">
-                            <h3 class="settings-section-title">Gestion des branches</h3>
-                            <p class="settings-section-hint">Nettoyer les branches mergees du projet actif</p>
-
-                            <div id="settings-branches-content" class="settings-branches-content">
-                                <div class="loading">Chargement...</div>
-                            </div>
-                        </div>
-
-                        <!-- GitHub Tab -->
-                        <div id="settings-tab-github" class="settings-panel hidden">
-                            <h3 class="settings-section-title">Integration GitHub</h3>
-                            <p class="settings-section-hint">Configuration du repository pour ce projet</p>
-
-                            <div id="settings-github-content" class="settings-github-content">
-                                <div class="loading">Chargement...</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary btn-close">Cancel</button>
-                    <button id="btn-save-settings" class="btn btn-primary">Save Settings</button>
-                </div>
-            </div>
-        </div>
-
         <!-- Auth Modal -->
         <div id="auth-modal" class="modal hidden">
             <div class="modal-content auth-modal">
@@ -1033,6 +1028,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="/js/auth.js"></script>
+    <script src="/js/settings-page.js"></script>
     <script src="/js/log-viewer.js"></script>
     <script type="module" src="/js/api.js"></script>
     <script type="module" src="/js/websocket.js"></script>

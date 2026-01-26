@@ -4590,3 +4590,98 @@ body {
 .btn-danger:hover {
   background: #d73a49;
 }
+
+/* ============================================
+   SETTINGS PAGE STYLES
+   ============================================ */
+
+.settings-page {
+  display: flex;
+  gap: 2rem;
+  padding: 1.5rem;
+  height: calc(100vh - 200px);
+}
+
+.settings-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.settings-nav-item {
+  background: transparent;
+  border: none;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.15s ease;
+}
+
+.settings-nav-item:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.settings-nav-item.active {
+  background: var(--accent-blue);
+  color: white;
+}
+
+.settings-main {
+  flex: 1;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.settings-page-panel {
+  display: none;
+}
+
+.settings-page-panel.active {
+  display: block;
+}
+
+.settings-page-panel h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+}
+
+.settings-description {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+.settings-page-panel .form-group {
+  margin-bottom: 1.25rem;
+}
+
+.settings-page-panel .form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.settings-page-panel .form-group select,
+.settings-page-panel .form-group input[type="text"] {
+  width: 100%;
+  max-width: 400px;
+}
+
+.settings-page-panel .checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.settings-page-panel .checkbox-group input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
