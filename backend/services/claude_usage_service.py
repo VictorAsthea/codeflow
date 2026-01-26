@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import sys
+import time
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -113,7 +114,7 @@ class ClaudeUsageService:
                                     break
                         except Exception:
                             pass
-                    asyncio.sleep(0.1)
+                    time.sleep(0.1)
 
                 # Send /usage command
                 pty.write('/usage\r\n')
@@ -131,7 +132,7 @@ class ClaudeUsageService:
                                 # Check if we have usage data
                                 if 'Current session' in buffer and '% left' in buffer:
                                     # Wait a bit more for full output
-                                    asyncio.sleep(1)
+                                    time.sleep(1)
                                     # Read remaining
                                     try:
                                         data = pty.read(4096, blocking=False)
@@ -143,11 +144,11 @@ class ClaudeUsageService:
                                     break
                         except Exception:
                             pass
-                    asyncio.sleep(0.1)
+                    time.sleep(0.1)
 
                 # Send escape to exit
                 pty.write('\x1b')
-                asyncio.sleep(0.5)
+                time.sleep(0.5)
                 pty.terminate()
 
             except Exception as e:
