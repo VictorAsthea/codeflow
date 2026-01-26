@@ -159,14 +159,14 @@ async def run_claude(
     cmd = [
         claude_cmd,
         "--print",
+        "--no-session-persistence",
         "--model", model,
         "--max-turns", str(max_turns),
-        "--permission-mode", "bypassPermissions"
+        "--dangerously-skip-permissions"
     ]
 
     if allowed_tools:
-        for tool in allowed_tools:
-            cmd.extend(["--allowedTools", tool])
+        cmd.extend(["--allowedTools", ",".join(allowed_tools)])
 
     print(f"[DEBUG] ========== CLAUDE COMMAND ==========")
     print(f"[DEBUG] Command as list (each element is a separate arg):")
