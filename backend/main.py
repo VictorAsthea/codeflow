@@ -1,10 +1,10 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
 from pathlib import Path
 import logging
+from typing import Callable, Awaitable, Dict, Any, Optional
 
 from backend.services.json_storage import JSONStorage
 
@@ -21,42 +21,106 @@ from backend.services.json_storage import JSONStorage
 MAX_BODY_SIZE = 1 * 1024 * 1024  # 1MB for regular requests
 MAX_FILE_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB for file uploads (if any)
 
+ASGIApp = Callable[[Dict[str, Any], Callable, Callable], Awaitable[None]]
 
-class RequestBodySizeLimitMiddleware(BaseHTTPMiddleware):
+
+class BodyTooLarge(Exception):
+    """Exception raised when request body exceeds size limit"""
+    pass
+
+
+class BodyFramingError(Exception):
+    """Exception raised when body framing is invalid (e.g., exceeds Content-Length)"""
+    pass
+
+
+class RequestBodySizeLimitMiddleware:
     """
-    Middleware to enforce request body size limits.
+    ASGI middleware to enforce request body size limits.
 
     Security: Prevents denial-of-service attacks by rejecting requests
     with bodies larger than the configured maximum size.
 
-    This middleware checks the Content-Length header before reading the body,
-    providing early rejection of oversized requests.
+    This middleware counts actual bytes received during streaming, regardless
+    of Content-Length header, and handles chunked transfer encoding properly.
+    It also rejects ambiguous requests with both Content-Length and Transfer-Encoding
+    headers to prevent request smuggling attacks.
     """
 
-    def __init__(self, app, max_body_size: int = MAX_BODY_SIZE):
-        super().__init__(app)
+    def __init__(self, app: ASGIApp, max_body_size: int = MAX_BODY_SIZE):
+        self.app = app
         self.max_body_size = max_body_size
 
-    async def dispatch(self, request: Request, call_next):
-        # Check Content-Length header if present
-        content_length = request.headers.get("content-length")
+    async def __call__(self, scope: dict, receive: Callable, send: Callable):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
 
-        if content_length:
+        # Parse headers (ASGI headers are lists of [name, value] byte tuples)
+        headers = {k.lower(): v for k, v in scope.get("headers") or []}
+
+        # Check for Content-Length header
+        content_length: Optional[int] = None
+        if b"content-length" in headers:
             try:
-                length = int(content_length)
-                if length > self.max_body_size:
-                    return JSONResponse(
-                        status_code=413,
-                        content={
-                            "detail": f"Request body too large. Maximum size is {self.max_body_size // (1024 * 1024)}MB."
-                        }
-                    )
-            except ValueError:
-                # Invalid Content-Length header - let the request proceed
-                # and fail naturally if the body is actually too large
-                pass
+                content_length = int(headers[b"content-length"].decode("ascii"))
+                if content_length < 0:
+                    raise ValueError("Negative Content-Length")
+            except (ValueError, UnicodeDecodeError):
+                # Invalid Content-Length header - reject request
+                response = JSONResponse(
+                    status_code=400,
+                    content={"detail": "Invalid Content-Length header"}
+                )
+                return await response(scope, receive, send)
 
-        return await call_next(request)
+        # Security: Reject requests with both Content-Length and Transfer-Encoding
+        # This prevents request smuggling attacks where parsers disagree on framing
+        if b"content-length" in headers and b"transfer-encoding" in headers:
+            response = JSONResponse(
+                status_code=400,
+                content={"detail": "Ambiguous request framing: both Content-Length and Transfer-Encoding present"}
+            )
+            return await response(scope, receive, send)
+
+        # Track bytes received during streaming
+        received_bytes = 0
+
+        async def guarded_receive():
+            nonlocal received_bytes
+            message = await receive()
+
+            if message["type"] != "http.request":
+                return message
+
+            body = message.get("body", b"") or b""
+            received_bytes += len(body)
+
+            # Check if we've exceeded the maximum body size
+            if received_bytes > self.max_body_size:
+                raise BodyTooLarge()
+
+            # If Content-Length is present, verify body doesn't exceed it
+            if content_length is not None and received_bytes > content_length:
+                raise BodyFramingError()
+
+            return message
+
+        try:
+            return await self.app(scope, guarded_receive, send)
+        except BodyTooLarge:
+            response = JSONResponse(
+                status_code=413,
+                content={
+                    "detail": f"Request body too large. Maximum size is {self.max_body_size // (1024 * 1024)}MB."
+                }
+            )
+            return await response(scope, receive, send)
+        except BodyFramingError:
+            response = JSONResponse(
+                status_code=400,
+                content={"detail": "Request body exceeds declared Content-Length"}
+            )
+            return await response(scope, receive, send)
 
 
 from backend.services.migration import run_migration_if_needed
