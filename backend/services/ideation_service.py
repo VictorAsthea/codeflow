@@ -6,7 +6,7 @@ Uses Claude CLI to analyze the project and generate improvement suggestions.
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -226,7 +226,7 @@ class IdeationService:
                     priority=SuggestionPriority(item.get("priority", "medium")),
                     file_path=item.get("file_path"),
                     line_number=item.get("line_number"),
-                    created_at=datetime.now()
+                    created_at=datetime.now(timezone.utc)
                 )
                 suggestions.append(suggestion)
             except Exception as e:
@@ -236,7 +236,7 @@ class IdeationService:
         # Update state
         state = self._load_state()
         state.suggestions.extend(suggestions)
-        state.last_analysis_at = datetime.now()
+        state.last_analysis_at = datetime.now(timezone.utc)
         self._save_state()
 
         logger.info(f"Analysis complete: {len(suggestions)} suggestions generated")
@@ -294,7 +294,7 @@ class IdeationService:
                     priority=SuggestionPriority(item.get("priority", "medium")),
                     file_path=item.get("file_path"),
                     line_number=item.get("line_number"),
-                    created_at=datetime.now()
+                    created_at=datetime.now(timezone.utc)
                 )
                 suggestions.append(suggestion)
             except Exception as e:
@@ -329,7 +329,7 @@ class IdeationService:
         user_msg = IdeationChatMessage(
             role="user",
             content=message,
-            timestamp=datetime.now()
+            timestamp=datetime.now(timezone.utc)
         )
         state.chat_history.append(user_msg)
 
@@ -383,7 +383,7 @@ Be conversational and helpful. If you need to look at specific files, you can us
         assistant_msg = IdeationChatMessage(
             role="assistant",
             content=response,
-            timestamp=datetime.now()
+            timestamp=datetime.now(timezone.utc)
         )
         state.chat_history.append(assistant_msg)
         self._save_state()

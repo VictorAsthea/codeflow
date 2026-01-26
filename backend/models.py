@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
@@ -106,8 +106,8 @@ class Task(BaseModel):
     review_output: str | None = None
     archived: bool = False
     archived_at: datetime | None = None
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     # v0.4 - Subtask workflow
     subtasks: list[Subtask] = Field(default_factory=list)
     current_phase: str | None = None  # "planning", "coding", "validation"
@@ -218,8 +218,8 @@ class Feature(BaseModel):
     impact: Impact
     status: FeatureStatus = FeatureStatus.UNDER_REVIEW
     task_id: str | None = None
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ProjectAnalysis(BaseModel):
@@ -308,7 +308,7 @@ class Suggestion(BaseModel):
     priority: SuggestionPriority
     file_path: str | None = None  # Related file
     line_number: int | None = None  # Related line
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     dismissed: bool = False
     task_id: str | None = None  # If converted to task
 
@@ -316,7 +316,7 @@ class Suggestion(BaseModel):
 class IdeationChatMessage(BaseModel):
     role: str  # "user" or "assistant"
     content: str
-    timestamp: datetime = Field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class IdeationState(BaseModel):
