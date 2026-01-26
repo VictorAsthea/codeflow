@@ -8,10 +8,16 @@ including conversation history, token usage, and session metadata.
 import json
 import logging
 import os
+import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from contextlib import contextmanager
+
+# Import fcntl only on Unix-like systems
+if sys.platform != 'win32':
+    import fcntl
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +48,44 @@ class MemoryService:
 
         self._ensure_directories()
 
+    @contextmanager
+    def _file_lock(self, file_path: Path):
+        """
+        Context manager for file locking on Windows and Unix.
+
+        On Windows, uses exclusive file access.
+        On Unix-like systems, uses fcntl locking.
+        """
+        if os.name == 'nt':  # Windows
+            # On Windows, we'll use a lock file approach
+            lock_file = file_path.with_suffix(file_path.suffix + '.lock')
+            lock_fd = None
+            try:
+                lock_fd = open(lock_file, 'w')
+                yield lock_fd
+            finally:
+                if lock_fd:
+                    lock_fd.close()
+                    try:
+                        lock_file.unlink()
+                    except FileNotFoundError:
+                        pass
+        else:  # Unix-like systems
+            lock_file = file_path.with_suffix(file_path.suffix + '.lock')
+            lock_fd = None
+            try:
+                lock_fd = open(lock_file, 'w')
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+                yield lock_fd
+            finally:
+                if lock_fd:
+                    fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+                    lock_fd.close()
+                    try:
+                        lock_file.unlink()
+                    except FileNotFoundError:
+                        pass
+
     def _ensure_directories(self):
         """Create necessary directories if they don't exist."""
         self.memory_dir.mkdir(parents=True, exist_ok=True)
@@ -52,6 +96,73 @@ class MemoryService:
         Atomically write data to a JSON file.
 
         Writes to a temporary file first, then renames to ensure atomicity.
+        """
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with self._file_lock(file_path):
+            fd, temp_path = tempfile.mkstemp(
+                dir=file_path.parent,
+                prefix=f".{file_path.name}.",
+                suffix=".tmp"
+            )
+
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+
+                temp_path_obj = Path(temp_path)
+                temp_path_obj.replace(file_path)
+            except Exception:
+                try:
+                    Path(temp_path).unlink()
+                except FileNotFoundError:
+                    pass
+                raise
+
+    def _read_json(self, file_path: Path) -> dict:
+        """Read and parse a JSON file."""
+        if not file_path.exists():
+            return {}
+
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to read {file_path}: {e}")
+            return {}
+
+    def _read_json_with_lock(self, file_path: Path) -> dict:
+        """Read and parse a JSON file with locking."""
+        if not file_path.exists():
+            return {}
+
+        try:
+            with self._file_lock(file_path):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to read {file_path}: {e}")
+            return {}
+
+    def _load_sessions_index(self) -> list[dict]:
+        """Load the sessions index from sessions.json."""
+        data = self._read_json(self.sessions_file)
+        return data.get("sessions", [])
+
+    def _save_sessions_index(self, sessions: list[dict]):
+        """Save the sessions index to sessions.json."""
+        data = {
+            "sessions": sessions,
+            "version": "1.0",
+            "last_updated": datetime.now().isoformat()
+        }
+        self._atomic_write_no_lock(self.sessions_file, data)
+
+    def _atomic_write_no_lock(self, file_path: Path, data: dict):
+        """
+        Atomically write data to a JSON file without acquiring lock.
+
+        Used when already within a lock context.
         """
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -73,32 +184,6 @@ class MemoryService:
             except FileNotFoundError:
                 pass
             raise
-
-    def _read_json(self, file_path: Path) -> dict:
-        """Read and parse a JSON file."""
-        if not file_path.exists():
-            return {}
-
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
-            logger.warning(f"Failed to read {file_path}: {e}")
-            return {}
-
-    def _load_sessions_index(self) -> list[dict]:
-        """Load the sessions index from sessions.json."""
-        data = self._read_json(self.sessions_file)
-        return data.get("sessions", [])
-
-    def _save_sessions_index(self, sessions: list[dict]):
-        """Save the sessions index to sessions.json."""
-        data = {
-            "sessions": sessions,
-            "version": "1.0",
-            "last_updated": datetime.now().isoformat()
-        }
-        self._atomic_write(self.sessions_file, data)
 
     def list_sessions(self, task_id: str | None = None) -> list[dict]:
         """
@@ -183,10 +268,11 @@ class MemoryService:
             "claude_session_id": data.get("claude_session_id")
         }
 
-        # Save session metadata to index
-        sessions = self._load_sessions_index()
-        sessions.append(session_meta)
-        self._save_sessions_index(sessions)
+        # Save session metadata to index atomically
+        with self._file_lock(self.sessions_file):
+            sessions = self._load_sessions_index()
+            sessions.append(session_meta)
+            self._save_sessions_index(sessions)
 
         # Save conversation details separately
         conversation_data = {
@@ -213,15 +299,17 @@ class MemoryService:
         Returns:
             True if deleted, False if not found
         """
-        sessions = self._load_sessions_index()
-        original_count = len(sessions)
+        # Delete session from index atomically
+        with self._file_lock(self.sessions_file):
+            sessions = self._load_sessions_index()
+            original_count = len(sessions)
 
-        sessions = [s for s in sessions if s.get("id") != session_id]
+            sessions = [s for s in sessions if s.get("id") != session_id]
 
-        if len(sessions) == original_count:
-            return False
+            if len(sessions) == original_count:
+                return False
 
-        self._save_sessions_index(sessions)
+            self._save_sessions_index(sessions)
 
         # Delete conversation file
         conversation_file = self.conversations_dir / f"{session_id}.json"

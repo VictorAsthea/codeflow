@@ -9,10 +9,13 @@ Provides endpoints for:
 - Resuming sessions with --resume
 """
 
+import logging
 from fastapi import APIRouter, HTTPException
 from typing import Optional
 
 from backend.models import Session, SessionDetail, SessionCreate, ResumeInfo
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/memory", tags=["memory"])
 
@@ -29,8 +32,8 @@ def get_memory_service():
         if project_path:
             from pathlib import Path
             return get_service(base_path=Path(project_path))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Unable to determine active project, using current directory: {e}")
 
     return get_service()
 
