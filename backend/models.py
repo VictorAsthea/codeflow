@@ -276,3 +276,62 @@ class RoadmapUpdate(BaseModel):
     project_description: str | None = None
     target_audience: str | None = None
     personas: list[str] | None = None
+
+
+# ============== Ideation Models ==============
+
+class SuggestionCategory(str, Enum):
+    SECURITY = "security"
+    PERFORMANCE = "performance"
+    QUALITY = "quality"
+    FEATURE = "feature"
+
+
+class SuggestionStatus(str, Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DISMISSED = "dismissed"
+
+
+class Suggestion(BaseModel):
+    id: str
+    title: str
+    description: str
+    category: SuggestionCategory
+    priority: str = "medium"  # low, medium, high
+    status: SuggestionStatus = SuggestionStatus.PENDING
+    task_id: str | None = None  # If converted to task
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
+class IdeationAnalysis(BaseModel):
+    project_path: str
+    project_name: str
+    stack: list[str] = Field(default_factory=list)
+    frameworks: list[str] = Field(default_factory=list)
+    files_count: int = 0
+    lines_count: int = 0
+    key_directories: list[str] = Field(default_factory=list)
+    patterns_detected: list[str] = Field(default_factory=list)
+    analyzed_at: datetime = Field(default_factory=datetime.now)
+
+
+class IdeationData(BaseModel):
+    analysis: IdeationAnalysis | None = None
+    suggestions: list[Suggestion] = Field(default_factory=list)
+
+
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+
+class ChatRequest(BaseModel):
+    message: str
+    context: list[ChatMessage] = Field(default_factory=list)
+
+
+class ChatResponse(BaseModel):
+    response: str
+    suggestions: list[str] = Field(default_factory=list)
