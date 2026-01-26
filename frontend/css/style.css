@@ -4463,3 +4463,130 @@ body {
 .auth-actions {
   margin-top: 1rem;
 }
+
+/* ============================================
+   BRANCHES TAB STYLES
+   ============================================ */
+
+.branches-summary {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.branches-stat {
+  flex: 1;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.branches-stat.current {
+  border-color: var(--accent-blue);
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.branches-stat .stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.branches-stat .stat-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.branches-actions {
+  margin-bottom: 1.5rem;
+}
+
+.branches-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.branch-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.branch-item.current {
+  border-color: var(--accent-blue);
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.branch-item.protected {
+  border-color: var(--accent-yellow);
+}
+
+.branch-item.merged {
+  border-color: var(--accent-green);
+  background: rgba(63, 185, 80, 0.05);
+}
+
+.branch-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.branch-name {
+  font-family: monospace;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.branch-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.branch-badge.current {
+  background: var(--accent-blue);
+  color: white;
+}
+
+.branch-badge.protected {
+  background: var(--accent-yellow);
+  color: black;
+}
+
+.branch-badge.merged {
+  background: var(--accent-green);
+  color: white;
+}
+
+.branch-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.branch-date {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.btn-danger {
+  background: var(--accent-red);
+  border-color: var(--accent-red);
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #d73a49;
+}

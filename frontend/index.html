@@ -892,6 +892,7 @@
                     <div class="settings-tabs">
                         <button class="settings-tab active" data-tab="general">Général</button>
                         <button class="settings-tab" data-tab="auth">Authentification</button>
+                        <button class="settings-tab" data-tab="branches">Branches</button>
                         <button class="settings-tab" data-tab="github">GitHub</button>
                     </div>
 
@@ -933,6 +934,16 @@
                             <p class="settings-section-hint">Comment Codeflow accede a Claude</p>
 
                             <div id="settings-auth-content" class="settings-auth-content">
+                                <div class="loading">Chargement...</div>
+                            </div>
+                        </div>
+
+                        <!-- Branches Tab -->
+                        <div id="settings-tab-branches" class="settings-panel hidden">
+                            <h3 class="settings-section-title">Gestion des branches</h3>
+                            <p class="settings-section-hint">Nettoyer les branches mergees du projet actif</p>
+
+                            <div id="settings-branches-content" class="settings-branches-content">
                                 <div class="loading">Chargement...</div>
                             </div>
                         </div>
