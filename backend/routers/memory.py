@@ -1,163 +1,214 @@
 """
-Router for Claude Code memory/session history.
-Provides endpoints to view and manage past Claude Code sessions.
+Memory router for session history management.
+
+Provides endpoints for:
+- Listing all sessions or sessions by task
+- Getting session details with conversation
+- Saving sessions after Claude Code execution
+- Deleting sessions
+- Resuming sessions with --resume
 """
 
-import asyncio
-from fastapi import APIRouter, HTTPException, Query
+import logging
+from fastapi import APIRouter, HTTPException
 from typing import Optional
 
-from backend.config import settings
-from backend.models import ClaudeSession, SessionDetail
-from backend.services.memory_service import get_memory_service
-from backend.services.claude_runner import find_claude_cli
+from backend.models import Session, SessionDetail, SessionCreate, ResumeInfo
 
-router = APIRouter()
+logger = logging.getLogger(__name__)
 
-
-@router.get("/memory/sessions", response_model=list[ClaudeSession])
-async def get_sessions(
-    project_path: Optional[str] = Query(None, description="Project path to filter sessions"),
-    include_worktrees: bool = Query(True, description="Include sessions from worktrees"),
-    limit: int = Query(50, ge=1, le=200, description="Maximum number of sessions to return")
-):
-    """
-    Get Claude Code sessions for the current project.
-
-    Returns sessions sorted by modification date (newest first).
-    If no project_path is provided, uses the current active project.
-    """
-    memory_service = get_memory_service()
-
-    # Use provided path or fall back to settings
-    path = project_path or settings.project_path
-
-    sessions = memory_service.get_sessions(
-        project_path=path,
-        include_worktrees=include_worktrees,
-        limit=limit
-    )
-
-    return sessions
+router = APIRouter(prefix="/memory", tags=["memory"])
 
 
-@router.get("/memory/sessions/{session_id}", response_model=SessionDetail)
-async def get_session_detail(
-    session_id: str,
-    project_path: Optional[str] = Query(None, description="Project path")
-):
-    """
-    Get detailed information about a specific session including messages.
-
-    Returns the full conversation history for the session.
-    """
-    memory_service = get_memory_service()
-    path = project_path or settings.project_path
-
-    session = memory_service.get_session_detail(session_id, path)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    return session
-
-
-@router.delete("/memory/sessions/{session_id}")
-async def delete_session(
-    session_id: str,
-    project_path: Optional[str] = Query(None, description="Project path")
-):
-    """
-    Delete a session from Claude Code history.
-
-    This removes the session file and updates the sessions index.
-    """
-    memory_service = get_memory_service()
-    path = project_path or settings.project_path
-
-    success = memory_service.delete_session(session_id, path)
-    if not success:
-        raise HTTPException(status_code=404, detail="Session not found or could not be deleted")
-
-    return {"message": "Session deleted", "session_id": session_id}
-
-
-@router.post("/memory/sessions/{session_id}/resume")
-async def resume_session(
-    session_id: str,
-    project_path: Optional[str] = Query(None, description="Project path")
-):
-    """
-    Resume a Claude Code session.
-
-    Launches 'claude --resume {session_id}' in a new terminal.
-    This opens an interactive Claude session that the user can continue.
-    """
-    memory_service = get_memory_service()
-    path = project_path or settings.project_path
-
-    # Verify session exists
-    session = memory_service.get_session_detail(session_id, path)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    if not session.is_resumable:
-        raise HTTPException(status_code=400, detail="Session is not resumable")
-
-    # Find claude CLI
-    claude_cmd = find_claude_cli()
-
-    # Get the working directory (use worktree path if available, otherwise project path)
-    working_dir = session.worktree_path or path
-
-    # Launch claude --resume in a new terminal window
-    # On Windows, use 'start' to open a new cmd window
-    # On Unix, we could use xterm or gnome-terminal
-    import platform
-    import subprocess
+def get_memory_service():
+    """Get memory service with active project path."""
+    from backend.services.memory_service import get_memory_service as get_service
+    from backend.services.workspace_service import get_workspace_service
 
     try:
-        if platform.system() == "Windows":
-            # Start a new cmd window with claude --resume
-            subprocess.Popen(
-                f'start cmd /k "{claude_cmd}" --resume {session_id}',
-                shell=True,
-                cwd=working_dir
-            )
-        else:
-            # On Linux/Mac, try to detect available terminal
-            # Default to running in background if no terminal found
-            terminals = [
-                ["gnome-terminal", "--", claude_cmd, "--resume", session_id],
-                ["xterm", "-e", claude_cmd, "--resume", session_id],
-                ["konsole", "-e", claude_cmd, "--resume", session_id],
-            ]
-
-            launched = False
-            for term_cmd in terminals:
-                try:
-                    subprocess.Popen(term_cmd, cwd=working_dir)
-                    launched = True
-                    break
-                except FileNotFoundError:
-                    continue
-
-            if not launched:
-                # Fallback: run in background (not ideal but works)
-                subprocess.Popen(
-                    [claude_cmd, "--resume", session_id],
-                    cwd=working_dir,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-
+        ws = get_workspace_service()
+        state = ws.get_workspace_state()
+        project_path = state.get("active_project")
+        if project_path:
+            from pathlib import Path
+            return get_service(base_path=Path(project_path))
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to launch Claude session: {str(e)}"
-        )
+        logger.warning(f"Unable to determine active project, using current directory: {e}")
 
-    return {
-        "message": "Session resumed",
-        "session_id": session_id,
-        "working_dir": working_dir
-    }
+    return get_service()
+
+
+@router.get("/sessions", response_model=list[Session])
+async def list_sessions(task_id: Optional[str] = None):
+    """
+    List all sessions, optionally filtered by task ID.
+
+    Args:
+        task_id: Optional task ID to filter sessions
+
+    Returns:
+        List of session metadata
+    """
+    try:
+        service = get_memory_service()
+        sessions = service.list_sessions(task_id=task_id)
+
+        return [Session(**s) for s in sessions]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/sessions/{task_id}", response_model=list[Session])
+async def list_sessions_by_task(task_id: str):
+    """
+    List all sessions for a specific task.
+
+    Args:
+        task_id: The task ID to get sessions for
+
+    Returns:
+        List of session metadata for the task
+    """
+    try:
+        service = get_memory_service()
+        sessions = service.list_sessions(task_id=task_id)
+
+        return [Session(**s) for s in sessions]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/session/{session_id}", response_model=SessionDetail)
+async def get_session(session_id: str):
+    """
+    Get session details including conversation history.
+
+    Args:
+        session_id: The session ID
+
+    Returns:
+        Session details with conversation
+    """
+    try:
+        service = get_memory_service()
+        session = service.get_session(session_id)
+
+        if not session:
+            raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+        return SessionDetail(**session)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sessions/{task_id}", response_model=Session)
+async def save_session(task_id: str, data: SessionCreate):
+    """
+    Save a new session after Claude Code execution.
+
+    Args:
+        task_id: The task ID this session belongs to
+        data: Session data including messages, tokens, etc.
+
+    Returns:
+        The saved session metadata
+    """
+    try:
+        service = get_memory_service()
+
+        session_data = {
+            "task_title": data.task_title,
+            "worktree": data.worktree,
+            "started_at": data.started_at.isoformat() if data.started_at else None,
+            "ended_at": data.ended_at.isoformat() if data.ended_at else None,
+            "status": data.status.value,
+            "messages_count": data.messages_count,
+            "tokens_used": data.tokens_used,
+            "claude_session_id": data.claude_session_id,
+            "messages": data.messages,
+            "raw_output": data.raw_output,
+            "error": data.error
+        }
+
+        result = service.save_session(task_id, session_data)
+
+        return Session(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/session/{session_id}")
+async def delete_session(session_id: str):
+    """
+    Delete a session and its conversation data.
+
+    Args:
+        session_id: The session ID to delete
+
+    Returns:
+        Success message
+    """
+    try:
+        service = get_memory_service()
+        deleted = service.delete_session(session_id)
+
+        if not deleted:
+            raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+        return {"message": f"Session {session_id} deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/session/{session_id}/resume", response_model=ResumeInfo)
+async def get_resume_info(session_id: str):
+    """
+    Get information needed to resume a session with --resume.
+
+    Args:
+        session_id: The session ID to resume
+
+    Returns:
+        Resume info including claude_session_id for --resume flag
+    """
+    try:
+        service = get_memory_service()
+        resume_info = service.get_resume_info(session_id)
+
+        if not resume_info:
+            raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+        return ResumeInfo(**resume_info)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/import")
+async def import_claude_sessions(project_path: Optional[str] = None):
+    """
+    Import sessions from ~/.claude/projects/ if available.
+
+    This reads Claude's native session storage and imports relevant sessions.
+
+    Args:
+        project_path: Optional project path to filter sessions
+
+    Returns:
+        List of imported sessions
+    """
+    try:
+        service = get_memory_service()
+        imported = service.import_from_claude_projects(project_path)
+
+        return {
+            "message": f"Imported {len(imported)} sessions",
+            "sessions": [Session(**s) for s in imported]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

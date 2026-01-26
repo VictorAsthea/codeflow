@@ -1,396 +1,454 @@
 """
-Service for reading Claude Code session history.
-Parses session data from ~/.claude/projects/{project}/sessions-index.json
-and individual session .jsonl files.
+Memory service for storing and retrieving Claude Code session history.
+
+This module provides functionality to track and manage agent sessions,
+including conversation history, token usage, and session metadata.
 """
 
 import json
 import logging
 import os
-import re
+import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from contextlib import contextmanager
 
-from backend.models import ClaudeSession, SessionDetail, SessionMessage
+# Import fcntl only on Unix-like systems
+if sys.platform != 'win32':
+    import fcntl
 
 logger = logging.getLogger(__name__)
 
 
-def _normalize_project_path(path: str) -> str:
-    """
-    Convert a project path to Claude's folder naming convention.
-    Example: C:\\Users\\victo\\Documents\\DEV\\Codeflow -> C--Users-victo-Documents-DEV-Codeflow
-
-    Claude's convention:
-    - Drive letter followed by double dash (C:\\ -> C--)
-    - Path separators become single dash
-    - .worktrees becomes -worktrees-
-    """
-    # Normalize path separators to forward slash first
-    normalized = path.replace("\\", "/")
-
-    # Handle Windows drive letter (C:/ -> C--)
-    if len(normalized) >= 2 and normalized[1] == ":":
-        drive = normalized[0]
-        rest = normalized[2:].lstrip("/")
-        normalized = f"{drive}--{rest}"
-
-    # Replace remaining path separators with dashes
-    normalized = normalized.replace("/", "-")
-
-    # Handle dots in path (like .worktrees)
-    normalized = normalized.replace(".", "")
-
-    return normalized
-
-
-def _get_claude_projects_dir() -> Path:
-    """Get the Claude projects directory path."""
-    home = Path.home()
-    return home / ".claude" / "projects"
-
-
-def _extract_task_id_from_path(path: str) -> Optional[str]:
-    """
-    Extract task ID from a worktree path.
-    Example: .worktrees/042-auth-feature -> 042
-    """
-    match = re.search(r"[/\\]\.?worktrees?[/\\](\d{3})-", path)
-    if match:
-        return match.group(1)
-    return None
-
-
-def _parse_iso_datetime(dt_string: str) -> datetime:
-    """Parse ISO datetime string, handling various formats."""
-    try:
-        # Handle ISO format with Z suffix
-        if dt_string.endswith("Z"):
-            dt_string = dt_string[:-1] + "+00:00"
-        return datetime.fromisoformat(dt_string)
-    except ValueError:
-        return datetime.now()
-
-
 class MemoryService:
-    """Service for accessing Claude Code session history."""
+    """
+    Service for managing Claude Code session history.
 
-    def __init__(self):
-        self._projects_dir = _get_claude_projects_dir()
+    Sessions are stored in:
+    - .codeflow/memory/sessions.json (index of all sessions)
+    - .codeflow/memory/conversations/{taskId}-{timestamp}.json (conversation details)
+    """
 
-    def _get_project_sessions_dir(self, project_path: str) -> Optional[Path]:
-        """Get the Claude sessions directory for a specific project."""
-        normalized = _normalize_project_path(project_path)
-        project_dir = self._projects_dir / normalized
-        if project_dir.exists():
-            return project_dir
-        return None
-
-    def _find_matching_projects(self, project_path: str) -> list[Path]:
+    def __init__(self, base_path: Path | None = None):
         """
-        Find all Claude project directories that match the given project path.
-        This includes the main project and all worktrees.
-        """
-        if not self._projects_dir.exists():
-            return []
-
-        # Normalize the base project path (without worktree suffix)
-        base_path = project_path
-        if ".worktrees" in project_path:
-            base_path = project_path.split(".worktrees")[0].rstrip("/\\")
-
-        normalized_base = _normalize_project_path(base_path)
-        matching_dirs = []
-
-        for entry in self._projects_dir.iterdir():
-            if entry.is_dir():
-                entry_name = entry.name
-                # Match exact project or worktrees of the project
-                if entry_name == normalized_base or entry_name.startswith(normalized_base + "-"):
-                    matching_dirs.append(entry)
-
-        return matching_dirs
-
-    def get_sessions(
-        self,
-        project_path: str,
-        include_worktrees: bool = True,
-        limit: int = 50
-    ) -> list[ClaudeSession]:
-        """
-        Get all Claude Code sessions for a project.
+        Initialize the memory service.
 
         Args:
-            project_path: Path to the project
-            include_worktrees: If True, include sessions from project worktrees
-            limit: Maximum number of sessions to return
-
-        Returns:
-            List of ClaudeSession objects, sorted by modification date (newest first)
+            base_path: Base directory for .codeflow storage. Defaults to current working directory.
         """
-        sessions: list[ClaudeSession] = []
+        if base_path is None:
+            base_path = Path.cwd()
 
-        if include_worktrees:
-            project_dirs = self._find_matching_projects(project_path)
-        else:
-            project_dir = self._get_project_sessions_dir(project_path)
-            project_dirs = [project_dir] if project_dir else []
+        self.base_path = Path(base_path)
+        self.memory_dir = self.base_path / ".codeflow" / "memory"
+        self.sessions_file = self.memory_dir / "sessions.json"
+        self.conversations_dir = self.memory_dir / "conversations"
 
-        for project_dir in project_dirs:
-            sessions.extend(self._load_sessions_from_index(project_dir))
+        self._ensure_directories()
 
-        # Sort by modification date, newest first
-        sessions.sort(key=lambda s: s.modified_at, reverse=True)
+    @contextmanager
+    def _file_lock(self, file_path: Path):
+        """
+        Context manager for file locking on Windows and Unix.
 
-        return sessions[:limit]
+        On Windows, uses exclusive file access.
+        On Unix-like systems, uses fcntl locking.
+        """
+        if os.name == 'nt':  # Windows
+            # On Windows, we'll use a lock file approach
+            lock_file = file_path.with_suffix(file_path.suffix + '.lock')
+            lock_fd = None
+            try:
+                lock_fd = open(lock_file, 'w')
+                yield lock_fd
+            finally:
+                if lock_fd:
+                    lock_fd.close()
+                    try:
+                        lock_file.unlink()
+                    except FileNotFoundError:
+                        pass
+        else:  # Unix-like systems
+            lock_file = file_path.with_suffix(file_path.suffix + '.lock')
+            lock_fd = None
+            try:
+                lock_fd = open(lock_file, 'w')
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+                yield lock_fd
+            finally:
+                if lock_fd:
+                    fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+                    lock_fd.close()
+                    try:
+                        lock_file.unlink()
+                    except FileNotFoundError:
+                        pass
 
-    def _load_sessions_from_index(self, project_dir: Path) -> list[ClaudeSession]:
-        """Load sessions from a project's sessions-index.json file."""
-        index_file = project_dir / "sessions-index.json"
-        if not index_file.exists():
-            logger.debug(f"No sessions-index.json found in {project_dir}")
-            return []
+    def _ensure_directories(self):
+        """Create necessary directories if they don't exist."""
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
+        self.conversations_dir.mkdir(exist_ok=True)
+
+    def _atomic_write(self, file_path: Path, data: dict):
+        """
+        Atomically write data to a JSON file.
+
+        Writes to a temporary file first, then renames to ensure atomicity.
+        """
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with self._file_lock(file_path):
+            fd, temp_path = tempfile.mkstemp(
+                dir=file_path.parent,
+                prefix=f".{file_path.name}.",
+                suffix=".tmp"
+            )
+
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+
+                temp_path_obj = Path(temp_path)
+                temp_path_obj.replace(file_path)
+            except Exception:
+                try:
+                    Path(temp_path).unlink()
+                except FileNotFoundError:
+                    pass
+                raise
+
+    def _read_json(self, file_path: Path) -> dict:
+        """Read and parse a JSON file."""
+        if not file_path.exists():
+            return {}
 
         try:
-            with open(index_file, "r", encoding="utf-8") as f:
-                index_data = json.load(f)
-        except (json.JSONDecodeError, OSError) as e:
-            logger.error(f"Failed to read sessions index: {e}")
-            return []
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to read {file_path}: {e}")
+            return {}
 
-        sessions = []
-        for entry in index_data.get("entries", []):
+    def _read_json_with_lock(self, file_path: Path) -> dict:
+        """Read and parse a JSON file with locking."""
+        if not file_path.exists():
+            return {}
+
+        try:
+            with self._file_lock(file_path):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to read {file_path}: {e}")
+            return {}
+
+    def _load_sessions_index(self) -> list[dict]:
+        """Load the sessions index from sessions.json."""
+        data = self._read_json(self.sessions_file)
+        return data.get("sessions", [])
+
+    def _save_sessions_index(self, sessions: list[dict]):
+        """Save the sessions index to sessions.json."""
+        data = {
+            "sessions": sessions,
+            "version": "1.0",
+            "last_updated": datetime.now().isoformat()
+        }
+        self._atomic_write_no_lock(self.sessions_file, data)
+
+    def _atomic_write_no_lock(self, file_path: Path, data: dict):
+        """
+        Atomically write data to a JSON file without acquiring lock.
+
+        Used when already within a lock context.
+        """
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        fd, temp_path = tempfile.mkstemp(
+            dir=file_path.parent,
+            prefix=f".{file_path.name}.",
+            suffix=".tmp"
+        )
+
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False, default=str)
+
+            temp_path_obj = Path(temp_path)
+            temp_path_obj.replace(file_path)
+        except Exception:
             try:
-                session = self._parse_session_entry(entry)
-                if session:
-                    sessions.append(session)
-            except Exception as e:
-                logger.warning(f"Failed to parse session entry: {e}")
+                Path(temp_path).unlink()
+            except FileNotFoundError:
+                pass
+            raise
+
+    def list_sessions(self, task_id: str | None = None) -> list[dict]:
+        """
+        List all sessions, optionally filtered by task ID.
+
+        Args:
+            task_id: Optional task ID to filter sessions
+
+        Returns:
+            List of session metadata dictionaries
+        """
+        sessions = self._load_sessions_index()
+
+        if task_id:
+            sessions = [s for s in sessions if s.get("task_id") == task_id]
+
+        # Sort by started_at descending (most recent first)
+        sessions.sort(key=lambda s: s.get("started_at", ""), reverse=True)
 
         return sessions
 
-    def _parse_session_entry(self, entry: dict) -> Optional[ClaudeSession]:
-        """Parse a session entry from sessions-index.json."""
-        session_id = entry.get("sessionId")
-        if not session_id:
-            return None
-
-        project_path = entry.get("projectPath", "")
-        worktree_path = None
-        task_id = None
-
-        # Check if this is a worktree session
-        if ".worktrees" in project_path or "-worktrees-" in project_path:
-            worktree_path = project_path
-            task_id = _extract_task_id_from_path(project_path)
-
-        return ClaudeSession(
-            session_id=session_id,
-            project_path=project_path,
-            first_prompt=entry.get("firstPrompt", "")[:200],  # Truncate long prompts
-            summary=entry.get("summary"),
-            message_count=entry.get("messageCount", 0),
-            token_count=0,  # Will be calculated when loading detail
-            git_branch=entry.get("gitBranch"),
-            worktree_path=worktree_path,
-            task_id=task_id,
-            created_at=_parse_iso_datetime(entry.get("created", "")),
-            modified_at=_parse_iso_datetime(entry.get("modified", "")),
-            is_resumable=not entry.get("isSidechain", False)
-        )
-
-    def get_session_detail(self, session_id: str, project_path: str) -> Optional[SessionDetail]:
+    def get_session(self, session_id: str) -> dict | None:
         """
-        Get detailed session info including messages.
+        Get session details including conversation history.
 
         Args:
-            session_id: The session UUID
-            project_path: Path to the project
+            session_id: The session ID
 
         Returns:
-            SessionDetail with full conversation or None if not found
+            Session data with conversation, or None if not found
         """
-        # Find the session in the index first
-        sessions = self.get_sessions(project_path, include_worktrees=True, limit=1000)
-        session = next((s for s in sessions if s.session_id == session_id), None)
+        sessions = self._load_sessions_index()
 
+        session = next((s for s in sessions if s.get("id") == session_id), None)
         if not session:
-            logger.warning(f"Session {session_id} not found in project {project_path}")
             return None
 
-        # Find the session file
-        project_dirs = self._find_matching_projects(project_path)
-        session_file = None
+        # Load conversation details
+        conversation_file = self.conversations_dir / f"{session_id}.json"
+        conversation_data = self._read_json(conversation_file)
 
-        for project_dir in project_dirs:
-            potential_file = project_dir / f"{session_id}.jsonl"
-            if potential_file.exists():
-                session_file = potential_file
-                break
+        return {
+            **session,
+            "conversation": conversation_data.get("messages", []),
+            "raw_output": conversation_data.get("raw_output"),
+            "error": conversation_data.get("error")
+        }
 
-        if not session_file:
-            logger.warning(f"Session file not found for {session_id}")
-            return None
-
-        # Parse messages from the jsonl file
-        messages, total_tokens = self._parse_session_messages(session_file)
-
-        return SessionDetail(
-            session_id=session.session_id,
-            project_path=session.project_path,
-            first_prompt=session.first_prompt,
-            summary=session.summary,
-            message_count=len(messages),
-            token_count=total_tokens,
-            git_branch=session.git_branch,
-            worktree_path=session.worktree_path,
-            task_id=session.task_id,
-            created_at=session.created_at,
-            modified_at=session.modified_at,
-            is_resumable=session.is_resumable,
-            messages=messages
-        )
-
-    def _parse_session_messages(self, session_file: Path) -> tuple[list[SessionMessage], int]:
+    def save_session(self, task_id: str, data: dict) -> dict:
         """
-        Parse messages from a session jsonl file.
-
-        Returns:
-            Tuple of (messages list, total token count)
-        """
-        messages: list[SessionMessage] = []
-        total_tokens = 0
-
-        try:
-            with open(session_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    if not line.strip():
-                        continue
-
-                    try:
-                        entry = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-
-                    entry_type = entry.get("type")
-                    if entry_type not in ("user", "assistant"):
-                        continue
-
-                    message_data = entry.get("message", {})
-                    role = message_data.get("role", entry_type)
-
-                    # Extract content
-                    content = ""
-                    raw_content = message_data.get("content", "")
-                    if isinstance(raw_content, str):
-                        content = raw_content
-                    elif isinstance(raw_content, list):
-                        # Handle content array (tool uses, text blocks)
-                        text_parts = []
-                        for item in raw_content:
-                            if isinstance(item, dict):
-                                if item.get("type") == "text":
-                                    text_parts.append(item.get("text", ""))
-                                elif item.get("type") == "tool_use":
-                                    text_parts.append(f"[Tool: {item.get('name', 'unknown')}]")
-                                elif item.get("type") == "tool_result":
-                                    text_parts.append("[Tool result]")
-                        content = "\n".join(text_parts)
-
-                    # Skip empty messages
-                    if not content.strip():
-                        continue
-
-                    # Extract token count from usage
-                    usage = message_data.get("usage", {})
-                    tokens = (
-                        usage.get("input_tokens", 0) +
-                        usage.get("output_tokens", 0) +
-                        usage.get("cache_creation_input_tokens", 0) +
-                        usage.get("cache_read_input_tokens", 0)
-                    )
-                    total_tokens += tokens
-
-                    timestamp = _parse_iso_datetime(entry.get("timestamp", ""))
-
-                    messages.append(SessionMessage(
-                        role=role,
-                        content=content[:10000],  # Truncate very long content
-                        timestamp=timestamp,
-                        token_count=tokens
-                    ))
-
-        except OSError as e:
-            logger.error(f"Failed to read session file: {e}")
-
-        return messages, total_tokens
-
-    def delete_session(self, session_id: str, project_path: str) -> bool:
-        """
-        Delete a session from Claude Code history.
+        Save a new session after Claude Code execution.
 
         Args:
-            session_id: The session UUID to delete
-            project_path: Path to the project
+            task_id: The task ID this session belongs to
+            data: Session data including:
+                - task_title: Title of the task
+                - worktree: Worktree/branch name
+                - status: Session status (completed, interrupted, failed)
+                - messages_count: Number of messages in conversation
+                - tokens_used: Total tokens used
+                - messages: List of conversation messages (optional)
+                - raw_output: Raw Claude output (optional)
+                - error: Error message if failed (optional)
+                - claude_session_id: Original Claude session ID for --resume (optional)
 
         Returns:
-            True if deleted successfully
+            The saved session metadata
         """
-        project_dirs = self._find_matching_projects(project_path)
+        timestamp = int(datetime.now().timestamp())
+        session_id = f"task-{task_id}-{timestamp}"
 
-        deleted = False
-        for project_dir in project_dirs:
-            # Delete the session jsonl file
-            session_file = project_dir / f"{session_id}.jsonl"
-            if session_file.exists():
-                try:
-                    session_file.unlink()
-                    deleted = True
-                    logger.info(f"Deleted session file: {session_file}")
-                except OSError as e:
-                    logger.error(f"Failed to delete session file: {e}")
+        session_meta = {
+            "id": session_id,
+            "task_id": task_id,
+            "task_title": data.get("task_title", ""),
+            "worktree": data.get("worktree", ""),
+            "started_at": data.get("started_at", datetime.now().isoformat()),
+            "ended_at": data.get("ended_at", datetime.now().isoformat()),
+            "status": data.get("status", "completed"),
+            "messages_count": data.get("messages_count", 0),
+            "tokens_used": data.get("tokens_used", 0),
+            "claude_session_id": data.get("claude_session_id")
+        }
 
-            # Delete session folder if exists
-            session_folder = project_dir / session_id
-            if session_folder.exists() and session_folder.is_dir():
-                try:
-                    import shutil
-                    shutil.rmtree(session_folder)
-                    logger.info(f"Deleted session folder: {session_folder}")
-                except OSError as e:
-                    logger.error(f"Failed to delete session folder: {e}")
+        # Save session metadata to index atomically
+        with self._file_lock(self.sessions_file):
+            sessions = self._load_sessions_index()
+            sessions.append(session_meta)
+            self._save_sessions_index(sessions)
 
-            # Update sessions-index.json
-            index_file = project_dir / "sessions-index.json"
-            if index_file.exists():
-                try:
-                    with open(index_file, "r", encoding="utf-8") as f:
-                        index_data = json.load(f)
+        # Save conversation details separately
+        conversation_data = {
+            "session_id": session_id,
+            "task_id": task_id,
+            "messages": data.get("messages", []),
+            "raw_output": data.get("raw_output"),
+            "error": data.get("error"),
+            "saved_at": datetime.now().isoformat()
+        }
+        conversation_file = self.conversations_dir / f"{session_id}.json"
+        self._atomic_write(conversation_file, conversation_data)
 
-                    # Filter out the deleted session
-                    index_data["entries"] = [
-                        e for e in index_data.get("entries", [])
-                        if e.get("sessionId") != session_id
-                    ]
+        logger.info(f"Saved session {session_id} for task {task_id}")
+        return session_meta
 
-                    with open(index_file, "w", encoding="utf-8") as f:
-                        json.dump(index_data, f, indent=2)
+    def delete_session(self, session_id: str) -> bool:
+        """
+        Delete a session and its conversation data.
 
-                    logger.info(f"Updated sessions index: {index_file}")
-                except (json.JSONDecodeError, OSError) as e:
-                    logger.error(f"Failed to update sessions index: {e}")
+        Args:
+            session_id: The session ID to delete
 
-        return deleted
+        Returns:
+            True if deleted, False if not found
+        """
+        # Delete session from index atomically
+        with self._file_lock(self.sessions_file):
+            sessions = self._load_sessions_index()
+            original_count = len(sessions)
+
+            sessions = [s for s in sessions if s.get("id") != session_id]
+
+            if len(sessions) == original_count:
+                return False
+
+            self._save_sessions_index(sessions)
+
+        # Delete conversation file
+        conversation_file = self.conversations_dir / f"{session_id}.json"
+        if conversation_file.exists():
+            conversation_file.unlink()
+            logger.info(f"Deleted conversation file for session {session_id}")
+
+        logger.info(f"Deleted session {session_id}")
+        return True
+
+    def get_resume_info(self, session_id: str) -> dict | None:
+        """
+        Get information needed to resume a session with --resume.
+
+        Args:
+            session_id: The session ID to resume
+
+        Returns:
+            Resume info dict or None if not found
+        """
+        session = self.get_session(session_id)
+        if not session:
+            return None
+
+        return {
+            "session_id": session_id,
+            "task_id": session.get("task_id"),
+            "task_title": session.get("task_title"),
+            "worktree": session.get("worktree"),
+            "claude_session_id": session.get("claude_session_id"),
+            "last_status": session.get("status"),
+            "can_resume": session.get("claude_session_id") is not None
+        }
+
+    def import_from_claude_projects(self, project_path: str | None = None) -> list[dict]:
+        """
+        Import sessions from ~/.claude/projects/ if available.
+
+        This reads Claude's native session storage and imports relevant sessions.
+
+        Args:
+            project_path: Project path to filter sessions (optional)
+
+        Returns:
+            List of imported sessions
+        """
+        claude_projects_dir = Path.home() / ".claude" / "projects"
+
+        if not claude_projects_dir.exists():
+            logger.debug("Claude projects directory not found")
+            return []
+
+        imported = []
+
+        # Claude stores projects by path hash, look for matching projects
+        for project_dir in claude_projects_dir.iterdir():
+            if not project_dir.is_dir():
+                continue
+
+            sessions_file = project_dir / "sessions.json"
+            if not sessions_file.exists():
+                continue
+
+            try:
+                sessions_data = self._read_json(sessions_file)
+
+                for session in sessions_data.get("sessions", []):
+                    # Import if matches project path filter or no filter
+                    if project_path is None or session.get("project_path") == project_path:
+                        imported_session = self._import_claude_session(session)
+                        if imported_session:
+                            imported.append(imported_session)
+            except Exception as e:
+                logger.warning(f"Failed to import from {project_dir}: {e}")
+
+        return imported
+
+    def _import_claude_session(self, claude_session: dict) -> dict | None:
+        """Convert and import a Claude session format to our format."""
+        try:
+            # Extract task ID from prompt or use timestamp
+            task_id = claude_session.get("task_id", f"imported-{int(datetime.now().timestamp())}")
+
+            session_data = {
+                "task_title": claude_session.get("title", "Imported session"),
+                "worktree": claude_session.get("worktree", ""),
+                "started_at": claude_session.get("created_at"),
+                "ended_at": claude_session.get("updated_at"),
+                "status": "imported",
+                "messages_count": claude_session.get("message_count", 0),
+                "tokens_used": claude_session.get("tokens_used", 0),
+                "claude_session_id": claude_session.get("id"),
+                "messages": claude_session.get("messages", [])
+            }
+
+            return self.save_session(task_id, session_data)
+        except Exception as e:
+            logger.warning(f"Failed to import Claude session: {e}")
+            return None
 
 
 # Singleton instance
 _memory_service: Optional[MemoryService] = None
 
 
-def get_memory_service() -> MemoryService:
-    """Get the singleton MemoryService instance."""
+def get_memory_service(base_path: Path | None = None) -> MemoryService:
+    """
+    Get the memory service instance.
+
+    Args:
+        base_path: Optional base path for storage. If None, uses active project.
+
+    Returns:
+        MemoryService instance
+    """
     global _memory_service
+
+    if base_path is not None:
+        # Return a new instance for specific path
+        return MemoryService(base_path=base_path)
+
     if _memory_service is None:
-        _memory_service = MemoryService()
+        # Try to get active project path
+        try:
+            from backend.services.workspace_service import get_workspace_service
+            ws = get_workspace_service()
+            state = ws.get_workspace_state()
+            project_path = state.get("active_project")
+            if project_path:
+                _memory_service = MemoryService(base_path=Path(project_path))
+            else:
+                _memory_service = MemoryService()
+        except Exception:
+            _memory_service = MemoryService()
+
     return _memory_service
+
+
+def reset_memory_service():
+    """Reset the singleton instance (useful for testing or project switching)."""
+    global _memory_service
+    _memory_service = None
