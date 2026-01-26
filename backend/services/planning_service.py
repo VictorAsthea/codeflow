@@ -28,48 +28,53 @@ Description: {task_description}
 
 {screenshots_section}
 
-## Instructions
+## Your Mission
 
-Break this task into 3-7 subtasks. Each subtask should:
-1. Be completable in one coding session (15-30 min)
-2. Have a clear, specific scope
-3. Be independently testable when possible
-4. Follow a logical order (dependencies respected)
+1. FIRST: Read and analyze the task description carefully to understand what needs to be built
+2. THEN: Explore relevant files in the codebase if needed to understand the existing architecture
+3. FINALLY: Break this task into 3-7 concrete subtasks
 
-## Output Format
+Each subtask should:
+- Be completable in one coding session (15-30 min)
+- Have a clear, specific scope with exact files to create/modify
+- Follow a logical order (dependencies respected)
 
-Return ONLY a JSON array with this structure:
+## CRITICAL: Output Format
 
+After your analysis, your FINAL output must be ONLY a valid JSON array. No text before or after.
+
+Example format:
 [
   {{
     "id": "subtask-1",
-    "title": "Short descriptive title",
-    "description": "Detailed description of what to implement",
+    "title": "Create the backend endpoint for X",
+    "description": "Create POST /api/x endpoint in backend/routers/x.py that handles...",
     "order": 1,
     "dependencies": []
   }},
   {{
     "id": "subtask-2",
-    "title": "Another subtask",
-    "description": "Description with specific details",
+    "title": "Add frontend component for X",
+    "description": "Create frontend/js/x.js with the component that calls the API...",
     "order": 2,
     "dependencies": ["subtask-1"]
   }}
 ]
 
 Rules:
-- IDs must be "subtask-1", "subtask-2", etc.
-- Order starts at 1
-- Dependencies reference IDs of subtasks that must complete first
-- Be specific in descriptions, mention file names and functions when relevant
-- Return ONLY the JSON array, nothing else
+- IDs: "subtask-1", "subtask-2", etc.
+- Order: starts at 1
+- Dependencies: array of subtask IDs that must complete first
+- Descriptions: Be specific! Mention exact file paths and function names
+- Output: Return ONLY the JSON array as your final response
 '''
 
 
 async def generate_subtasks(
     task: Task,
     project_path: str,
-    on_output: Callable[[str], None] | None = None
+    on_output: Callable[[str], None] | None = None,
+    max_retries: int = 2
 ) -> list[Subtask]:
     """
     Generate subtasks for a task using Claude Code CLI.
@@ -78,6 +83,7 @@ async def generate_subtasks(
         task: The task to break down
         project_path: Project path
         on_output: Callback for streaming
+        max_retries: Number of retries on failure
 
     Returns:
         List of Subtask
@@ -115,34 +121,56 @@ async def generate_subtasks(
 
     logger.info(f"Generating subtasks for task {task.id}: {task.title}")
 
-    # Call Claude CLI
-    success, result = await run_claude_for_json(
-        prompt=prompt,
-        cwd=project_path,
-        timeout=300,  # 5 min max for planning
-        on_output=on_output
-    )
+    # Retry loop for robustness
+    last_error = None
+    for attempt in range(max_retries + 1):
+        if attempt > 0:
+            logger.info(f"Retry attempt {attempt}/{max_retries} for subtask generation")
+            if on_output:
+                on_output(f"\n[Planning] Retry attempt {attempt}/{max_retries}...\n")
 
-    if not success or result is None:
-        logger.error(f"Failed to generate subtasks for task {task.id}")
-        # Return a single fallback subtask
-        return [
-            Subtask(
-                id="subtask-1",
-                title=f"Implement: {task.title}",
-                description=task.description or "Complete the task as described",
-                order=1,
-                dependencies=[],
-                status=SubtaskStatus.PENDING
-            )
-        ]
+        # Call Claude CLI
+        success, result = await run_claude_for_json(
+            prompt=prompt,
+            cwd=project_path,
+            timeout=300,  # 5 min max for planning
+            on_output=on_output
+        )
 
-    # Parse into list of Subtask
-    subtasks = parse_subtasks_response(result)
+        if success and result is not None:
+            # Parse into list of Subtask
+            subtasks = parse_subtasks_response(result)
 
-    logger.info(f"Generated {len(subtasks)} subtasks for task {task.id}")
+            if len(subtasks) > 1:
+                # Success - got multiple subtasks
+                logger.info(f"Generated {len(subtasks)} subtasks for task {task.id}")
+                return subtasks
+            elif len(subtasks) == 1:
+                # Got single subtask - might be valid for simple tasks
+                logger.info(f"Generated 1 subtask for task {task.id}")
+                return subtasks
+            else:
+                last_error = "Empty subtasks list returned"
+                logger.warning(f"Attempt {attempt + 1}: {last_error}")
+        else:
+            last_error = "Claude CLI returned failure or None"
+            logger.warning(f"Attempt {attempt + 1}: {last_error}")
 
-    return subtasks
+    # All retries exhausted - return fallback
+    logger.error(f"Failed to generate subtasks for task {task.id} after {max_retries + 1} attempts: {last_error}")
+    if on_output:
+        on_output(f"\n[Planning] WARNING: Could not generate detailed subtasks. Using single-task fallback.\n")
+
+    return [
+        Subtask(
+            id="subtask-1",
+            title=f"Implement: {task.title}",
+            description=task.description or "Complete the task as described",
+            order=1,
+            dependencies=[],
+            status=SubtaskStatus.PENDING
+        )
+    ]
 
 
 def parse_subtasks_response(data: any) -> list[Subtask]:

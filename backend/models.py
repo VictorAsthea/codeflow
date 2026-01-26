@@ -278,53 +278,60 @@ class RoadmapUpdate(BaseModel):
     personas: list[str] | None = None
 
 
-# ============== Memory Session Models ==============
+# ============== Ideation Models ==============
 
-class SessionStatus(str, Enum):
-    COMPLETED = "completed"
-    INTERRUPTED = "interrupted"
-    FAILED = "failed"
-    IMPORTED = "imported"
+class SuggestionCategory(str, Enum):
+    SECURITY = "security"
+    PERFORMANCE = "performance"
+    QUALITY = "quality"
+    FEATURE = "feature"
 
 
-class Session(BaseModel):
+class SuggestionStatus(str, Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DISMISSED = "dismissed"
+
+
+class Suggestion(BaseModel):
     id: str
-    task_id: str
-    task_title: str
-    worktree: str = ""
-    started_at: datetime
-    ended_at: datetime
-    status: SessionStatus = SessionStatus.COMPLETED
-    messages_count: int = 0
-    tokens_used: int = 0
-    claude_session_id: str | None = None
+    title: str
+    description: str
+    category: SuggestionCategory
+    priority: str = "medium"  # low, medium, high
+    status: SuggestionStatus = SuggestionStatus.PENDING
+    task_id: str | None = None  # If converted to task
+    created_at: datetime = Field(default_factory=datetime.now)
 
 
-class SessionDetail(Session):
-    conversation: list[dict] = Field(default_factory=list)
-    raw_output: str | None = None
-    error: str | None = None
+class IdeationAnalysis(BaseModel):
+    project_path: str
+    project_name: str
+    stack: list[str] = Field(default_factory=list)
+    frameworks: list[str] = Field(default_factory=list)
+    files_count: int = 0
+    lines_count: int = 0
+    key_directories: list[str] = Field(default_factory=list)
+    patterns_detected: list[str] = Field(default_factory=list)
+    analyzed_at: datetime = Field(default_factory=datetime.now)
 
 
-class SessionCreate(BaseModel):
-    task_title: str
-    worktree: str = ""
-    started_at: datetime | None = None
-    ended_at: datetime | None = None
-    status: SessionStatus = SessionStatus.COMPLETED
-    messages_count: int = 0
-    tokens_used: int = 0
-    claude_session_id: str | None = None
-    messages: list[dict] = Field(default_factory=list)
-    raw_output: str | None = None
-    error: str | None = None
+class IdeationData(BaseModel):
+    analysis: IdeationAnalysis | None = None
+    suggestions: list[Suggestion] = Field(default_factory=list)
 
 
-class ResumeInfo(BaseModel):
-    session_id: str
-    task_id: str
-    task_title: str
-    worktree: str = ""
-    claude_session_id: str | None = None
-    last_status: str
-    can_resume: bool = False
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+
+class ChatRequest(BaseModel):
+    message: str
+    context: list[ChatMessage] = Field(default_factory=list)
+
+
+class ChatResponse(BaseModel):
+    response: str
+    suggestions: list[str] = Field(default_factory=list)
