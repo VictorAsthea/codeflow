@@ -30,6 +30,7 @@ from backend.services.ideation_service import (
 )
 from backend.services.workspace_service import get_workspace_service
 from backend.config import settings
+from backend.validation import SuggestionId
 
 router = APIRouter()
 
@@ -130,7 +131,7 @@ async def list_suggestions():
 
 
 @router.get("/ideation/suggestions/{suggestion_id}")
-async def get_suggestion(suggestion_id: str):
+async def get_suggestion(suggestion_id: SuggestionId):
     """Get a specific suggestion by ID."""
     storage = get_storage()
     suggestion = storage.get_suggestion(suggestion_id)
@@ -142,7 +143,7 @@ async def get_suggestion(suggestion_id: str):
 
 
 @router.post("/ideation/suggestions/{suggestion_id}/accept")
-async def accept_suggestion(suggestion_id: str):
+async def accept_suggestion(suggestion_id: SuggestionId):
     """
     Accept a suggestion and convert it to a Kanban task.
 
@@ -225,7 +226,7 @@ async def accept_suggestion(suggestion_id: str):
 
 
 @router.post("/ideation/suggestions/{suggestion_id}/dismiss")
-async def dismiss_suggestion(suggestion_id: str):
+async def dismiss_suggestion(suggestion_id: SuggestionId):
     """Dismiss a suggestion (mark as ignored)."""
     storage = get_storage()
     suggestion = storage.get_suggestion(suggestion_id)
@@ -244,7 +245,7 @@ async def dismiss_suggestion(suggestion_id: str):
 
 
 @router.delete("/ideation/suggestions/{suggestion_id}")
-async def delete_suggestion(suggestion_id: str):
+async def delete_suggestion(suggestion_id: SuggestionId):
     """Delete a suggestion permanently."""
     storage = get_storage()
 

@@ -5,7 +5,7 @@ Provides endpoints for roadmap management, feature CRUD, and AI-powered generati
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 import uuid
 
@@ -24,6 +24,7 @@ from backend.models import (
 from backend.services.roadmap_storage import RoadmapStorage
 from backend.services import roadmap_ai
 from backend.config import settings
+from backend.validation import FeatureId
 
 router = APIRouter()
 
@@ -101,7 +102,7 @@ async def create_feature(data: FeatureCreate):
 
 
 @router.patch("/roadmap/features/{feature_id}")
-async def update_feature(feature_id: str, data: FeatureUpdate):
+async def update_feature(feature_id: FeatureId, data: FeatureUpdate):
     """Update a feature's properties."""
     storage = get_storage()
 
@@ -115,7 +116,7 @@ async def update_feature(feature_id: str, data: FeatureUpdate):
 
 
 @router.delete("/roadmap/features/{feature_id}")
-async def delete_feature(feature_id: str):
+async def delete_feature(feature_id: FeatureId):
     """Delete a feature from the roadmap."""
     storage = get_storage()
 
@@ -126,7 +127,7 @@ async def delete_feature(feature_id: str):
 
 
 @router.patch("/roadmap/features/{feature_id}/status")
-async def update_feature_status(feature_id: str, status: FeatureStatus):
+async def update_feature_status(feature_id: FeatureId, status: FeatureStatus):
     """Update feature status (for drag-drop)."""
     storage = get_storage()
 
@@ -143,7 +144,7 @@ class StatusUpdateRequest(BaseModel):
 
 
 @router.patch("/roadmap/features/{feature_id}/drag")
-async def drag_feature(feature_id: str, data: StatusUpdateRequest):
+async def drag_feature(feature_id: FeatureId, data: StatusUpdateRequest):
     """Update feature status via drag-drop."""
     storage = get_storage()
 
@@ -158,7 +159,7 @@ async def drag_feature(feature_id: str, data: StatusUpdateRequest):
 # ============== Build Feature (Convert to Task) ==============
 
 @router.post("/roadmap/features/{feature_id}/build")
-async def build_feature(feature_id: str):
+async def build_feature(feature_id: FeatureId):
     """Create a task from a feature."""
     from backend.main import storage as task_storage
     from backend.models import Task, TaskStatus, Phase, PhaseConfig, PhaseStatus
@@ -239,9 +240,9 @@ async def get_analysis_status():
 # ============== AI Generation Endpoints ==============
 
 class AnalyzeRequest(BaseModel):
-    project_name: str = ""
-    project_description: str = ""
-    target_audience: str = ""
+    project_name: str = Field(default="", max_length=200)
+    project_description: str = Field(default="", max_length=5000)
+    target_audience: str = Field(default="", max_length=1000)
 
 
 @router.post("/roadmap/analyze")
@@ -357,7 +358,7 @@ async def generate_features(data: GenerateRequest | None = None):
 
 
 @router.post("/roadmap/features/{feature_id}/expand")
-async def expand_feature(feature_id: str):
+async def expand_feature(feature_id: FeatureId):
     """Expand a feature's description using AI."""
     storage = get_storage()
     feature = storage.get_feature(feature_id)

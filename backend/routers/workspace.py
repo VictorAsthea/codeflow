@@ -2,8 +2,9 @@
 Router pour les endpoints de gestion du workspace.
 """
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
+from typing import Optional
 from pathlib import Path
 
 from backend.services.workspace_service import get_workspace_service
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/workspace", tags=["workspace"])
 
 
 class ProjectPathRequest(BaseModel):
-    project_path: str
+    project_path: str = Field(..., min_length=1, max_length=500)
 
 
 @router.get("/state")
@@ -63,23 +64,56 @@ async def get_recent_projects():
 
 
 @router.get("/browse")
-async def browse_folders(path: str = None):
+async def browse_folders(
+    path: Optional[str] = Query(
+        default=None,
+        max_length=500,
+        pattern=r"^(?!.*\.\.).*$",  # Rejette les chemins contenant ..
+        description="Directory path to browse"
+    )
+):
     """
     Liste les dossiers pour le file browser.
     Si path est None, retourne le dossier Documents/DEV ou Home.
     """
     import os
 
+    # Define allowed base directories
+    home = Path.home()
+    allowed_bases = [
+        home,
+        home / "Documents" / "DEV",
+        home / "Documents",
+    ]
+
     if path is None:
         # Démarrer dans Documents/DEV si existe, sinon Home
-        home = Path.home()
         dev_folder = home / "Documents" / "DEV"
         if dev_folder.exists():
             current = dev_folder
         else:
             current = home
     else:
-        current = Path(path)
+        # Validate and resolve the path to prevent directory traversal
+        try:
+            requested_path = Path(path).resolve()
+
+            # Check if the resolved path is within any allowed base directory
+            path_allowed = False
+            for base in allowed_bases:
+                try:
+                    requested_path.relative_to(base.resolve())
+                    path_allowed = True
+                    break
+                except ValueError:
+                    continue
+
+            if not path_allowed:
+                raise HTTPException(400, "Access to this directory is not allowed")
+
+            current = requested_path
+        except (OSError, ValueError):
+            raise HTTPException(400, "Invalid path")
 
     if not current.exists():
         return {"current": str(Path.home()), "folders": []}

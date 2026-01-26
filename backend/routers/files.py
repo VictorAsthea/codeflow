@@ -8,12 +8,19 @@ router = APIRouter()
 
 @router.get("/files/list")
 async def list_project_files(
-    pattern: str = Query("**/*", description="Glob pattern"),
-    exclude: List[str] = Query(default=[
-        "**/.git/**", "**/node_modules/**", "**/__pycache__/**",
-        "**/.venv/**", "**/dist/**", "**/build/**", "**/.worktrees/**",
-        "**/venv/**", "**/.env", "**/*.pyc", "**/.DS_Store"
-    ])
+    pattern: str = Query(
+        default="**/*",
+        max_length=200,
+        description="Glob pattern for file matching"
+    ),
+    exclude: List[str] = Query(
+        default=[
+            "**/.git/**", "**/node_modules/**", "**/__pycache__/**",
+            "**/.venv/**", "**/dist/**", "**/build/**", "**/.worktrees/**",
+            "**/venv/**", "**/.env", "**/*.pyc", "**/.DS_Store"
+        ],
+        description="Glob patterns to exclude"
+    )
 ):
     """List files matching pattern from project directory"""
     from backend.config import settings
@@ -56,7 +63,9 @@ async def list_project_files(
 
 
 @router.get("/files/search")
-async def search_files(q: str = Query(..., min_length=1)):
+async def search_files(
+    q: str = Query(..., min_length=1, max_length=200, description="Search query for file name")
+):
     """Search files by name in project directory"""
     from backend.config import settings
 

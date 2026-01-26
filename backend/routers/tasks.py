@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from datetime import datetime
 import re
 import asyncio
@@ -10,6 +10,7 @@ from backend.models import (
 )
 from backend.config import settings
 from backend.services.subtask_executor import get_subtask_progress
+from backend.validation import TaskId, SubtaskId, PhaseName
 
 
 def get_storage():
@@ -34,7 +35,9 @@ def generate_task_id(title: str, existing_tasks: list[Task]) -> str:
 
 
 @router.get("/tasks")
-async def list_tasks(include_archived: bool = False):
+async def list_tasks(
+    include_archived: bool = Query(default=False, description="Include archived tasks")
+):
     """List all tasks"""
     tasks = get_storage().load_tasks()
     if not include_archived:
@@ -111,7 +114,7 @@ async def create_new_task(task_data: TaskCreate):
 
 
 @router.get("/tasks/{task_id}")
-async def get_task_detail(task_id: str):
+async def get_task_detail(task_id: TaskId):
     """Get task detail"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -120,7 +123,7 @@ async def get_task_detail(task_id: str):
 
 
 @router.patch("/tasks/{task_id}")
-async def update_task_detail(task_id: str, task_data: TaskUpdate):
+async def update_task_detail(task_id: TaskId, task_data: TaskUpdate):
     """Update task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -141,7 +144,7 @@ async def update_task_detail(task_id: str, task_data: TaskUpdate):
 
 
 @router.delete("/tasks/{task_id}")
-async def delete_task_endpoint(task_id: str):
+async def delete_task_endpoint(task_id: TaskId):
     """Delete a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -152,7 +155,7 @@ async def delete_task_endpoint(task_id: str):
 
 
 @router.patch("/tasks/{task_id}/archive")
-async def archive_task(task_id: str):
+async def archive_task(task_id: TaskId):
     """Archive a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -173,7 +176,7 @@ async def archive_task(task_id: str):
 
 
 @router.patch("/tasks/{task_id}/unarchive")
-async def unarchive_task(task_id: str):
+async def unarchive_task(task_id: TaskId):
     """Unarchive a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -273,7 +276,7 @@ async def execute_task_background(task_id: str, project_path: str):
 
 
 @router.post("/tasks/{task_id}/start")
-async def start_task(task_id: str):
+async def start_task(task_id: TaskId):
     """Start task execution immediately (bypasses queue)"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -292,7 +295,7 @@ async def start_task(task_id: str):
 
 
 @router.post("/tasks/{task_id}/queue")
-async def queue_task(task_id: str):
+async def queue_task(task_id: TaskId):
     """Add task to the execution queue"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -314,7 +317,7 @@ async def queue_task(task_id: str):
 
 
 @router.delete("/tasks/{task_id}/queue")
-async def unqueue_task(task_id: str):
+async def unqueue_task(task_id: TaskId):
     """Remove task from the queue"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -339,7 +342,7 @@ async def get_queue_status():
 
 
 @router.post("/tasks/{task_id}/stop")
-async def stop_task(task_id: str):
+async def stop_task(task_id: TaskId):
     """Stop task execution"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -353,7 +356,7 @@ async def stop_task(task_id: str):
 
 
 @router.post("/tasks/{task_id}/resume")
-async def resume_task(task_id: str):
+async def resume_task(task_id: TaskId):
     """Resume a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -367,7 +370,7 @@ async def resume_task(task_id: str):
 
 
 @router.patch("/tasks/{task_id}/status")
-async def change_task_status(task_id: str, status_data: dict):
+async def change_task_status(task_id: TaskId, status_data: dict):
     """Change task status (for drag & drop)"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -403,7 +406,7 @@ async def change_task_status(task_id: str, status_data: dict):
 
 
 @router.patch("/tasks/{task_id}/phases/{phase_name}")
-async def update_phase_config(task_id: str, phase_name: str, config_data: PhaseConfigUpdate):
+async def update_phase_config(task_id: TaskId, phase_name: PhaseName, config_data: PhaseConfigUpdate):
     """Update phase configuration"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -427,7 +430,7 @@ async def update_phase_config(task_id: str, phase_name: str, config_data: PhaseC
 
 
 @router.post("/tasks/{task_id}/phases/{phase_name}/retry")
-async def retry_phase(task_id: str, phase_name: str):
+async def retry_phase(task_id: TaskId, phase_name: PhaseName):
     """Retry a failed phase"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -448,7 +451,7 @@ async def retry_phase(task_id: str, phase_name: str):
 
 
 @router.post("/tasks/{task_id}/review/accept")
-async def accept_review(task_id: str):
+async def accept_review(task_id: TaskId):
     """Accept AI review and proceed to human review"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -466,7 +469,7 @@ async def accept_review(task_id: str):
 
 
 @router.post("/tasks/{task_id}/review/skip")
-async def skip_review(task_id: str):
+async def skip_review(task_id: TaskId):
     """Skip AI review and proceed to human review"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -484,7 +487,7 @@ async def skip_review(task_id: str):
 
 
 @router.post("/tasks/{task_id}/review/retry")
-async def retry_review_fixes(task_id: str):
+async def retry_review_fixes(task_id: TaskId):
     """Retry with auto-fix for review issues"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -504,7 +507,7 @@ async def retry_review_fixes(task_id: str):
 
 
 @router.get("/tasks/{task_id}/review/status")
-async def get_review_status(task_id: str):
+async def get_review_status(task_id: TaskId):
     """Get review status for a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -521,7 +524,7 @@ async def get_review_status(task_id: str):
 
 
 @router.post("/tasks/{task_id}/create-pr")
-async def create_pull_request(task_id: str):
+async def create_pull_request(task_id: TaskId):
     """Create a pull request for the task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -629,7 +632,7 @@ async def create_pull_request(task_id: str):
 
 
 @router.post("/tasks/{task_id}/sync-pr")
-async def sync_pr_info(task_id: str):
+async def sync_pr_info(task_id: TaskId):
     """
     Sync PR info from GitHub for a task.
 
@@ -689,7 +692,7 @@ async def sync_pr_info(task_id: str):
 
 
 @router.get("/tasks/{task_id}/check-conflicts")
-async def check_conflicts(task_id: str):
+async def check_conflicts(task_id: TaskId):
     """Check if task branch has conflicts with develop"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -705,7 +708,7 @@ async def check_conflicts(task_id: str):
 
 
 @router.get("/tasks/{task_id}/pr-reviews")
-async def get_pr_reviews(task_id: str):
+async def get_pr_reviews(task_id: TaskId):
     """Get PR review comments for a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -721,7 +724,7 @@ async def get_pr_reviews(task_id: str):
 
 
 @router.post("/tasks/{task_id}/fix-comments")
-async def fix_comments(task_id: str, request: FixCommentsRequest):
+async def fix_comments(task_id: TaskId, request: FixCommentsRequest):
     """Fix selected PR review comments using Claude"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -754,7 +757,7 @@ async def fix_comments(task_id: str, request: FixCommentsRequest):
 
 
 @router.post("/tasks/{task_id}/resolve-conflicts")
-async def resolve_conflicts(task_id: str):
+async def resolve_conflicts(task_id: TaskId):
     """Resolve merge conflicts with develop using Claude"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -780,7 +783,7 @@ async def resolve_conflicts(task_id: str):
 # ============== Subtasks Endpoints (v0.4) ==============
 
 @router.get("/tasks/{task_id}/subtasks")
-async def get_task_subtasks(task_id: str):
+async def get_task_subtasks(task_id: TaskId):
     """Get subtasks for a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -794,7 +797,7 @@ async def get_task_subtasks(task_id: str):
 
 
 @router.get("/tasks/{task_id}/phases")
-async def get_task_phases(task_id: str):
+async def get_task_phases(task_id: TaskId):
     """Get phases state for a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -812,7 +815,7 @@ async def get_task_phases(task_id: str):
 
 
 @router.post("/tasks/{task_id}/validate")
-async def trigger_validation(task_id: str, background_tasks: BackgroundTasks):
+async def trigger_validation(task_id: TaskId, background_tasks: BackgroundTasks):
     """Trigger validation phase manually"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -843,7 +846,7 @@ async def trigger_validation(task_id: str, background_tasks: BackgroundTasks):
 
 
 @router.post("/tasks/{task_id}/subtasks/{subtask_id}/retry")
-async def retry_subtask(task_id: str, subtask_id: str):
+async def retry_subtask(task_id: TaskId, subtask_id: SubtaskId):
     """Retry a failed subtask"""
     task = get_storage().get_task(task_id)
     if not task:

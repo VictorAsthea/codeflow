@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from backend.config import settings
 from backend.services.worktree_service import (
     list_worktrees,
@@ -33,7 +33,15 @@ async def delete_worktree(task_id: str):
 
 
 @router.post("/worktrees/{task_id}/merge")
-async def merge_worktree_endpoint(task_id: str, target: str = "develop"):
+async def merge_worktree_endpoint(
+    task_id: str,
+    target: str = Query(
+        default="develop",
+        max_length=100,
+        pattern=r"^[a-zA-Z0-9_\-/.]+$",
+        description="Target branch to merge into"
+    )
+):
     """Merge a worktree's branch into target branch"""
     worktree = await get_worktree_by_task_id(settings.project_path, task_id)
     if not worktree:
