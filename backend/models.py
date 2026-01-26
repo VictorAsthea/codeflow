@@ -286,6 +286,11 @@ class Task(BaseModel):
         ge=0,
         description="Total execution duration in seconds"
     )
+    # Retry system state for server restart recovery
+    retry_state: "RetryState | None" = Field(
+        default=None,
+        description="Current retry state for recoverable error handling"
+    )
 
     @field_validator("title", "description")
     @classmethod
@@ -986,6 +991,177 @@ class ChatResponse(BaseModel):
 
 
 # ============== Memory/Session Models ==============
+
+# ============== Retry System Models ==============
+
+class RecoverableErrorType(str, Enum):
+    """Error types that can trigger automatic retry."""
+    TIMEOUT = "timeout"
+    CONNECTION_ERROR = "connection_error"
+    RATE_LIMIT = "rate_limit"
+    SERVER_ERROR = "server_error"
+    DNS_ERROR = "dns_error"
+    SSL_ERROR = "ssl_error"
+
+
+# HTTP status codes that are recoverable
+RECOVERABLE_HTTP_CODES = frozenset({429, 502, 503, 504, 520, 521, 522, 523, 524})
+
+# HTTP status codes that are NOT recoverable (fatal errors)
+FATAL_HTTP_CODES = frozenset({400, 401, 403, 404, 422})
+
+
+class RetryConfig(BaseModel):
+    """Configuration for the intelligent retry system.
+
+    This model defines all parameters for the retry mechanism including
+    exponential backoff with jitter, recoverable error types, and timeouts.
+    """
+    # Core retry settings
+    max_retries: int = Field(
+        default=4,
+        ge=0,
+        le=10,
+        description="Maximum number of retry attempts (0 disables retries)"
+    )
+    base_delay: float = Field(
+        default=2.0,
+        ge=0.1,
+        le=60.0,
+        description="Base delay in seconds before first retry"
+    )
+    multiplier: float = Field(
+        default=2.0,
+        ge=1.0,
+        le=5.0,
+        description="Multiplier for exponential backoff (delay = base_delay * multiplier^attempt)"
+    )
+    jitter_factor: float = Field(
+        default=0.2,
+        ge=0.0,
+        le=0.5,
+        description="Random jitter factor (±jitter_factor) to avoid thundering herd"
+    )
+
+    # Timeout settings
+    max_total_timeout: float = Field(
+        default=1800.0,
+        ge=60.0,
+        le=7200.0,
+        description="Maximum total time (in seconds) for all retries combined"
+    )
+
+    # Error type configuration
+    recoverable_error_types: list[RecoverableErrorType] = Field(
+        default_factory=lambda: list(RecoverableErrorType),
+        description="List of error types that should trigger a retry"
+    )
+    recoverable_http_codes: list[int] = Field(
+        default_factory=lambda: list(RECOVERABLE_HTTP_CODES),
+        description="HTTP status codes that should trigger a retry"
+    )
+
+    @field_validator("recoverable_http_codes")
+    @classmethod
+    def validate_http_codes(cls, v: list[int]) -> list[int]:
+        """Validate that HTTP codes are within valid range."""
+        for code in v:
+            if not (400 <= code <= 599):
+                raise ValueError(f"HTTP status code {code} is not a valid error code (must be 400-599)")
+        return v
+
+    def calculate_delay(self, attempt: int) -> float:
+        """Calculate the delay for a given retry attempt with jitter.
+
+        Args:
+            attempt: The current attempt number (0-indexed)
+
+        Returns:
+            The delay in seconds, including random jitter
+        """
+        import random
+        base = self.base_delay * (self.multiplier ** attempt)
+        jitter = base * random.uniform(-self.jitter_factor, self.jitter_factor)
+        return max(0.1, base + jitter)  # Minimum 100ms delay
+
+    def get_max_delay(self, attempt: int) -> float:
+        """Get the maximum possible delay for an attempt (without jitter)."""
+        return self.base_delay * (self.multiplier ** attempt) * (1 + self.jitter_factor)
+
+
+class RetryState(BaseModel):
+    """Tracks the state of retry attempts for a task execution.
+
+    This model is used to persist retry state across server restarts
+    and to provide real-time feedback to the user interface.
+    """
+    attempt: int = Field(
+        default=0,
+        ge=0,
+        description="Current attempt number (0 = first attempt, not a retry)"
+    )
+    max_attempts: int = Field(
+        default=4,
+        ge=1,
+        description="Maximum attempts allowed (including initial attempt)"
+    )
+    last_error_type: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Type of the last error encountered"
+    )
+    last_error_message: str | None = Field(
+        default=None,
+        max_length=2000,
+        description="Message from the last error"
+    )
+    last_http_code: int | None = Field(
+        default=None,
+        ge=400,
+        le=599,
+        description="HTTP status code from the last error (if applicable)"
+    )
+    next_retry_at: datetime | None = Field(
+        default=None,
+        description="Scheduled time for the next retry attempt"
+    )
+    total_retry_time: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Total time spent on retries in seconds"
+    )
+    error_history: list[dict] = Field(
+        default_factory=list,
+        description="History of all errors encountered during retries"
+    )
+    started_at: datetime | None = Field(
+        default=None,
+        description="When the first attempt started"
+    )
+
+    @property
+    def is_retrying(self) -> bool:
+        """Check if currently in a retry state."""
+        return self.attempt > 0 and self.attempt < self.max_attempts
+
+    @property
+    def retries_remaining(self) -> int:
+        """Get the number of retries remaining."""
+        return max(0, self.max_attempts - self.attempt - 1)
+
+    def add_error(self, error_type: str, message: str, http_code: int | None = None) -> None:
+        """Record an error in the history."""
+        self.error_history.append({
+            "attempt": self.attempt,
+            "error_type": error_type,
+            "message": message[:2000] if message else None,  # Truncate long messages
+            "http_code": http_code,
+            "timestamp": datetime.now().isoformat()
+        })
+        self.last_error_type = error_type
+        self.last_error_message = message[:2000] if message else None
+        self.last_http_code = http_code
+
 
 class SessionStatus(str, Enum):
     RUNNING = "running"
