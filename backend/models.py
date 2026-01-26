@@ -276,3 +276,34 @@ class RoadmapUpdate(BaseModel):
     project_description: str | None = None
     target_audience: str | None = None
     personas: list[str] | None = None
+
+
+# ============== Memory Models ==============
+
+class SessionMessage(BaseModel):
+    """A single message in a Claude Code session."""
+    role: str  # "user" or "assistant"
+    content: str
+    timestamp: datetime
+    token_count: int = 0
+
+
+class ClaudeSession(BaseModel):
+    """A Claude Code session with conversation history."""
+    session_id: str
+    project_path: str
+    first_prompt: str
+    summary: str | None = None
+    message_count: int = 0
+    token_count: int = 0
+    git_branch: str | None = None
+    worktree_path: str | None = None
+    task_id: str | None = None  # Linked Codeflow task ID if any
+    created_at: datetime
+    modified_at: datetime
+    is_resumable: bool = True  # Can be resumed with --resume
+
+
+class SessionDetail(ClaudeSession):
+    """Extended session info with full conversation."""
+    messages: list[SessionMessage] = Field(default_factory=list)

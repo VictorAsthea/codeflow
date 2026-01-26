@@ -158,6 +158,36 @@ export const API = {
             fetchJSON(`${API_BASE}/changelog?limit=${limit}&offset=${offset}&codeflow_only=${codeflowOnly}`),
     },
 
+    memory: {
+        list: (options = {}) => {
+            const params = new URLSearchParams();
+            if (options.projectPath) params.append('project_path', options.projectPath);
+            if (options.includeWorktrees !== undefined) params.append('include_worktrees', options.includeWorktrees);
+            if (options.limit) params.append('limit', options.limit);
+            const query = params.toString();
+            return fetchJSON(`${API_BASE}/memory/sessions${query ? '?' + query : ''}`);
+        },
+
+        get: (sessionId, projectPath = null) => {
+            const params = projectPath ? `?project_path=${encodeURIComponent(projectPath)}` : '';
+            return fetchJSON(`${API_BASE}/memory/sessions/${encodeURIComponent(sessionId)}${params}`);
+        },
+
+        delete: (sessionId, projectPath = null) => {
+            const params = projectPath ? `?project_path=${encodeURIComponent(projectPath)}` : '';
+            return fetchJSON(`${API_BASE}/memory/sessions/${encodeURIComponent(sessionId)}${params}`, {
+                method: 'DELETE',
+            });
+        },
+
+        resume: (sessionId, projectPath = null) => {
+            const params = projectPath ? `?project_path=${encodeURIComponent(projectPath)}` : '';
+            return fetchJSON(`${API_BASE}/memory/sessions/${encodeURIComponent(sessionId)}/resume${params}`, {
+                method: 'POST',
+            });
+        },
+    },
+
     roadmap: {
         get: () => fetchJSON(`${API_BASE}/roadmap`),
 

@@ -3472,3 +3472,551 @@ body {
 .selected-folder strong {
   color: var(--text-primary);
 }
+
+/* ========================================
+   MEMORY VIEW STYLES
+   ======================================== */
+
+.memory-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 2rem;
+  max-width: 1000px;
+}
+
+.memory-section {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.memory-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 1rem 1.25rem;
+  margin: 0;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+}
+
+.memory-sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Memory Session Card */
+.memory-session-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.2s ease;
+}
+
+.memory-session-card:last-child {
+  border-bottom: none;
+}
+
+.memory-session-card:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.memory-session-card.active {
+  background-color: rgba(88, 166, 255, 0.1);
+  border-left: 3px solid var(--accent-blue);
+}
+
+/* Session Header */
+.memory-session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.memory-session-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.memory-session-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.memory-session-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-session-time {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+/* Session Meta - message count, tokens, status */
+.memory-session-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.memory-session-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.memory-session-messages {
+  color: var(--text-secondary);
+}
+
+.memory-session-tokens {
+  color: var(--accent-yellow);
+}
+
+.memory-session-status {
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.memory-session-status.completed {
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--accent-green);
+}
+
+.memory-session-status.running {
+  background: rgba(210, 153, 34, 0.15);
+  color: var(--accent-yellow);
+}
+
+.memory-session-status.failed {
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--accent-red);
+}
+
+/* Session Worktree Info */
+.memory-session-worktree {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.memory-session-worktree::before {
+  content: "↳ ";
+  color: var(--accent-blue);
+}
+
+/* Session Actions */
+.memory-session-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.memory-session-actions .btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.memory-session-actions .btn-action:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+.memory-session-actions .btn-view {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.memory-session-actions .btn-view:hover {
+  background-color: var(--accent-blue);
+  color: white;
+}
+
+.memory-session-actions .btn-resume {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+}
+
+.memory-session-actions .btn-resume:hover {
+  background-color: var(--accent-green);
+  color: white;
+}
+
+.memory-session-actions .btn-delete {
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+.memory-session-actions .btn-delete:hover {
+  background-color: var(--accent-red);
+  color: white;
+}
+
+/* Memory Filter Dropdown */
+.memory-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.memory-filter label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.memory-filter select,
+.memory-filter-dropdown {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.memory-filter select:hover,
+.memory-filter-dropdown:hover {
+  border-color: var(--accent-blue);
+}
+
+.memory-filter select:focus,
+.memory-filter-dropdown:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
+
+/* Memory Context Summary */
+.memory-project-context {
+  padding: 1rem 1.25rem;
+}
+
+.memory-context-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.memory-context-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.memory-context-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  min-width: 100px;
+}
+
+.memory-context-value {
+  color: var(--text-primary);
+}
+
+.memory-context-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.memory-context-tag {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.memory-context-date {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+}
+
+/* Memory Empty State */
+.memory-empty {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: var(--text-secondary);
+}
+
+.memory-empty .empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.memory-empty p {
+  margin: 0.5rem 0;
+}
+
+.memory-empty .empty-hint {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+/* Memory Session Detail Modal */
+.memory-detail-modal {
+  max-width: 800px;
+}
+
+.memory-conversation {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.memory-message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+}
+
+.memory-message.user {
+  border-left: 3px solid var(--accent-blue);
+  background: rgba(88, 166, 255, 0.05);
+}
+
+.memory-message.assistant {
+  border-left: 3px solid var(--accent-green);
+  background: rgba(63, 185, 80, 0.05);
+}
+
+.memory-message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.memory-message-role {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.memory-message.user .memory-message-role {
+  color: var(--accent-blue);
+}
+
+.memory-message.assistant .memory-message-role {
+  color: var(--accent-green);
+}
+
+.memory-message-time {
+  color: var(--text-secondary);
+}
+
+.memory-message-content {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Memory Day Groups */
+.memory-sessions-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.memory-day-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.memory-day-header {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.memory-day-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Memory Detail Modal */
+.memory-detail-modal {
+  max-width: 900px;
+  max-height: 90vh;
+}
+
+.memory-detail-modal .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.memory-detail-meta {
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 1rem;
+  flex-shrink: 0;
+}
+
+.memory-detail-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.memory-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.memory-detail-label {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  min-width: 80px;
+}
+
+.memory-detail-value {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.memory-detail-value.monospace {
+  font-family: monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+/* Conversation in detail modal */
+.memory-conversation {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.5rem;
+}
+
+.memory-message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  border-left: 3px solid var(--border);
+}
+
+.memory-message.user {
+  border-left-color: var(--accent-blue);
+  background: rgba(88, 166, 255, 0.05);
+}
+
+.memory-message.assistant {
+  border-left-color: var(--accent-green);
+  background: rgba(63, 185, 80, 0.05);
+}
+
+.memory-message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.memory-message-role {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.memory-message.user .memory-message-role {
+  color: var(--accent-blue);
+}
+
+.memory-message.assistant .memory-message-role {
+  color: var(--accent-green);
+}
+
+.memory-message-time {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.memory-message-content {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.memory-message-content pre {
+  background: var(--bg-tertiary);
+  padding: 0.75rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+
+.memory-message-content code {
+  font-family: monospace;
+  font-size: 0.85rem;
+  background: var(--bg-tertiary);
+  padding: 0.15rem 0.3rem;
+  border-radius: 3px;
+}
+
+.memory-message-content pre code {
+  background: none;
+  padding: 0;
+}

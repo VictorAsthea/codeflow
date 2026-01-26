@@ -92,6 +92,12 @@
                         <kbd class="nav-kbd">C</kbd>
                     </a>
 
+                    <a href="#memory" class="nav-item" data-shortcut="Y" data-view="memory">
+                        <span class="nav-icon">🧠</span>
+                        <span class="nav-label">Memory</span>
+                        <kbd class="nav-kbd">Y</kbd>
+                    </a>
+
                     <div class="nav-divider"></div>
 
                     <a href="#settings" class="nav-item" data-shortcut="S">
@@ -283,6 +289,44 @@
                     </div>
                     <div id="changelog-content" class="changelog-container">
                         <div class="loading">Chargement du changelog...</div>
+                    </div>
+                </div>
+
+                <!-- Memory View -->
+                <div id="memory-view" class="view hidden">
+                    <div class="view-header">
+                        <div class="view-header-content">
+                            <h1>🧠 Memory</h1>
+                            <p>Historique des sessions Claude Code</p>
+                        </div>
+                        <div class="view-header-actions">
+                            <div class="memory-filter">
+                                <label for="memory-filter-select">Filtre:</label>
+                                <select id="memory-filter-select" class="input">
+                                    <option value="all">Toutes</option>
+                                    <option value="task">Par tâche</option>
+                                </select>
+                            </div>
+                            <button id="refresh-memory-btn" class="btn btn-secondary">Rafraîchir</button>
+                        </div>
+                    </div>
+
+                    <!-- Sessions List -->
+                    <div class="memory-content">
+                        <div class="memory-section">
+                            <h3>Sessions</h3>
+                            <div id="memory-sessions-list" class="memory-sessions-list">
+                                <div class="loading">Chargement des sessions...</div>
+                            </div>
+                        </div>
+
+                        <!-- Project Context Summary -->
+                        <div class="memory-section">
+                            <h3>Contexte projet (depuis analyse)</h3>
+                            <div id="memory-project-context" class="memory-project-context">
+                                <div class="loading">Chargement du contexte...</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </main>
@@ -784,6 +828,30 @@
             </div>
         </div>
 
+        <!-- Memory Session Detail Modal -->
+        <div id="memory-detail-modal" class="modal hidden">
+            <div class="modal-content memory-detail-modal">
+                <div class="modal-header">
+                    <h2 id="memory-detail-title">Session Details</h2>
+                    <button class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="memory-detail-meta" id="memory-detail-meta">
+                        <!-- Session metadata will be rendered here -->
+                    </div>
+                    <div class="memory-conversation" id="memory-conversation">
+                        <div class="loading">Chargement de la conversation...</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btn-delete-session" class="btn btn-danger">Supprimer</button>
+                    <div class="modal-actions">
+                        <button id="btn-resume-session" class="btn btn-success hidden">Reprendre</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Settings Modal -->
         <div id="settings-modal" class="modal hidden">
             <div class="modal-content">
@@ -844,6 +912,7 @@
     <script type="module" src="/js/roadmap-wizard.js"></script>
     <script type="module" src="/js/context.js"></script>
     <script type="module" src="/js/changelog.js"></script>
+    <script type="module" src="/js/memory.js"></script>
     <script type="module" src="/js/app.js"></script>
     <script src="/js/project-init.js"></script>
     <script src="/js/workspace.js"></script>
