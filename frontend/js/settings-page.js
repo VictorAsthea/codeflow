@@ -40,6 +40,9 @@ function loadSettingsTabContent(tab) {
         case 'general':
             loadGeneralSettings();
             break;
+        case 'parallel':
+            loadParallelSettings();
+            break;
         case 'auth':
             loadAuthSettings();
             break;
@@ -95,6 +98,172 @@ async function saveGeneralSettings() {
     } catch (error) {
         if (window.showToast) {
             window.showToast('Failed to save settings', 'error');
+        }
+    }
+}
+
+// ============== PARALLEL EXECUTION SETTINGS ==============
+
+async function loadParallelSettings() {
+    const container = document.getElementById('settings-page-parallel-content');
+    if (!container) return;
+
+    container.innerHTML = '<div class="loading">Chargement...</div>';
+
+    try {
+        const response = await fetch('/api/settings/parallel');
+        if (!response.ok) throw new Error('Failed to load parallel settings');
+
+        const data = await response.json();
+        container.innerHTML = renderParallelContent(data);
+
+        // Setup slider event listener
+        setupParallelSlider();
+    } catch (error) {
+        container.innerHTML = `<p class="error-message">Erreur: ${error.message}</p>`;
+    }
+}
+
+function renderParallelContent(data) {
+    const { max_parallel_tasks, current_running, current_queued, is_paused } = data;
+
+    return `
+        <div class="parallel-settings-form">
+            <div class="parallel-status-summary">
+                <div class="parallel-stat-box">
+                    <span class="stat-value">${current_running}</span>
+                    <span class="stat-label">Running</span>
+                </div>
+                <div class="parallel-stat-box">
+                    <span class="stat-value">${current_queued}</span>
+                    <span class="stat-label">Queued</span>
+                </div>
+                <div class="parallel-stat-box ${is_paused ? 'paused' : ''}">
+                    <span class="stat-value">${is_paused ? '⏸' : '▶'}</span>
+                    <span class="stat-label">${is_paused ? 'Paused' : 'Active'}</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="max-parallel-slider">Maximum Parallel Tasks</label>
+                <div class="slider-container">
+                    <input type="range"
+                           id="max-parallel-slider"
+                           min="1"
+                           max="10"
+                           value="${max_parallel_tasks}"
+                           class="settings-slider">
+                    <span id="max-parallel-value" class="slider-value">${max_parallel_tasks}</span>
+                </div>
+                <small class="form-help">
+                    Number of tasks that can run simultaneously (1-10).
+                    Higher values increase throughput but use more system resources.
+                </small>
+            </div>
+
+            <div class="form-group">
+                <button type="button" id="btn-save-parallel" class="btn btn-primary">
+                    Save Parallel Settings
+                </button>
+                <button type="button" id="btn-optimize-queue" class="btn btn-secondary">
+                    Optimize Queue Order
+                </button>
+            </div>
+
+            <div class="parallel-help-section">
+                <h4>Smart Scheduling</h4>
+                <p>
+                    Codeflow uses smart scheduling to estimate task durations based on:
+                </p>
+                <ul>
+                    <li>Number of subtasks in the task</li>
+                    <li>Historical execution data from similar tasks</li>
+                    <li>Agent profile complexity (quick/balanced/thorough)</li>
+                </ul>
+                <p>
+                    Click "Optimize Queue Order" to automatically reorder queued tasks
+                    for maximum throughput using shortest-job-first scheduling.
+                </p>
+            </div>
+        </div>
+    `;
+}
+
+function setupParallelSlider() {
+    const slider = document.getElementById('max-parallel-slider');
+    const valueDisplay = document.getElementById('max-parallel-value');
+    const saveBtn = document.getElementById('btn-save-parallel');
+    const optimizeBtn = document.getElementById('btn-optimize-queue');
+
+    if (slider && valueDisplay) {
+        slider.addEventListener('input', () => {
+            valueDisplay.textContent = slider.value;
+        });
+    }
+
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async () => {
+            const newValue = parseInt(slider?.value || '3');
+            await saveParallelSettings(newValue);
+        });
+    }
+
+    if (optimizeBtn) {
+        optimizeBtn.addEventListener('click', async () => {
+            await optimizeQueueOrder();
+        });
+    }
+}
+
+async function saveParallelSettings(maxParallelTasks) {
+    try {
+        const response = await fetch('/api/settings/parallel', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ max_parallel_tasks: maxParallelTasks })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            if (window.showToast) {
+                window.showToast(`Max parallel tasks set to ${result.max_parallel_tasks}`, 'success');
+            }
+            // Update header display
+            const queueMaxEl = document.getElementById('queue-max');
+            if (queueMaxEl) {
+                queueMaxEl.textContent = result.max_parallel_tasks;
+            }
+        } else {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save');
+        }
+    } catch (error) {
+        if (window.showToast) {
+            window.showToast(`Error: ${error.message}`, 'error');
+        }
+    }
+}
+
+async function optimizeQueueOrder() {
+    try {
+        const response = await fetch('/api/queue/optimize', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            if (window.showToast) {
+                window.showToast(result.message, 'success');
+            }
+            // Refresh parallel settings to show updated queue
+            loadParallelSettings();
+        } else {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to optimize');
+        }
+    } catch (error) {
+        if (window.showToast) {
+            window.showToast(`Error: ${error.message}`, 'error');
         }
     }
 }
