@@ -95,16 +95,10 @@ class Sidebar {
       item.addEventListener('click', (e) => {
         e.preventDefault();
         const view = item.getAttribute('href')?.substring(1);
-        if (view && view !== 'settings') {
+        if (view) {
           this.navigateTo(view);
         }
       });
-    });
-
-    const settingsBtn = this.sidebar.querySelector('a[href="#settings"]');
-    settingsBtn?.addEventListener('click', (e) => {
-      e.preventDefault();
-      this.openSettings();
     });
   }
 
@@ -149,14 +143,6 @@ class Sidebar {
     window.dispatchEvent(new CustomEvent('view-changed', {
       detail: { view: viewName }
     }));
-  }
-
-  /**
-   * Open settings modal
-   */
-  openSettings() {
-    const settingsBtn = document.getElementById('settings-btn');
-    settingsBtn?.click();
   }
 
   /**
