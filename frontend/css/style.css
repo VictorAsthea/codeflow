@@ -197,10 +197,15 @@ body {
 }
 
 /* Rate Limit Indicator */
+.rate-limit-wrapper {
+  position: relative;
+}
+
 .rate-limit-indicator {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0.35rem;
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border);
   padding: 0.4rem 0.75rem;
@@ -209,8 +214,22 @@ body {
   font-weight: 500;
   color: var(--text-secondary);
   min-width: 50px;
-  cursor: default;
+  cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.rate-limit-indicator:hover {
+  border-color: var(--text-secondary);
+  background-color: var(--bg-secondary);
+}
+
+.rate-limit-arrow {
+  font-size: 0.6rem;
+  transition: transform 0.2s ease;
+}
+
+.rate-limit-wrapper.open .rate-limit-arrow {
+  transform: rotate(180deg);
 }
 
 .rate-limit-indicator.subscription {
@@ -235,6 +254,86 @@ body {
 @keyframes pulse-danger {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
+}
+
+/* Rate Limit Dropdown */
+.rate-limit-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 280px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.rate-limit-dropdown.hidden {
+  display: none;
+}
+
+.usage-section {
+  margin-bottom: 1rem;
+}
+
+.usage-section:last-of-type {
+  margin-bottom: 0.5rem;
+}
+
+.usage-header {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+}
+
+.usage-bar-container {
+  height: 8px;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.usage-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-blue-bright));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.usage-bar.warning {
+  background: linear-gradient(90deg, var(--accent-yellow), #e3b341);
+}
+
+.usage-bar.danger {
+  background: linear-gradient(90deg, var(--accent-red), #ff7b72);
+}
+
+.usage-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.usage-info span:first-child {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.usage-reset {
+  color: var(--text-secondary);
+}
+
+.usage-last-updated {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-align: center;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  margin-top: 0.5rem;
 }
 
 .kanban-board {
