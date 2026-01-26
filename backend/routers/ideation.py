@@ -28,26 +28,15 @@ from backend.services.ideation_service import (
     chat_ideation,
     get_ideation_storage,
 )
-from backend.services.workspace_service import get_workspace_service
-from backend.config import settings
+from backend.utils.project_helpers import get_active_project_path
 from backend.validation import SuggestionId
 
 router = APIRouter()
 
 
-def _get_active_project_path() -> str:
-    """Get the active project path from workspace service."""
-    try:
-        ws = get_workspace_service()
-        state = ws.get_workspace_state()
-        return state.get("active_project") or settings.project_path
-    except Exception:
-        return settings.project_path
-
-
 def get_storage() -> IdeationStorage:
     """Get storage for the active project."""
-    return get_ideation_storage(_get_active_project_path())
+    return get_ideation_storage(get_active_project_path())
 
 
 # ============== Analysis Endpoints ==============
@@ -60,7 +49,7 @@ async def analyze_project_endpoint():
     Scans files, detects patterns (tests, CI/CD, linting), and counts lines.
     Results are cached in .codeflow/ideation/analysis.json
     """
-    project_path = _get_active_project_path()
+    project_path = get_active_project_path()
     analysis = await analyze_project(project_path)
 
     return {
@@ -102,13 +91,13 @@ async def generate_suggestions_endpoint():
 
     # Run analysis if not done
     if not data.analysis:
-        project_path = _get_active_project_path()
+        project_path = get_active_project_path()
         data.analysis = await analyze_project(project_path)
 
     # Generate suggestions
     new_suggestions = await generate_suggestions(
         data.analysis,
-        _get_active_project_path()
+        get_active_project_path()
     )
 
     return {
@@ -265,7 +254,7 @@ async def chat_endpoint(request: ChatRequest):
     Have a conversation about ideas, improvements, and technical approaches.
     The AI has context about the project analysis.
     """
-    project_path = _get_active_project_path()
+    project_path = get_active_project_path()
 
     # Convert request context to ChatMessage objects
     context = [

@@ -11,6 +11,7 @@ from backend.models import (
 from backend.config import settings
 from backend.services.subtask_executor import get_subtask_progress
 from backend.validation import TaskId, SubtaskId, PhaseName
+from backend.utils.project_helpers import get_active_project_path
 
 
 def get_storage():
@@ -289,7 +290,7 @@ async def start_task(task_id: TaskId):
     task.updated_at = datetime.now()
     get_storage().update_task(task)
 
-    asyncio.create_task(execute_task_background(task_id, settings.project_path))
+    asyncio.create_task(execute_task_background(task_id, get_active_project_path()))
 
     return {"message": "Task started", "task": task}
 
@@ -307,7 +308,7 @@ async def queue_task(task_id: TaskId):
     if task.status == TaskStatus.QUEUED:
         raise HTTPException(status_code=400, detail="Task is already queued")
 
-    success = await task_queue.queue_task(task_id, settings.project_path)
+    success = await task_queue.queue_task(task_id, get_active_project_path())
     if not success:
         raise HTTPException(status_code=500, detail="Failed to queue task")
 
@@ -719,7 +720,7 @@ async def get_pr_reviews(task_id: TaskId):
 
     from backend.services.github_service import get_all_pr_reviews
 
-    result = await get_all_pr_reviews(task.pr_number, settings.project_path)
+    result = await get_all_pr_reviews(task.pr_number, get_active_project_path())
     return result
 
 
@@ -749,7 +750,7 @@ async def fix_comments(task_id: TaskId, request: FixCommentsRequest):
         comment_ids=request.comment_ids,
         pr_number=task.pr_number,
         worktree_path=task.worktree_path,
-        project_path=settings.project_path,
+        project_path=get_active_project_path(),
         log_callback=log_handler
     )
 
@@ -835,7 +836,7 @@ async def trigger_validation(task_id: TaskId, background_tasks: BackgroundTasks)
 
         await start_validation(
             task=task,
-            project_path=settings.project_path,
+            project_path=get_active_project_path(),
             worktree_path=task.worktree_path,
             log_callback=log_handler
         )

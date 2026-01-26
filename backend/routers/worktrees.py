@@ -1,11 +1,11 @@
 from fastapi import APIRouter, HTTPException, Query
-from backend.config import settings
 from backend.services.worktree_service import (
     list_worktrees,
     remove_worktree,
     merge_worktree,
     get_worktree_by_task_id
 )
+from backend.utils.project_helpers import get_active_project_path
 
 router = APIRouter()
 
@@ -13,18 +13,19 @@ router = APIRouter()
 @router.get("/worktrees")
 async def get_worktrees():
     """List all worktrees with their stats"""
-    worktrees = await list_worktrees(settings.project_path)
+    worktrees = await list_worktrees(get_active_project_path())
     return {"worktrees": worktrees}
 
 
 @router.delete("/worktrees/{task_id}")
 async def delete_worktree(task_id: str):
     """Remove a worktree by task ID"""
-    worktree = await get_worktree_by_task_id(settings.project_path, task_id)
+    project_path = get_active_project_path()
+    worktree = await get_worktree_by_task_id(project_path, task_id)
     if not worktree:
         raise HTTPException(status_code=404, detail=f"Worktree for task {task_id} not found")
 
-    result = await remove_worktree(settings.project_path, worktree['path'])
+    result = await remove_worktree(project_path, worktree['path'])
 
     if not result['success']:
         raise HTTPException(status_code=500, detail=result.get('error', 'Failed to remove worktree'))
@@ -43,11 +44,12 @@ async def merge_worktree_endpoint(
     )
 ):
     """Merge a worktree's branch into target branch"""
-    worktree = await get_worktree_by_task_id(settings.project_path, task_id)
+    project_path = get_active_project_path()
+    worktree = await get_worktree_by_task_id(project_path, task_id)
     if not worktree:
         raise HTTPException(status_code=404, detail=f"Worktree for task {task_id} not found")
 
-    result = await merge_worktree(settings.project_path, worktree['path'], target)
+    result = await merge_worktree(project_path, worktree['path'], target)
 
     if not result['success']:
         raise HTTPException(status_code=500, detail=result.get('error', 'Failed to merge worktree'))

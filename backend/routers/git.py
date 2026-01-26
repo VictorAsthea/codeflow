@@ -3,20 +3,12 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 import subprocess
 import logging
-from backend.config import settings
 from backend.services import git_service
-from backend.services.workspace_service import get_workspace_service
 from backend.websocket_manager import kanban_manager
+from backend.utils.project_helpers import get_active_project_path
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-def get_active_project_path() -> str:
-    """Get the active project path from workspace service."""
-    ws = get_workspace_service()
-    state = ws.get_workspace_state()
-    return state.get("active_project") or settings.project_path
 
 
 class BranchDeleteRequest(BaseModel):

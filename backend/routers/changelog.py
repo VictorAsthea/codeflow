@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Optional
 
 from backend.config import settings
+from backend.utils.project_helpers import get_active_project_path
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -122,7 +123,7 @@ async def get_changelog(
                 f"-{fetch_limit + offset}",  # Fetch enough to account for skip
                 "--format=%H|%h|%aI|%s"
             ],
-            settings.project_path
+            get_active_project_path()
         )
 
         if result.returncode != 0:
@@ -146,7 +147,7 @@ async def get_changelog(
             full_hash, short_hash, date_str, message = parts
 
             # Get commit body to check if it's a Codeflow commit
-            body = await get_commit_body(full_hash, settings.project_path)
+            body = await get_commit_body(full_hash, get_active_project_path())
             is_codeflow = is_codeflow_commit(body)
 
             # Filter if codeflow_only is True
@@ -154,7 +155,7 @@ async def get_changelog(
                 continue
 
             # Get files modified in this commit
-            files = await get_commit_files(full_hash, settings.project_path)
+            files = await get_commit_files(full_hash, get_active_project_path())
 
             # Extract task ID from commit message
             task_id = parse_commit_message(message)

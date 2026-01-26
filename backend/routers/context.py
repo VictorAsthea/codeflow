@@ -5,7 +5,7 @@ Router pour les endpoints de contexte projet.
 from fastapi import APIRouter, HTTPException
 
 from backend.services.project_context import get_project_context
-from backend.config import settings
+from backend.utils.project_helpers import get_active_project_path
 
 router = APIRouter(prefix="/api/context", tags=["context"])
 
@@ -15,7 +15,7 @@ async def get_context():
     """
     Retourne le contexte du projet actuel.
     """
-    project_path = settings.project_path
+    project_path = get_active_project_path()
 
     try:
         ctx = get_project_context(project_path)
@@ -36,7 +36,7 @@ async def refresh_context():
     """
     Force un rafraîchissement du contexte (rescan du projet).
     """
-    project_path = settings.project_path
+    project_path = get_active_project_path()
 
     try:
         ctx = get_project_context(project_path)
@@ -57,7 +57,7 @@ async def get_context_summary():
     """
     Retourne un résumé court du contexte (pour affichage dans header/sidebar).
     """
-    project_path = settings.project_path
+    project_path = get_active_project_path()
 
     try:
         ctx = get_project_context(project_path)

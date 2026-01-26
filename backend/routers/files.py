@@ -3,6 +3,8 @@ from pathlib import Path
 from typing import List
 import os
 
+from backend.utils.project_helpers import get_active_project_path
+
 router = APIRouter()
 
 
@@ -23,9 +25,7 @@ async def list_project_files(
     )
 ):
     """List files matching pattern from project directory"""
-    from backend.config import settings
-
-    project_path = Path(settings.project_path)
+    project_path = Path(get_active_project_path())
 
     if not project_path.exists():
         return []
@@ -67,9 +67,7 @@ async def search_files(
     q: str = Query(..., min_length=1, max_length=200, description="Search query for file name")
 ):
     """Search files by name in project directory"""
-    from backend.config import settings
-
-    project_path = Path(settings.project_path)
+    project_path = Path(get_active_project_path())
 
     if not project_path.exists():
         return []
