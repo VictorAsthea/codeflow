@@ -179,9 +179,11 @@ function setupSettingsTabs() {
                 targetPanel.classList.remove('hidden');
             }
 
-            // Load GitHub content when switching to GitHub tab
+            // Load content when switching tabs
             if (targetTab === 'github') {
                 renderSettingsGitHub();
+            } else if (targetTab === 'auth') {
+                window.authManager?.loadSettingsAuthStatus();
             }
         });
     });

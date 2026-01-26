@@ -7,7 +7,7 @@ import logging
 
 from backend.services.json_storage import JSONStorage
 from backend.services.migration import run_migration_if_needed
-from backend.routers import tasks, settings, git, webhooks, worktrees, roadmap, context, changelog, project, workspace, memory, ideation
+from backend.routers import tasks, settings, git, webhooks, worktrees, roadmap, context, changelog, project, workspace, memory, ideation, auth
 from backend.services.task_queue import task_queue
 from backend.services.pr_monitor import PRMonitor
 from backend.websocket_manager import manager, kanban_manager
@@ -80,6 +80,7 @@ app.include_router(project.router, prefix="/api", tags=["project"])
 app.include_router(workspace.router, prefix="/api", tags=["workspace"])
 app.include_router(memory.router, prefix="/api", tags=["memory"])
 app.include_router(ideation.router, prefix="/api", tags=["ideation"])
+app.include_router(auth.router, prefix="/api", tags=["auth"])
 
 app.mount("/css", StaticFiles(directory="frontend/css"), name="css")
 app.mount("/js", StaticFiles(directory="frontend/js"), name="js")

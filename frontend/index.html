@@ -891,6 +891,7 @@
                 <div class="modal-body settings-body">
                     <div class="settings-tabs">
                         <button class="settings-tab active" data-tab="general">Général</button>
+                        <button class="settings-tab" data-tab="auth">Authentification</button>
                         <button class="settings-tab" data-tab="github">GitHub</button>
                     </div>
 
@@ -926,9 +927,19 @@
                             </form>
                         </div>
 
+                        <!-- Auth Tab -->
+                        <div id="settings-tab-auth" class="settings-panel hidden">
+                            <h3 class="settings-section-title">Methode de connexion</h3>
+                            <p class="settings-section-hint">Comment Codeflow accede a Claude</p>
+
+                            <div id="settings-auth-content" class="settings-auth-content">
+                                <div class="loading">Chargement...</div>
+                            </div>
+                        </div>
+
                         <!-- GitHub Tab -->
                         <div id="settings-tab-github" class="settings-panel hidden">
-                            <h3 class="settings-section-title">🐙 Intégration GitHub</h3>
+                            <h3 class="settings-section-title">Integration GitHub</h3>
                             <p class="settings-section-hint">Configuration du repository pour ce projet</p>
 
                             <div id="settings-github-content" class="settings-github-content">
@@ -943,9 +954,74 @@
                 </div>
             </div>
         </div>
+
+        <!-- Auth Modal -->
+        <div id="auth-modal" class="modal hidden">
+            <div class="modal-content auth-modal">
+                <div class="modal-header">
+                    <h2>Authentification requise</h2>
+                </div>
+                <div class="modal-body">
+                    <p class="auth-description">
+                        Codeflow necessite un acces a Claude pour fonctionner.
+                        Choisissez votre methode de connexion:
+                    </p>
+
+                    <div class="auth-options">
+                        <!-- Option 1: Subscription -->
+                        <div class="auth-option-card">
+                            <div class="auth-option-header">
+                                <span class="auth-icon">&#128100;</span>
+                                <h3>Abonnement Pro/Max</h3>
+                            </div>
+                            <p>Utilisez votre abonnement Claude existant (20$/100$ par mois)</p>
+                            <button class="btn btn-primary" onclick="authManager.loginWithSubscription()">
+                                Connexion via CLI
+                            </button>
+                            <div id="subscription-instructions" class="auth-instructions hidden">
+                                <p class="auth-instructions-status">Page Claude.ai ouverte!</p>
+                                <ol>
+                                    <li>Connectez-vous sur Claude.ai</li>
+                                    <li>Dans un terminal, lancez: <code>claude login</code></li>
+                                    <li>Completez l'authentification</li>
+                                    <li>Revenez ici et cliquez "Verifier"</li>
+                                </ol>
+                                <button class="btn btn-secondary" onclick="authManager.verifySubscription()">
+                                    Verifier la connexion
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="auth-separator">ou</div>
+
+                        <!-- Option 2: API Key -->
+                        <div class="auth-option-card">
+                            <div class="auth-option-header">
+                                <span class="auth-icon">&#128273;</span>
+                                <h3>Cle API Anthropic</h3>
+                            </div>
+                            <p>Pour les utilisateurs de l'API (facturation a l'usage)</p>
+                            <input type="password"
+                                   id="api-key-input"
+                                   class="input"
+                                   placeholder="sk-ant-api...">
+                            <button class="btn btn-primary" onclick="authManager.loginWithApiKey()">
+                                Connexion
+                            </button>
+                            <a href="https://console.anthropic.com/settings/keys"
+                               target="_blank"
+                               class="auth-link">
+                                Obtenir une cle API
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="/js/auth.js"></script>
     <script src="/js/log-viewer.js"></script>
     <script type="module" src="/js/api.js"></script>
     <script type="module" src="/js/websocket.js"></script>
