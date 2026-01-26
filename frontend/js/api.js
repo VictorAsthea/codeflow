@@ -234,6 +234,10 @@ export const API = {
             method: 'POST',
         }),
 
+        research: () => fetchJSON(`${API_BASE}/ideation/research`, {
+            method: 'POST',
+        }),
+
         getSuggestions: () => fetchJSON(`${API_BASE}/ideation/suggestions`),
 
         acceptSuggestion: (id) => fetchJSON(`${API_BASE}/ideation/suggestions/${id}/accept`, {

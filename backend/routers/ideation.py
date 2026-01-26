@@ -25,6 +25,7 @@ from backend.services.ideation_service import (
     IdeationStorage,
     analyze_project,
     generate_suggestions,
+    research_trends,
     chat_ideation,
     get_ideation_storage,
 )
@@ -104,6 +105,40 @@ async def generate_suggestions_endpoint():
         "suggestions": [s.model_dump(mode="json") for s in new_suggestions],
         "count": len(new_suggestions),
         "message": f"Generated {len(new_suggestions)} suggestions"
+    }
+
+
+@router.post("/ideation/research")
+async def research_trends_endpoint():
+    """
+    Research market trends, competitors, and new technologies via web.
+
+    Uses AI with web search to find:
+    - Competitor features and innovations
+    - Industry trends and best practices
+    - New technologies in the stack
+    - User expectations in the domain
+
+    Returns research-based suggestions that are appended to existing suggestions.
+    """
+    storage = get_storage()
+    data = storage.get_data()
+
+    # Run analysis if not done
+    if not data.analysis:
+        project_path = get_active_project_path()
+        data.analysis = await analyze_project(project_path)
+
+    # Research trends
+    new_suggestions = await research_trends(
+        data.analysis,
+        get_active_project_path()
+    )
+
+    return {
+        "suggestions": [s.model_dump(mode="json") for s in new_suggestions],
+        "count": len(new_suggestions),
+        "message": f"Found {len(new_suggestions)} ideas from market research"
     }
 
 

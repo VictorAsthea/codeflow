@@ -807,6 +807,15 @@ body {
   background-color: var(--border);
 }
 
+.btn-accent {
+  background-color: var(--accent-purple);
+  color: white;
+}
+
+.btn-accent:hover {
+  background-color: #9b6dd1;
+}
+
 .btn-danger {
   background-color: var(--accent-red);
   color: white;

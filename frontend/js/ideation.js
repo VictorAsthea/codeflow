@@ -13,6 +13,7 @@ class IdeationManager {
 
         this.analyzeBtn = document.getElementById('ideation-analyze-btn');
         this.suggestBtn = document.getElementById('ideation-suggest-btn');
+        this.researchBtn = document.getElementById('ideation-research-btn');
         this.chatSendBtn = document.getElementById('ideation-chat-send');
         this.filterCategory = document.getElementById('ideation-filter-category');
         this.filterStatus = document.getElementById('ideation-filter-status');
@@ -29,6 +30,7 @@ class IdeationManager {
         // Button listeners
         this.analyzeBtn?.addEventListener('click', () => this.analyzeProject());
         this.suggestBtn?.addEventListener('click', () => this.generateSuggestions());
+        this.researchBtn?.addEventListener('click', () => this.researchTrends());
         this.chatSendBtn?.addEventListener('click', () => this.sendChatMessage());
 
         // Chat input enter key
@@ -111,6 +113,31 @@ class IdeationManager {
         } finally {
             this.suggestBtn.disabled = false;
             this.suggestBtn.textContent = '✨ Générer suggestions';
+        }
+    }
+
+    async researchTrends() {
+        if (!this.researchBtn) return;
+
+        this.researchBtn.disabled = true;
+        this.researchBtn.textContent = '🔄 Recherche en cours...';
+
+        try {
+            const result = await API.ideation.research();
+
+            // Merge new suggestions with existing
+            const existingIds = new Set(this.suggestions.map(s => s.id));
+            const newSuggestions = result.suggestions.filter(s => !existingIds.has(s.id));
+            this.suggestions = [...this.suggestions, ...newSuggestions];
+
+            this.renderSuggestions();
+            window.showToast?.(`${result.count} idées trouvées via recherche`, 'success');
+        } catch (error) {
+            console.error('Research failed:', error);
+            window.showToast?.('Erreur lors de la recherche', 'error');
+        } finally {
+            this.researchBtn.disabled = false;
+            this.researchBtn.textContent = '🌐 Rechercher tendances';
         }
     }
 
