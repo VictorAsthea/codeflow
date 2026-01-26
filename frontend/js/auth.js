@@ -338,6 +338,78 @@ class AuthManager {
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
+
+    /**
+     * Fetch and display rate limit status
+     */
+    async loadRateLimitStatus() {
+        const indicator = document.getElementById('rate-limit-indicator');
+        const text = document.getElementById('rate-limit-text');
+        if (!indicator || !text) return;
+
+        try {
+            const response = await fetch('/api/auth/rate-limit');
+            const data = await response.json();
+
+            if (!data.method) {
+                text.textContent = '--';
+                indicator.classList.remove('warning', 'danger');
+                indicator.title = 'Non connecte';
+                return;
+            }
+
+            // Format display based on method
+            if (data.method === 'subscription') {
+                const tierLabel = data.tier?.includes('max_5x') ? 'Max' :
+                                  data.tier?.includes('pro') ? 'Pro' : 'Sub';
+                text.textContent = tierLabel;
+                indicator.title = `Abonnement ${tierLabel}`;
+                indicator.classList.remove('warning', 'danger');
+                indicator.classList.add('subscription');
+            } else if (data.method === 'api_key') {
+                text.textContent = 'API';
+                indicator.title = 'Cle API Anthropic';
+                indicator.classList.remove('warning', 'danger', 'subscription');
+            }
+
+            // Add warning class if near limit (if we have limit info)
+            if (data.requests_remaining !== null && data.requests_limit !== null) {
+                const ratio = data.requests_remaining / data.requests_limit;
+                if (ratio < 0.1) {
+                    indicator.classList.add('danger');
+                    indicator.title += ` - ${data.requests_remaining}/${data.requests_limit} requetes`;
+                } else if (ratio < 0.3) {
+                    indicator.classList.add('warning');
+                    indicator.title += ` - ${data.requests_remaining}/${data.requests_limit} requetes`;
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load rate limit:', error);
+            text.textContent = '--';
+        }
+    }
+
+    /**
+     * Start periodic rate limit check
+     */
+    startRateLimitRefresh() {
+        // Initial load
+        this.loadRateLimitStatus();
+        // Refresh every 30 seconds
+        this.rateLimitInterval = setInterval(() => {
+            this.loadRateLimitStatus();
+        }, 30000);
+    }
+
+    /**
+     * Stop rate limit refresh
+     */
+    stopRateLimitRefresh() {
+        if (this.rateLimitInterval) {
+            clearInterval(this.rateLimitInterval);
+            this.rateLimitInterval = null;
+        }
+    }
 }
 
 // Initialize AuthManager on DOM ready
@@ -347,6 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check auth status with a small delay (like project-init)
     setTimeout(() => {
         window.authManager.checkAuth();
+        window.authManager.startRateLimitRefresh();
     }, 300);
 });
 

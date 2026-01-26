@@ -44,6 +44,18 @@ class LoginCliResponse(BaseModel):
     error: str | None = None
 
 
+class RateLimitResponse(BaseModel):
+    """Response for rate limit status."""
+    method: str | None = None
+    tier: str | None = None
+    requests_limit: int | None = None
+    requests_remaining: int | None = None
+    requests_reset: str | None = None
+    tokens_limit: int | None = None
+    tokens_remaining: int | None = None
+    tokens_reset: str | None = None
+
+
 @router.get("/status", response_model=AuthStatusResponse)
 async def get_status():
     """
@@ -144,3 +156,23 @@ async def login_cli():
     except Exception as e:
         logger.error(f"Failed to open login page: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/rate-limit", response_model=RateLimitResponse)
+async def get_rate_limit():
+    """
+    Get current rate limit status.
+
+    For subscription: reads from credentials file
+    For API key: makes minimal API call to get headers
+
+    Returns:
+        RateLimitResponse with rate limit info
+    """
+    try:
+        service = get_auth_service()
+        result = await service.get_rate_limit_status()
+        return RateLimitResponse(**result)
+    except Exception as e:
+        logger.error(f"Failed to get rate limit: {e}")
+        return RateLimitResponse()

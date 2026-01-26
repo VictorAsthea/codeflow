@@ -338,6 +338,60 @@ class AuthService:
                 "error": f"Failed to open browser: {str(e)}"
             }
 
+    async def get_rate_limit_status(self) -> dict:
+        """
+        Get rate limit status.
+
+        For subscription: reads tier from credentials file
+        For API key: would need to make API call (returns basic info)
+
+        Returns:
+            dict with rate limit info
+        """
+        result = {
+            "method": None,
+            "tier": None,
+            "requests_limit": None,
+            "requests_remaining": None,
+            "requests_reset": None,
+            "tokens_limit": None,
+            "tokens_remaining": None,
+            "tokens_reset": None
+        }
+
+        # Check subscription first
+        try:
+            if self.CLAUDE_CREDENTIALS_FILE.exists():
+                with open(self.CLAUDE_CREDENTIALS_FILE, 'r', encoding='utf-8') as f:
+                    credentials = json.load(f)
+
+                oauth = credentials.get("claudeAiOauth", {})
+                if oauth.get("accessToken"):
+                    result["method"] = "subscription"
+                    result["tier"] = oauth.get("rateLimitTier", "unknown")
+
+                    # Map tier to approximate limits
+                    tier = result["tier"]
+                    if "max_5x" in tier:
+                        result["requests_limit"] = 500  # Approximate for Max
+                    elif "pro" in tier.lower():
+                        result["requests_limit"] = 100  # Approximate for Pro
+
+                    return result
+        except Exception as e:
+            logger.warning(f"Failed to read subscription rate limit: {e}")
+
+        # Check API key
+        api_key = await self.get_api_key()
+        if api_key:
+            result["method"] = "api_key"
+            result["tier"] = "api"
+            # Note: To get actual rate limits, we'd need to make an API call
+            # and read the response headers. For now, return basic info.
+            return result
+
+        return result
+
 
 # Singleton instance
 _auth_service: Optional[AuthService] = None
