@@ -276,3 +276,55 @@ class RoadmapUpdate(BaseModel):
     project_description: str | None = None
     target_audience: str | None = None
     personas: list[str] | None = None
+
+
+# ============== Memory Session Models ==============
+
+class SessionStatus(str, Enum):
+    COMPLETED = "completed"
+    INTERRUPTED = "interrupted"
+    FAILED = "failed"
+    IMPORTED = "imported"
+
+
+class Session(BaseModel):
+    id: str
+    task_id: str
+    task_title: str
+    worktree: str = ""
+    started_at: datetime
+    ended_at: datetime
+    status: SessionStatus = SessionStatus.COMPLETED
+    messages_count: int = 0
+    tokens_used: int = 0
+    claude_session_id: str | None = None
+
+
+class SessionDetail(Session):
+    conversation: list[dict] = Field(default_factory=list)
+    raw_output: str | None = None
+    error: str | None = None
+
+
+class SessionCreate(BaseModel):
+    task_title: str
+    worktree: str = ""
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    status: SessionStatus = SessionStatus.COMPLETED
+    messages_count: int = 0
+    tokens_used: int = 0
+    claude_session_id: str | None = None
+    messages: list[dict] = Field(default_factory=list)
+    raw_output: str | None = None
+    error: str | None = None
+
+
+class ResumeInfo(BaseModel):
+    session_id: str
+    task_id: str
+    task_title: str
+    worktree: str = ""
+    claude_session_id: str | None = None
+    last_status: str
+    can_resume: bool = False
