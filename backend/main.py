@@ -1,11 +1,64 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
 from pathlib import Path
 import logging
 
 from backend.services.json_storage import JSONStorage
+
+
+# =============================================================================
+# SECURITY MIDDLEWARE
+# =============================================================================
+# Request body size limits to prevent denial-of-service attacks via large payloads.
+# - Regular API requests: 1MB (1,048,576 bytes)
+# - File uploads: 10MB (10,485,760 bytes) - reserved for future use
+# =============================================================================
+
+# Maximum request body sizes in bytes
+MAX_BODY_SIZE = 1 * 1024 * 1024  # 1MB for regular requests
+MAX_FILE_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB for file uploads (if any)
+
+
+class RequestBodySizeLimitMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware to enforce request body size limits.
+
+    Security: Prevents denial-of-service attacks by rejecting requests
+    with bodies larger than the configured maximum size.
+
+    This middleware checks the Content-Length header before reading the body,
+    providing early rejection of oversized requests.
+    """
+
+    def __init__(self, app, max_body_size: int = MAX_BODY_SIZE):
+        super().__init__(app)
+        self.max_body_size = max_body_size
+
+    async def dispatch(self, request: Request, call_next):
+        # Check Content-Length header if present
+        content_length = request.headers.get("content-length")
+
+        if content_length:
+            try:
+                length = int(content_length)
+                if length > self.max_body_size:
+                    return JSONResponse(
+                        status_code=413,
+                        content={
+                            "detail": f"Request body too large. Maximum size is {self.max_body_size // (1024 * 1024)}MB."
+                        }
+                    )
+            except ValueError:
+                # Invalid Content-Length header - let the request proceed
+                # and fail naturally if the body is actually too large
+                pass
+
+        return await call_next(request)
+
+
 from backend.services.migration import run_migration_if_needed
 from backend.routers import tasks, settings, git, webhooks, worktrees, roadmap, context, changelog, project, workspace, memory, ideation, auth
 from backend.services.task_queue import task_queue
@@ -67,6 +120,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Codeflow", version="0.1.0", lifespan=lifespan)
+
+# =============================================================================
+# MIDDLEWARE STACK
+# =============================================================================
+# Order matters: middleware is executed in reverse order of registration.
+# Request body size limit is added first to reject oversized requests early.
+# =============================================================================
+app.add_middleware(RequestBodySizeLimitMiddleware, max_body_size=MAX_BODY_SIZE)
 
 app.include_router(tasks.router, prefix="/api", tags=["tasks"])
 app.include_router(settings.router, prefix="/api", tags=["settings"])

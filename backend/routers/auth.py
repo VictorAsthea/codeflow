@@ -9,7 +9,7 @@ Provides endpoints for:
 
 import logging
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.services.auth_service import get_auth_service
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 class ApiKeyRequest(BaseModel):
     """Request body for setting API key."""
-    key: str
+    key: str = Field(..., min_length=1, max_length=500)
 
 
 class AuthStatusResponse(BaseModel):

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 import subprocess
 import logging
@@ -21,7 +21,7 @@ def get_active_project_path() -> str:
 
 class BranchDeleteRequest(BaseModel):
     """Request for deleting branches."""
-    branches: List[str]
+    branches: List[str] = Field(..., min_length=1, max_length=50)
     force: bool = False
 
 

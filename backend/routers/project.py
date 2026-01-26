@@ -3,7 +3,7 @@ Router pour les endpoints de gestion de projet.
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 
 from backend.services.project_init_service import get_project_init_service
@@ -14,7 +14,7 @@ router = APIRouter()
 
 
 class InitRequest(BaseModel):
-    project_path: Optional[str] = None
+    project_path: Optional[str] = Field(default=None, max_length=500)
 
 
 class UpdateSettingsRequest(BaseModel):
@@ -22,17 +22,17 @@ class UpdateSettingsRequest(BaseModel):
 
 
 class UpdateSecurityRequest(BaseModel):
-    custom_commands: List[str]
+    custom_commands: List[str] = Field(..., max_length=100)
 
 
 class UpdateMCPRequest(BaseModel):
-    server_name: str
+    server_name: str = Field(..., min_length=1, max_length=100)
     enabled: bool
 
 
 class UpdateGitHubRequest(BaseModel):
-    repo: Optional[str] = None
-    default_branch: Optional[str] = None
+    repo: Optional[str] = Field(default=None, max_length=200)
+    default_branch: Optional[str] = Field(default=None, max_length=100, pattern=r"^[a-zA-Z0-9_\-/.]+$")
 
 
 def _get_active_project_path() -> str:

@@ -2,8 +2,9 @@
 Router pour les endpoints de gestion du workspace.
 """
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
+from typing import Optional
 from pathlib import Path
 
 from backend.services.workspace_service import get_workspace_service
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/workspace", tags=["workspace"])
 
 
 class ProjectPathRequest(BaseModel):
-    project_path: str
+    project_path: str = Field(..., min_length=1, max_length=500)
 
 
 @router.get("/state")
@@ -63,7 +64,13 @@ async def get_recent_projects():
 
 
 @router.get("/browse")
-async def browse_folders(path: str = None):
+async def browse_folders(
+    path: Optional[str] = Query(
+        default=None,
+        max_length=500,
+        description="Directory path to browse"
+    )
+):
     """
     Liste les dossiers pour le file browser.
     Si path est None, retourne le dossier Documents/DEV ou Home.
