@@ -10,11 +10,15 @@ Provides functionality to:
 import json
 import uuid
 import logging
-import fcntl
 import asyncio
+import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
+
+# fcntl only available on Unix
+if sys.platform != 'win32':
+    import fcntl
 
 from backend.models import (
     IdeationAnalysis,
@@ -53,9 +57,10 @@ class IdeationStorage:
         lock_file = self.suggestions_file.with_suffix('.lock')
 
         try:
-            # Open lock file and acquire exclusive lock
+            # Open lock file and acquire exclusive lock (Unix only)
             with open(lock_file, 'w') as lock_fd:
-                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+                if sys.platform != 'win32':
+                    fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
 
                 # Write to temporary file first
                 temp_file = self.suggestions_file.with_suffix('.tmp')
