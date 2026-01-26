@@ -276,3 +276,58 @@ class RoadmapUpdate(BaseModel):
     project_description: str | None = None
     target_audience: str | None = None
     personas: list[str] | None = None
+
+
+# ============== Ideation Models ==============
+
+class SuggestionCategory(str, Enum):
+    SECURITY = "security"
+    PERFORMANCE = "performance"
+    CODE_QUALITY = "code_quality"
+    FEATURE = "feature"
+    BUG = "bug"
+    REFACTORING = "refactoring"
+    DOCUMENTATION = "documentation"
+    TESTING = "testing"
+    ACCESSIBILITY = "accessibility"
+    OTHER = "other"
+
+
+class SuggestionPriority(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class Suggestion(BaseModel):
+    id: str
+    title: str
+    description: str
+    category: SuggestionCategory
+    priority: SuggestionPriority
+    file_path: str | None = None  # Related file
+    line_number: int | None = None  # Related line
+    created_at: datetime = Field(default_factory=datetime.now)
+    dismissed: bool = False
+    task_id: str | None = None  # If converted to task
+
+
+class IdeationChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+
+class IdeationState(BaseModel):
+    suggestions: list[Suggestion] = Field(default_factory=list)
+    chat_history: list[IdeationChatMessage] = Field(default_factory=list)
+    last_analysis_at: datetime | None = None
+
+
+class IdeationChatRequest(BaseModel):
+    message: str
+
+
+class SuggestionToTaskRequest(BaseModel):
+    suggestion_id: str
