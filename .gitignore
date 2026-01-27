@@ -59,3 +59,9 @@ nul
 
 # Spec files (temporary)
 *-spec.md
+
+# Documentation files (local only)
+GIT_STRATEGY.md
+SPEC.md
+QUICKSTART.md
+PR_AUTO_STOP.md
