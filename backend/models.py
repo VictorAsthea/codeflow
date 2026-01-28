@@ -104,6 +104,9 @@ class Task(BaseModel):
     review_cycles: int = 0
     review_status: str | None = None
     review_output: str | None = None
+    # Cleanup metadata
+    cleanup_performed: bool = False
+    cleanup_files: list[str] = Field(default_factory=list)
     archived: bool = False
     archived_at: datetime | None = None
     created_at: datetime = Field(default_factory=datetime.now)
@@ -395,3 +398,60 @@ class ResumeInfo(BaseModel):
     project_path: str | None = None
     worktree_path: str | None = None
     last_message: str | None = None
+
+
+# ============== Cleanup Configuration Models ==============
+
+class CleanupConfig(BaseModel):
+    """Configuration for auto-cleanup of test/debug files before Human Review."""
+    enabled: bool = True
+    patterns: list[str] = Field(
+        default_factory=lambda: [
+            # Test files
+            "test_*.py",
+            "*_test.py",
+            "*.test.ts",
+            "*.test.tsx",
+            "*.test.js",
+            "*.test.jsx",
+            "*.spec.ts",
+            "*.spec.tsx",
+            "*.spec.js",
+            "*.spec.jsx",
+            # Spec/debug documentation
+            "*-spec.md",
+            "*-debug.md",
+            # Cache directories
+            ".pytest_cache/",
+            "__pycache__/",
+            ".mypy_cache/",
+            # Debug scripts
+            "scripts/debug_*.py",
+            "scripts/test_*.py",
+            # Build artifacts
+            "*.pyc",
+            "*.pyo",
+        ],
+        description="Glob patterns for files/directories to remove during cleanup"
+    )
+    keep_patterns: list[str] = Field(
+        default_factory=lambda: [
+            # Keep actual test suites in tests/ directories
+            "tests/**",
+            "test/**",
+            "__tests__/**",
+            # Keep CI/CD test configurations
+            ".github/**",
+            "pytest.ini",
+            "jest.config.*",
+            "vitest.config.*",
+        ],
+        description="Glob patterns for files/directories to preserve (overrides patterns)"
+    )
+
+
+class CleanupConfigUpdate(BaseModel):
+    """Model for updating cleanup configuration."""
+    enabled: bool | None = None
+    patterns: list[str] | None = None
+    keep_patterns: list[str] | None = None

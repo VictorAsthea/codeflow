@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from backend.services.workspace_service import get_workspace_service
+from backend.config import settings as app_settings
 
 
 class ProjectConfigService:
@@ -234,6 +235,62 @@ class ProjectConfigService:
             return {"connected": False, "error": "Connection timeout"}
         except Exception as e:
             return {"connected": False, "error": str(e)}
+
+    def get_cleanup_config(self) -> Dict[str, Any]:
+        """
+        Retourne la configuration de cleanup.
+        Priorité: project config > global app settings > defaults
+        """
+        # Default config from app settings
+        default_config = {
+            "enabled": app_settings.cleanup_enabled,
+            "patterns": app_settings.cleanup_patterns,
+            "keep_patterns": app_settings.cleanup_keep_patterns,
+        }
+
+        if not self.is_initialized():
+            return default_config
+
+        # Get project-specific cleanup config
+        config = self.get_config()
+        project_cleanup = config.get("cleanup", {})
+
+        # Merge with defaults (project config overrides defaults)
+        return {
+            "enabled": project_cleanup.get("enabled", default_config["enabled"]),
+            "patterns": project_cleanup.get("patterns", default_config["patterns"]),
+            "keep_patterns": project_cleanup.get("keep_patterns", default_config["keep_patterns"]),
+        }
+
+    def update_cleanup_config(self, cleanup_settings: Dict[str, Any]) -> bool:
+        """Met à jour la configuration de cleanup."""
+        if not self.is_initialized():
+            return False
+
+        config = self.get_config()
+        config["cleanup"] = {**config.get("cleanup", {}), **cleanup_settings}
+
+        config_file = self.codeflow_dir / "config.json"
+        try:
+            config_file.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding='utf-8')
+            return True
+        except Exception:
+            return False
+
+    def is_cleanup_enabled(self) -> bool:
+        """Vérifie si le cleanup est activé."""
+        cleanup_config = self.get_cleanup_config()
+        return cleanup_config.get("enabled", True)
+
+    def get_cleanup_patterns(self) -> List[str]:
+        """Retourne les patterns de fichiers à supprimer."""
+        cleanup_config = self.get_cleanup_config()
+        return cleanup_config.get("patterns", [])
+
+    def get_cleanup_keep_patterns(self) -> List[str]:
+        """Retourne les patterns de fichiers à préserver."""
+        cleanup_config = self.get_cleanup_config()
+        return cleanup_config.get("keep_patterns", [])
 
 
 def get_project_config(project_path: Optional[str] = None) -> ProjectConfigService:

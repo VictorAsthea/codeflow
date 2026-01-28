@@ -30,6 +30,7 @@ from backend.services.validation_service import (
     should_auto_fix
 )
 from backend.services.git_service import commit_changes, push_branch
+from backend.services.worktree_service import cleanup_worktree_files
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +97,81 @@ class TaskOrchestrator:
 
         if phase and phase in self.task.phases:
             self.task.phases[phase].logs.append(message.rstrip())
+
+    async def _run_cleanup(self) -> dict | None:
+        """
+        Run cleanup of test/debug files before transitioning to Human Review.
+
+        Returns cleanup result dict or None if cleanup is disabled.
+        Failures are logged but don't block the workflow.
+        """
+        if not settings.cleanup_enabled:
+            return None
+
+        try:
+            await self.log("Running cleanup of test/debug files...\n", "validation")
+
+            cleanup_result = await cleanup_worktree_files(
+                worktree_path=self.worktree_path,
+                patterns=settings.cleanup_patterns,
+                keep_patterns=settings.cleanup_keep_patterns
+            )
+
+            # Log cleaned files
+            if cleanup_result["cleaned_files"]:
+                await self.log(f"Cleaned {len(cleanup_result['cleaned_files'])} files:\n", "validation")
+                for f in cleanup_result["cleaned_files"][:10]:  # Show first 10
+                    await self.log(f"  - {f}\n", "validation")
+                if len(cleanup_result["cleaned_files"]) > 10:
+                    await self.log(f"  ... and {len(cleanup_result['cleaned_files']) - 10} more\n", "validation")
+
+            # Log cleaned directories
+            if cleanup_result["cleaned_dirs"]:
+                await self.log(f"Cleaned {len(cleanup_result['cleaned_dirs'])} directories:\n", "validation")
+                for d in cleanup_result["cleaned_dirs"][:10]:
+                    await self.log(f"  - {d}/\n", "validation")
+                if len(cleanup_result["cleaned_dirs"]) > 10:
+                    await self.log(f"  ... and {len(cleanup_result['cleaned_dirs']) - 10} more\n", "validation")
+
+            # Log skipped files (protected by keep patterns)
+            if cleanup_result["skipped"]:
+                await self.log(f"Skipped {len(cleanup_result['skipped'])} protected files.\n", "validation")
+
+            # Log any errors (non-blocking)
+            if cleanup_result["errors"]:
+                await self.log(f"Cleanup warnings: {len(cleanup_result['errors'])} issues\n", "validation")
+                for err in cleanup_result["errors"][:5]:
+                    await self.log(f"  ! {err}\n", "validation")
+
+            total_cleaned = len(cleanup_result["cleaned_files"]) + len(cleanup_result["cleaned_dirs"])
+            if total_cleaned == 0:
+                await self.log("No test/debug files found to clean.\n", "validation")
+            else:
+                await self.log(f"Cleanup completed: {total_cleaned} items removed.\n", "validation")
+
+            # Update task metadata with cleanup info
+            all_cleaned = cleanup_result["cleaned_files"] + cleanup_result["cleaned_dirs"]
+            if all_cleaned:
+                self.task.cleanup_performed = True
+                self.task.cleanup_files = all_cleaned
+                await update_task(self.task)
+
+                # Emit cleanup completed event
+                self.emit("task:cleanup_completed", {
+                    "task_id": self.task.id,
+                    "files_count": len(cleanup_result["cleaned_files"]),
+                    "dirs_count": len(cleanup_result["cleaned_dirs"]),
+                    "total_count": total_cleaned,
+                    "cleaned_items": all_cleaned[:20]  # Limit to first 20 for event payload
+                })
+
+            return cleanup_result
+
+        except Exception as e:
+            # Cleanup failures should not block the transition to Human Review
+            logger.error(f"Cleanup failed for task {self.task.id}: {e}")
+            await self.log(f"Cleanup warning: {str(e)} (non-blocking)\n", "validation")
+            return {"success": False, "error": str(e)}
 
     async def run(self) -> dict:
         """Execute the full workflow (Planning + Coding + Validation)."""
@@ -342,6 +418,9 @@ class TaskOrchestrator:
             phase.completed_at = datetime.now()
             phase.metrics.progress_percentage = 100
 
+            # Run cleanup before transitioning to Human Review
+            await self._run_cleanup()
+
             self.task.status = TaskStatus.HUMAN_REVIEW
             self.task.review_status = "completed"
             await update_task(self.task)
@@ -378,6 +457,9 @@ class TaskOrchestrator:
             # Move to HUMAN_REVIEW with issues noted (user decides what to do)
             phase.status = PhaseStatus.DONE
             phase.completed_at = datetime.now()
+
+            # Run cleanup before transitioning to Human Review
+            await self._run_cleanup()
 
             self.task.status = TaskStatus.HUMAN_REVIEW
             self.task.review_status = "needs_attention"

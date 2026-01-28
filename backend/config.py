@@ -53,6 +53,46 @@ class Settings(BaseSettings):
     coding_model: str = "claude-sonnet-4-20250514"
     validation_model: str = "claude-haiku-4-20250514"
 
+    # Cleanup settings - auto-cleanup test/debug files before Human Review
+    cleanup_enabled: bool = True
+    cleanup_patterns: list[str] = [
+        # Test files
+        "test_*.py",
+        "*_test.py",
+        "*.test.ts",
+        "*.test.tsx",
+        "*.test.js",
+        "*.test.jsx",
+        "*.spec.ts",
+        "*.spec.tsx",
+        "*.spec.js",
+        "*.spec.jsx",
+        # Spec/debug documentation
+        "*-spec.md",
+        "*-debug.md",
+        # Cache directories
+        ".pytest_cache/",
+        "__pycache__/",
+        ".mypy_cache/",
+        # Debug scripts
+        "scripts/debug_*.py",
+        "scripts/test_*.py",
+        # Build artifacts that shouldn't be committed
+        "*.pyc",
+        "*.pyo",
+    ]
+    cleanup_keep_patterns: list[str] = [
+        # Keep actual test suites in tests/ directories
+        "tests/**",
+        "test/**",
+        "__tests__/**",
+        # Keep CI/CD test configurations
+        ".github/**",
+        "pytest.ini",
+        "jest.config.*",
+        "vitest.config.*",
+    ]
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
