@@ -210,11 +210,11 @@ async def fix_pr_comments(
                     "commit_sha": commit_result["commit_sha"]
                 }
             else:
-                await log("[PR-FIXER] No changes were made by Claude")
+                await log("[PR-FIXER] No changes were made by Claude - comments may need manual review")
                 return {
-                    "success": True,
+                    "success": False,
                     "fixed_count": 0,
-                    "message": "No changes needed"
+                    "error": "Claude made no changes - comments may need manual review"
                 }
         else:
             await log(f"[PR-FIXER] Failed to commit/push: {commit_result.get('error')}")

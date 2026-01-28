@@ -177,6 +177,33 @@ function renderOverviewTab() {
             </div>
         </div>
         ` : ''}
+
+        ${currentTask.manual_actions && currentTask.manual_actions.length > 0 ? `
+        <div style="margin-bottom: 1.5rem; background: var(--bg-tertiary); padding: 1rem; border-radius: 8px; border-left: 4px solid var(--accent-yellow);">
+            <h3 style="margin-bottom: 0.75rem; color: var(--accent-yellow);">⚠️ Actions Manuelles Requises</h3>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                ${currentTask.manual_actions.map(action => `
+                    <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 6px; ${action.completed ? 'opacity: 0.6;' : ''}">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <span style="font-size: 1.1rem;">${action.completed ? '✅' : '⏳'}</span>
+                            <strong>${action.title}</strong>
+                        </div>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">${action.description}</p>
+                        ${action.command ? `
+                            <div style="background: var(--bg-primary); padding: 0.5rem; border-radius: 4px; font-family: monospace; font-size: 0.85rem; overflow-x: auto;">
+                                ${action.command}
+                            </div>
+                        ` : ''}
+                        ${action.file_path ? `
+                            <p style="font-size: 0.85rem; margin-top: 0.5rem; color: var(--text-secondary);">
+                                📁 ${action.file_path}
+                            </p>
+                        ` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
     `;
 
     // Add click handlers for screenshot lightbox

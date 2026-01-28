@@ -202,6 +202,17 @@ class GitOptions(BaseModel):
     target_branch: str = "develop"
 
 
+class ManualAction(BaseModel):
+    """Represents an action that requires manual user intervention."""
+    id: str = Field(..., description="Unique identifier for the action")
+    title: str = Field(..., description="Short description of the action")
+    description: str = Field(..., description="Detailed instructions")
+    command: str | None = Field(default=None, description="Command to execute (if applicable)")
+    file_path: str | None = Field(default=None, description="File path related to the action")
+    completed: bool = Field(default=False, description="Whether the action has been completed")
+    completed_at: datetime | None = Field(default=None, description="When the action was completed")
+
+
 class FileReference(BaseModel):
     path: str = Field(
         ...,
@@ -296,6 +307,11 @@ class Task(BaseModel):
         default=None,
         max_length=MAX_PATH_LENGTH,
         description="Project path this task belongs to (for multi-project support)"
+    )
+    # Manual actions required from user (e.g., apply migration, run command)
+    manual_actions: list[ManualAction] = Field(
+        default_factory=list,
+        description="List of actions that require manual user intervention"
     )
 
     @field_validator("title", "description")

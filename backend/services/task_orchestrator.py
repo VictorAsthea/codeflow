@@ -50,9 +50,17 @@ def get_storage():
 
 
 async def update_task(task: Task):
-    """Update task in storage"""
+    """Update task in storage, using task's project_path if available"""
+    from backend.services.json_storage import JSONStorage
+    from backend.utils.project_helpers import get_active_project_path
+    from pathlib import Path
+
+    # Use task's project path if available, otherwise fallback to active project
+    project_path = task.project_path or get_active_project_path()
+    storage = JSONStorage(base_path=Path(project_path))
+
     task.updated_at = datetime.now()
-    get_storage().update_task(task)
+    storage.update_task(task)
 
 
 def save_retry_state(task: Task, retry_state: RetryState) -> None:

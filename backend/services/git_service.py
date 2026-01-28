@@ -533,7 +533,9 @@ async def commit_changes(worktree_path: str, commit_message: str) -> dict:
 
 async def get_sync_status(project_path: str) -> dict:
     """
-    Check if local develop is behind origin/develop.
+    Check if local branch is behind origin.
+
+    Uses the project's configured default_branch from settings.
 
     Returns:
         dict with keys:
@@ -541,12 +543,19 @@ async def get_sync_status(project_path: str) -> dict:
             - ahead_count: int (commits ahead of origin)
             - is_behind: bool
             - last_fetch: str (ISO timestamp of last fetch)
+            - default_branch: str (the branch being checked)
     """
     try:
+        # Get the default branch from project settings
+        from backend.services.project_config_service import get_project_config
+        project_config = get_project_config(project_path)
+        project_settings = project_config.get_settings()
+        default_branch = project_settings.get("default_branch", "main")
+
         # Fetch from origin first
         await asyncio.to_thread(
             subprocess.run,
-            ["git", "fetch", "origin", "develop"],
+            ["git", "fetch", "origin", default_branch],
             cwd=project_path,
             capture_output=True,
             text=True,
@@ -558,7 +567,7 @@ async def get_sync_status(project_path: str) -> dict:
         # Count commits behind
         behind_result = await asyncio.to_thread(
             subprocess.run,
-            ["git", "rev-list", "--count", "HEAD..origin/develop"],
+            ["git", "rev-list", "--count", f"HEAD..origin/{default_branch}"],
             cwd=project_path,
             capture_output=True,
             text=True,
@@ -573,7 +582,7 @@ async def get_sync_status(project_path: str) -> dict:
         # Count commits ahead
         ahead_result = await asyncio.to_thread(
             subprocess.run,
-            ["git", "rev-list", "--count", "origin/develop..HEAD"],
+            ["git", "rev-list", "--count", f"origin/{default_branch}..HEAD"],
             cwd=project_path,
             capture_output=True,
             text=True,
@@ -590,7 +599,8 @@ async def get_sync_status(project_path: str) -> dict:
             "behind_count": behind_count,
             "ahead_count": ahead_count,
             "is_behind": behind_count > 0,
-            "last_fetch": datetime.now().isoformat()
+            "last_fetch": datetime.now().isoformat(),
+            "default_branch": default_branch
         }
 
     except subprocess.CalledProcessError as e:
