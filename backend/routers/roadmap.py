@@ -5,7 +5,7 @@ Provides endpoints for roadmap management, feature CRUD, and AI-powered generati
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 import uuid
 
@@ -24,19 +24,17 @@ from backend.models import (
 from backend.services.roadmap_storage import RoadmapStorage
 from backend.services import roadmap_ai
 from backend.config import settings
+from backend.validation import FeatureId
+from backend.utils.project_helpers import get_active_project_path
+from pathlib import Path
 
 router = APIRouter()
 
-# Storage instance
-_storage: RoadmapStorage | None = None
-
 
 def get_storage() -> RoadmapStorage:
-    """Get or create storage instance."""
-    global _storage
-    if _storage is None:
-        _storage = RoadmapStorage()
-    return _storage
+    """Get storage instance for active project."""
+    project_path = Path(get_active_project_path())
+    return RoadmapStorage(base_path=project_path)
 
 
 # ============== Roadmap CRUD ==============
@@ -101,7 +99,7 @@ async def create_feature(data: FeatureCreate):
 
 
 @router.patch("/roadmap/features/{feature_id}")
-async def update_feature(feature_id: str, data: FeatureUpdate):
+async def update_feature(feature_id: FeatureId, data: FeatureUpdate):
     """Update a feature's properties."""
     storage = get_storage()
 
@@ -115,7 +113,7 @@ async def update_feature(feature_id: str, data: FeatureUpdate):
 
 
 @router.delete("/roadmap/features/{feature_id}")
-async def delete_feature(feature_id: str):
+async def delete_feature(feature_id: FeatureId):
     """Delete a feature from the roadmap."""
     storage = get_storage()
 
@@ -126,7 +124,7 @@ async def delete_feature(feature_id: str):
 
 
 @router.patch("/roadmap/features/{feature_id}/status")
-async def update_feature_status(feature_id: str, status: FeatureStatus):
+async def update_feature_status(feature_id: FeatureId, status: FeatureStatus):
     """Update feature status (for drag-drop)."""
     storage = get_storage()
 
@@ -143,7 +141,7 @@ class StatusUpdateRequest(BaseModel):
 
 
 @router.patch("/roadmap/features/{feature_id}/drag")
-async def drag_feature(feature_id: str, data: StatusUpdateRequest):
+async def drag_feature(feature_id: FeatureId, data: StatusUpdateRequest):
     """Update feature status via drag-drop."""
     storage = get_storage()
 
@@ -158,11 +156,14 @@ async def drag_feature(feature_id: str, data: StatusUpdateRequest):
 # ============== Build Feature (Convert to Task) ==============
 
 @router.post("/roadmap/features/{feature_id}/build")
-async def build_feature(feature_id: str):
+async def build_feature(feature_id: FeatureId):
     """Create a task from a feature."""
-    from backend.main import storage as task_storage
+    from backend.services.json_storage import JSONStorage
     from backend.models import Task, TaskStatus, Phase, PhaseConfig, PhaseStatus
 
+    # Use active project's storage, not global Codeflow storage
+    project_path = Path(get_active_project_path())
+    task_storage = JSONStorage(base_path=project_path)
     roadmap_storage = get_storage()
     feature = roadmap_storage.get_feature(feature_id)
 
@@ -209,7 +210,9 @@ async def build_feature(feature_id: str):
             "validation": Phase(name="validation", config=default_config),
         },
         created_at=datetime.now(),
-        updated_at=datetime.now()
+        updated_at=datetime.now(),
+        # Store the project path for multi-project support
+        project_path=str(project_path)
     )
 
     task_storage.create_task(task)
@@ -239,9 +242,9 @@ async def get_analysis_status():
 # ============== AI Generation Endpoints ==============
 
 class AnalyzeRequest(BaseModel):
-    project_name: str = ""
-    project_description: str = ""
-    target_audience: str = ""
+    project_name: str = Field(default="", max_length=200)
+    project_description: str = Field(default="", max_length=5000)
+    target_audience: str = Field(default="", max_length=1000)
 
 
 @router.post("/roadmap/analyze")
@@ -253,10 +256,13 @@ async def analyze_project_endpoint(data: AnalyzeRequest | None = None):
     if not roadmap:
         roadmap = Roadmap()
 
+    # Get active project path
+    project_path = Path(get_active_project_path())
+
     # Auto-extract project info if not provided
     if not data or (not data.project_name and not data.project_description):
         # Use AI to extract project info from files
-        project_info = await roadmap_ai.extract_project_info()
+        project_info = await roadmap_ai.extract_project_info(project_path)
         roadmap.project_name = project_info["project_name"]
         roadmap.project_description = project_info["description"]
         roadmap.target_audience = project_info["target_audience"]
@@ -269,8 +275,8 @@ async def analyze_project_endpoint(data: AnalyzeRequest | None = None):
         if data.target_audience:
             roadmap.target_audience = data.target_audience
 
-    # Run analysis
-    analysis = await roadmap_ai.analyze_project()
+    # Run analysis with active project path
+    analysis = await roadmap_ai.analyze_project(project_path)
     roadmap.analysis = analysis
     storage.save_roadmap(roadmap)
 
@@ -335,14 +341,18 @@ async def generate_features(data: GenerateRequest | None = None):
 
     use_competitors = data.use_competitor_analysis if data else True
 
-    # Generate features
+    # Get active project path for deep scanning
+    project_path = Path(get_active_project_path())
+
+    # Generate features with deep codebase analysis
     new_features = await roadmap_ai.generate_features(
         project_name=roadmap.project_name,
         project_description=roadmap.project_description,
         target_audience=roadmap.target_audience,
         analysis=roadmap.analysis,
         competitor_analysis=roadmap.competitor_analysis if use_competitors else None,
-        existing_features=roadmap.features
+        existing_features=roadmap.features,
+        project_path=project_path
     )
 
     # Add new features to roadmap
@@ -357,7 +367,7 @@ async def generate_features(data: GenerateRequest | None = None):
 
 
 @router.post("/roadmap/features/{feature_id}/expand")
-async def expand_feature(feature_id: str):
+async def expand_feature(feature_id: FeatureId):
     """Expand a feature's description using AI."""
     storage = get_storage()
     feature = storage.get_feature(feature_id)

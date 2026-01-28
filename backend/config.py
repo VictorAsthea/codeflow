@@ -1,5 +1,9 @@
 from pydantic_settings import BaseSettings
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.models import RetryConfig
 
 
 # Agent profiles for different task execution strategies
@@ -53,9 +57,37 @@ class Settings(BaseSettings):
     coding_model: str = "claude-sonnet-4-20250514"
     validation_model: str = "claude-haiku-4-20250514"
 
+    # Retry system settings for Claude CLI execution
+    retry_enabled: bool = True
+    retry_max_attempts: int = 4
+    retry_base_delay: float = 2.0
+    retry_multiplier: float = 2.0
+    retry_jitter_factor: float = 0.2
+    retry_max_total_timeout: float = 1800.0  # 30 minutes max for all retries
+
+    # Circuit breaker settings (prevents retries when system is unhealthy)
+    circuit_breaker_enabled: bool = True
+    circuit_breaker_failure_threshold: int = 5  # Consecutive failures to trigger
+    circuit_breaker_recovery_timeout: float = 300.0  # 5 minutes before retry
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+
+    def get_retry_config(self) -> "RetryConfig":
+        """Create a RetryConfig instance from current settings.
+
+        Returns:
+            RetryConfig: Configuration object for the retry system
+        """
+        from backend.models import RetryConfig
+        return RetryConfig(
+            max_retries=self.retry_max_attempts,
+            base_delay=self.retry_base_delay,
+            multiplier=self.retry_multiplier,
+            jitter_factor=self.retry_jitter_factor,
+            max_total_timeout=self.retry_max_total_timeout
+        )
 
 
 settings = Settings()

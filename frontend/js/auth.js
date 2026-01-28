@@ -338,6 +338,182 @@ class AuthManager {
             setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
+
+    /**
+     * Fetch and display rate limit status
+     */
+    async loadRateLimitStatus() {
+        const indicator = document.getElementById('rate-limit-indicator');
+        const text = document.getElementById('rate-limit-text');
+        if (!indicator || !text) return;
+
+        try {
+            const response = await fetch('/api/auth/rate-limit');
+            const data = await response.json();
+
+            if (!data.method) {
+                text.textContent = '--';
+                indicator.classList.remove('warning', 'danger', 'subscription');
+                return;
+            }
+
+            // Format display based on method
+            if (data.method === 'subscription') {
+                const tierLabel = data.tier?.includes('max_5x') ? 'Max' :
+                                  data.tier?.includes('pro') ? 'Pro' : 'Sub';
+                text.textContent = tierLabel;
+                indicator.classList.remove('warning', 'danger');
+                indicator.classList.add('subscription');
+            } else if (data.method === 'api_key') {
+                text.textContent = 'API';
+                indicator.classList.remove('warning', 'danger', 'subscription');
+            }
+            // Usage data is now only loaded on manual refresh click
+        } catch (error) {
+            console.error('Failed to load rate limit:', error);
+            text.textContent = '--';
+        }
+    }
+
+    /**
+     * Fetch and display usage data in dropdown
+     */
+    async loadUsageData() {
+        try {
+            const response = await fetch('/api/auth/usage');
+            const data = await response.json();
+
+            if (data.error) {
+                console.warn('Usage data error:', data.error);
+                return;
+            }
+
+            // Update session usage
+            this.updateUsageBar('session', data.session_percentage, data.session_reset_text);
+
+            // Update weekly usage
+            this.updateUsageBar('weekly', data.weekly_percentage, data.weekly_reset_text);
+
+            // Update sonnet usage
+            this.updateUsageBar('sonnet', data.sonnet_percentage, data.sonnet_reset_text);
+
+            // Update last updated
+            const lastUpdated = document.getElementById('usage-last-updated');
+            if (lastUpdated && data.last_updated) {
+                const date = new Date(data.last_updated);
+                lastUpdated.textContent = `Mis a jour: ${date.toLocaleTimeString()}`;
+            }
+
+            // Update main indicator with session percentage
+            if (data.session_percentage !== null) {
+                const indicator = document.getElementById('rate-limit-indicator');
+                const text = document.getElementById('rate-limit-text');
+                if (indicator && text) {
+                    text.textContent = `${data.session_percentage}%`;
+                    indicator.classList.remove('warning', 'danger');
+                    if (data.session_percentage > 80) {
+                        indicator.classList.add('danger');
+                    } else if (data.session_percentage > 60) {
+                        indicator.classList.add('warning');
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load usage data:', error);
+        }
+    }
+
+    /**
+     * Update a usage bar
+     */
+    updateUsageBar(type, percentage, resetText) {
+        const bar = document.getElementById(`usage-${type}-bar`);
+        const percentEl = document.getElementById(`usage-${type}-percent`);
+        const resetEl = document.getElementById(`usage-${type}-reset`);
+
+        if (bar) {
+            if (percentage !== null) {
+                bar.style.width = `${percentage}%`;
+                bar.classList.remove('warning', 'danger');
+                if (percentage > 80) {
+                    bar.classList.add('danger');
+                } else if (percentage > 60) {
+                    bar.classList.add('warning');
+                }
+            } else {
+                bar.style.width = '0%';
+            }
+        }
+
+        if (percentEl) {
+            percentEl.textContent = percentage !== null ? `${percentage}% utilise` : '--%';
+        }
+
+        if (resetEl) {
+            resetEl.textContent = resetText || '';
+        }
+    }
+
+    /**
+     * Setup dropdown toggle
+     */
+    setupUsageDropdown() {
+        const wrapper = document.getElementById('rate-limit-wrapper');
+        const indicator = document.getElementById('rate-limit-indicator');
+        const dropdown = document.getElementById('rate-limit-dropdown');
+        const refreshBtn = document.getElementById('usage-refresh-btn');
+
+        if (!wrapper || !indicator || !dropdown) return;
+
+        // Toggle on click
+        indicator.addEventListener('click', (e) => {
+            e.stopPropagation();
+            wrapper.classList.toggle('open');
+            dropdown.classList.toggle('hidden');
+            // No auto-refresh on open - user must click refresh button
+        });
+
+        // Manual refresh button
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = '⏳';
+                try {
+                    await this.loadUsageData();
+                } finally {
+                    refreshBtn.disabled = false;
+                    refreshBtn.textContent = '🔄';
+                }
+            });
+        }
+
+        // Close on click outside
+        document.addEventListener('click', (e) => {
+            if (!wrapper.contains(e.target)) {
+                wrapper.classList.remove('open');
+                dropdown.classList.add('hidden');
+            }
+        });
+    }
+
+    /**
+     * Initialize rate limit display (no auto-refresh)
+     */
+    startRateLimitRefresh() {
+        // Setup dropdown with manual refresh button
+        this.setupUsageDropdown();
+        // Initial load only - no periodic refresh
+        // User can click refresh button to update
+        this.loadRateLimitStatus();
+    }
+
+    /**
+     * Stop rate limit refresh (kept for compatibility)
+     */
+    stopRateLimitRefresh() {
+        // No interval to clear anymore
+    }
 }
 
 // Initialize AuthManager on DOM ready
@@ -347,6 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check auth status with a small delay (like project-init)
     setTimeout(() => {
         window.authManager.checkAuth();
+        window.authManager.startRateLimitRefresh();
     }, 300);
 });
 

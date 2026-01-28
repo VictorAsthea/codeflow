@@ -4,6 +4,7 @@ let currentTask = null;
 let refreshInterval = null;
 let prReviewPollingInterval = null;
 let selectedCommentIds = new Set();
+let fixedCommentIds = new Set();  // Comments that were fixed (hidden locally)
 let prReviewData = null;
 let conflictData = null;
 
@@ -19,6 +20,11 @@ export function initTaskModal() {
 }
 
 async function openModal(taskId) {
+    // Reset PR review state for new task
+    selectedCommentIds.clear();
+    fixedCommentIds.clear();
+    prReviewData = null;
+
     try {
         currentTask = await API.tasks.get(taskId);
 
@@ -168,6 +174,23 @@ function renderOverviewTab() {
                 ${currentTask.screenshots.map((screenshot, i) => `
                     <img src="${screenshot}" alt="Screenshot ${i+1}" class="screenshot-thumbnail" data-index="${i}">
                 `).join('')}
+            </div>
+        </div>
+        ` : ''}
+
+        ${currentTask.cleanup_performed && currentTask.cleanup_files && currentTask.cleanup_files.length > 0 ? `
+        <div style="margin-bottom: 1.5rem;">
+            <h3 style="margin-bottom: 0.5rem;">Cleanup Summary</h3>
+            <div style="padding: 0.75rem; background-color: var(--bg-tertiary); border-radius: 6px; border-left: 3px solid var(--accent-green);">
+                <p style="margin-bottom: 0.5rem; color: var(--accent-green);">
+                    ${currentTask.cleanup_files.length} test/debug file(s) cleaned before review
+                </p>
+                <details style="font-size: 0.85rem; color: var(--text-secondary);">
+                    <summary style="cursor: pointer; margin-bottom: 0.5rem;">View cleaned files</summary>
+                    <ul style="margin: 0; padding-left: 1.5rem; max-height: 150px; overflow-y: auto;">
+                        ${currentTask.cleanup_files.map(f => `<li style="font-family: monospace; font-size: 0.8rem;">${escapeHtml(f)}</li>`).join('')}
+                    </ul>
+                </details>
             </div>
         </div>
         ` : ''}
@@ -697,29 +720,43 @@ function renderPRReviewTab() {
         resolveBtn.classList.add('hidden');
     }
 
-    // Render comments grouped by file
+    // Render comments grouped by file (filter out fixed comments)
     const groupedByFile = prReviewData.grouped_by_file || {};
     const files = Object.keys(groupedByFile);
 
-    if (files.length === 0) {
-        container.innerHTML = '<p class="no-comments">No review comments yet.</p>';
-        return;
-    }
-
+    let totalPending = 0;
     let html = '';
+
     for (const filePath of files) {
-        const comments = groupedByFile[filePath];
+        // Filter out fixed comments
+        const allComments = groupedByFile[filePath];
+        const pendingComments = allComments.filter(c => !fixedCommentIds.has(c.id));
+
+        if (pendingComments.length === 0) continue;  // Skip files with no pending comments
+
+        totalPending += pendingComments.length;
+        const fixedCount = allComments.length - pendingComments.length;
+        const fixedBadge = fixedCount > 0 ? ` <span class="fixed-badge">${fixedCount} fixed</span>` : '';
+
         html += `
             <div class="pr-file-group">
                 <div class="pr-file-header">
                     <span class="pr-file-path">${escapeHtml(filePath)}</span>
-                    <span class="pr-file-count">${comments.length} comment(s)</span>
+                    <span class="pr-file-count">${pendingComments.length} comment(s)${fixedBadge}</span>
                 </div>
                 <div class="pr-file-comments">
-                    ${comments.map(comment => renderComment(comment)).join('')}
+                    ${pendingComments.map(comment => renderComment(comment)).join('')}
                 </div>
             </div>
         `;
+    }
+
+    if (totalPending === 0) {
+        const fixedTotal = fixedCommentIds.size;
+        container.innerHTML = fixedTotal > 0
+            ? `<p class="no-comments">✅ Tous les commentaires ont été traités (${fixedTotal} fixés)</p>`
+            : '<p class="no-comments">No review comments yet.</p>';
+        return;
     }
 
     container.innerHTML = html;
@@ -737,23 +774,72 @@ function handleContainerChange(event) {
     }
 }
 
+function parseCommentBody(body) {
+    // Extract severity from markdown images like ![high](url) or ![medium](url)
+    const severityMatch = body.match(/!\[(high|medium|low|critical|info)\]/i);
+    const severity = severityMatch ? severityMatch[1].toLowerCase() : null;
+
+    // Remove markdown image syntax
+    let cleanBody = body.replace(/!\[[^\]]*\]\([^)]*\)/g, '').trim();
+
+    // Get first sentence or first 150 chars as summary
+    const firstSentence = cleanBody.match(/^[^.!?]*[.!?]/);
+    const summary = firstSentence
+        ? firstSentence[0].trim()
+        : (cleanBody.length > 150 ? cleanBody.substring(0, 150) + '...' : cleanBody);
+
+    // Full body is the rest (if longer than summary)
+    const hasMore = cleanBody.length > summary.length;
+
+    return { severity, summary, fullBody: cleanBody, hasMore };
+}
+
+function getSeverityBadge(severity) {
+    const badges = {
+        critical: { icon: '🔴', label: 'Critique', class: 'severity-critical' },
+        high: { icon: '🟠', label: 'Haute', class: 'severity-high' },
+        medium: { icon: '🟡', label: 'Moyenne', class: 'severity-medium' },
+        low: { icon: '🟢', label: 'Basse', class: 'severity-low' },
+        info: { icon: '🔵', label: 'Info', class: 'severity-info' }
+    };
+    return badges[severity] || null;
+}
+
 function renderComment(comment) {
     const isSelected = selectedCommentIds.has(comment.id);
-    const isBot = ['coderabbitai[bot]', 'gemini-code-review[bot]', 'github-actions[bot]'].includes(comment.author);
+    const isBot = ['coderabbitai[bot]', 'gemini-code-assist[bot]', 'gemini-code-review[bot]', 'github-actions[bot]'].includes(comment.author);
+
+    // Parse comment body for better UX
+    const { severity, summary, fullBody, hasMore } = parseCommentBody(comment.body);
+    const badge = getSeverityBadge(severity);
+
+    // Clean author name (remove [bot] suffix for display)
+    const displayAuthor = comment.author.replace(/\[bot\]$/, '');
 
     return `
-        <div class="pr-comment ${isBot ? 'pr-comment-bot' : ''}">
+        <div class="pr-comment ${isBot ? 'pr-comment-bot' : ''} ${severity ? 'has-severity' : ''}">
             <div class="pr-comment-header">
                 <label class="pr-comment-checkbox-label">
                     <input type="checkbox" class="pr-comment-checkbox" data-comment-id="${comment.id}" ${isSelected ? 'checked' : ''}>
-                    <span class="pr-comment-author">${escapeHtml(comment.author)}</span>
+                    ${badge ? `<span class="pr-severity-badge ${badge.class}">${badge.icon} ${badge.label}</span>` : ''}
                 </label>
-                ${comment.line ? `<span class="pr-comment-line">Line ${comment.line}</span>` : ''}
+                <div class="pr-comment-meta">
+                    <span class="pr-comment-author">${escapeHtml(displayAuthor)}</span>
+                    ${comment.line ? `<span class="pr-comment-line">L${comment.line}</span>` : ''}
+                </div>
             </div>
-            <div class="pr-comment-body">${escapeHtml(comment.body)}</div>
+            <div class="pr-comment-body">
+                <p class="pr-comment-summary">${escapeHtml(summary)}</p>
+                ${hasMore ? `
+                    <details class="pr-comment-details">
+                        <summary>Voir plus</summary>
+                        <p>${escapeHtml(fullBody)}</p>
+                    </details>
+                ` : ''}
+            </div>
             ${comment.diff_hunk ? `
                 <details class="pr-comment-diff">
-                    <summary>View diff context</summary>
+                    <summary>Contexte du code</summary>
                     <pre><code>${escapeHtml(comment.diff_hunk)}</code></pre>
                 </details>
             ` : ''}
@@ -815,19 +901,28 @@ function setupPRReviewActions() {
             fixBtn.disabled = true;
             fixBtn.textContent = 'Fixing...';
 
+            // Keep track of which comments we're fixing
+            const commentsToFix = Array.from(selectedCommentIds);
+
             try {
-                const result = await API.tasks.fixComments(currentTask.id, Array.from(selectedCommentIds));
+                const result = await API.tasks.fixComments(currentTask.id, commentsToFix);
                 if (result.success) {
-                    alert(`Fixed ${result.fixed_count} comment(s). Commit: ${result.commit_sha?.slice(0, 8) || 'N/A'}`);
+                    // Mark these comments as fixed (they'll be hidden)
+                    commentsToFix.forEach(id => fixedCommentIds.add(id));
                     selectedCommentIds.clear();
                     updateFixSelectedButton();
-                    await loadPRReviewData();
+
+                    // Re-render to hide fixed comments
+                    renderPRReviewTab();
+
+                    const commitMsg = result.commit_sha ? ` (${result.commit_sha.slice(0, 8)})` : '';
+                    window.showToast?.(`${result.fixed_count} commentaire(s) corrigé(s)${commitMsg}`, 'success');
                 } else {
-                    alert('Failed to fix comments: ' + (result.error || 'Unknown error'));
+                    window.showToast?.('Erreur: ' + (result.error || 'Échec'), 'error');
                 }
             } catch (error) {
                 console.error('Failed to fix comments:', error);
-                alert('Failed to fix comments: ' + error.message);
+                window.showToast?.('Erreur: ' + error.message, 'error');
             } finally {
                 fixBtn.disabled = false;
                 updateFixSelectedButton();

@@ -759,6 +759,118 @@ Please respond helpfully. If you have specific actionable suggestions, format th
     return response, extracted_suggestions
 
 
+async def research_trends(
+    analysis: IdeationAnalysis,
+    project_path: Optional[str] = None
+) -> list[Suggestion]:
+    """
+    Research market trends, competitors, and new technologies via web search.
+
+    Uses Claude with web search to find:
+    - Competitor features and innovations
+    - Industry trends and best practices
+    - New technologies in the stack
+    - User expectations in the domain
+
+    Args:
+        analysis: Project analysis data
+        project_path: Path to project root
+
+    Returns:
+        List of research-based suggestions
+    """
+    storage = IdeationStorage(project_path)
+
+    # Build context from project analysis
+    stack_str = ', '.join(analysis.stack) if analysis.stack else 'unknown'
+    frameworks_str = ', '.join(analysis.frameworks) if analysis.frameworks else 'none'
+
+    # Determine project domain from name and structure
+    project_name = analysis.project_name.lower()
+
+    system_prompt = """Tu es un expert en veille technologique et product management.
+Tu dois rechercher sur internet les tendances actuelles, les fonctionnalités des concurrents,
+et les nouvelles technologies pertinentes pour ce projet.
+
+IMPORTANT:
+- Utilise des informations RÉCENTES (2024-2025)
+- Cite des outils/produits RÉELS comme exemples
+- Propose des idées CONCRÈTES et ACTIONNABLES
+- Réponds UNIQUEMENT avec un tableau JSON valide"""
+
+    prompt = f"""Projet: {analysis.project_name}
+Stack technique: {stack_str}
+Frameworks: {frameworks_str}
+Taille: {analysis.files_count} fichiers, {analysis.lines_count} lignes
+
+Recherche sur internet et analyse:
+1. Les tendances actuelles dans ce domaine technologique
+2. Les fonctionnalités innovantes chez les concurrents/produits similaires
+3. Les nouvelles librairies ou outils pour ce stack
+4. Les attentes utilisateurs modernes pour ce type d'application
+
+Génère 5-8 suggestions basées sur ta recherche. Pour chaque suggestion:
+- title: titre court et clair
+- description: 2-3 phrases expliquant l'idée et pourquoi c'est pertinent (cite des exemples réels)
+- category: "feature" | "performance" | "quality" | "security"
+- priority: "high" | "medium" | "low"
+- source: d'où vient cette idée (ex: "Tendance 2024", "Feature de [Concurrent]", "Nouvelle librairie [nom]")
+
+Réponds UNIQUEMENT avec le JSON array:
+[{{"title": "...", "description": "...", "category": "...", "priority": "...", "source": "..."}}]"""
+
+    suggestions = []
+
+    success, output, stderr = call_claude(
+        prompt,
+        timeout=180,  # Plus long pour la recherche web
+        json_output=True,
+        system_prompt=system_prompt
+    )
+
+    if success and output:
+        logger.info(f"Research trends response: {len(output)} chars")
+        data = extract_json_array(output)
+
+        if data:
+            for item in data:
+                if isinstance(item, dict):
+                    try:
+                        category_str = item.get("category", "feature").lower()
+                        category = SuggestionCategory(category_str)
+                    except ValueError:
+                        category = SuggestionCategory.FEATURE
+
+                    # Add source to description
+                    description = item.get("description", "")
+                    source = item.get("source", "")
+                    if source:
+                        description = f"{description}\n\n📚 Source: {source}"
+
+                    suggestions.append(Suggestion(
+                        id=generate_suggestion_id(),
+                        title=item.get("title", "Untitled"),
+                        description=description,
+                        category=category,
+                        priority=item.get("priority", "medium"),
+                        status=SuggestionStatus.PENDING,
+                        created_at=datetime.now()
+                    ))
+            logger.info(f"Generated {len(suggestions)} research-based suggestions")
+        else:
+            logger.warning(f"Failed to parse research JSON: {output[:200]}")
+    else:
+        logger.warning(f"Research Claude call failed: {stderr}")
+
+    # Save suggestions (append to existing)
+    if suggestions:
+        existing = storage.get_data().suggestions
+        all_suggestions = existing + suggestions
+        storage.save_suggestions(all_suggestions)
+
+    return suggestions
+
+
 # Singleton storage instances
 _storages: dict[str, IdeationStorage] = {}
 

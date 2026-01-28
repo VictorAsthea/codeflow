@@ -14,5 +14,39 @@
     "enable_sounds": true,
     "enable_desktop_notifications": false
   },
+  "cleanup": {
+    "enabled": true,
+    "patterns": [
+      "test_*.py",
+      "*_test.py",
+      "*.test.ts",
+      "*.test.tsx",
+      "*.test.js",
+      "*.test.jsx",
+      "*.spec.ts",
+      "*.spec.tsx",
+      "*.spec.js",
+      "*.spec.jsx",
+      "*-spec.md",
+      "*-debug.md",
+      ".pytest_cache/",
+      "__pycache__/",
+      ".mypy_cache/",
+      "scripts/debug_*.py",
+      "scripts/test_*.py",
+      "*.pyc",
+      "*.pyo"
+    ],
+    "keep_patterns": [
+      "tests/**",
+      "test/**",
+      "__tests__/**",
+      ".github/**",
+      "pytest.ini",
+      "jest.config.*",
+      "vitest.config.*",
+      "pyproject.toml"
+    ]
+  },
   "last_updated": "2026-01-26T13:37:20.773697"
 }

@@ -101,13 +101,20 @@ async def run_validation(
         completed_subtasks=completed_subtasks
     )
 
-    # Execute Claude CLI for review
-    success, output = await run_claude_for_review(
+    # Execute Claude CLI for review (with retry support)
+    success, output, retry_metadata = await run_claude_for_review(
         prompt=prompt,
         cwd=worktree_path,
         timeout=300,  # 5 min max for validation
-        on_output=on_output
+        on_output=on_output,
+        task_id=f"{task.id}:validation",  # Task ID for metrics tracking
     )
+
+    if retry_metadata and retry_metadata.had_retries:
+        logger.info(
+            f"Validation completed after {retry_metadata.total_attempts} attempts "
+            f"(retry time: {retry_metadata.total_retry_time:.1f}s)"
+        )
 
     # Parse the result
     result = parse_validation_result(output)
@@ -280,15 +287,22 @@ Please fix these specific issues:
 Do not refactor or change anything else.
 '''
 
-    success = await run_claude_for_coding(
+    success, retry_metadata = await run_claude_for_coding(
         prompt=fix_prompt,
         cwd=worktree_path,
         timeout=600,
-        on_output=on_output
+        on_output=on_output,
+        task_id=f"{task.id}:auto-fix",  # Task ID for metrics tracking
     )
 
     if success:
-        logger.info(f"Auto-fix completed for task {task.id}")
+        if retry_metadata and retry_metadata.had_retries:
+            logger.info(
+                f"Auto-fix completed for task {task.id} after "
+                f"{retry_metadata.total_attempts} attempts"
+            )
+        else:
+            logger.info(f"Auto-fix completed for task {task.id}")
         return True
 
     logger.warning(f"Auto-fix failed for task {task.id}")

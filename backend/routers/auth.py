@@ -9,9 +9,10 @@ Provides endpoints for:
 
 import logging
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.services.auth_service import get_auth_service
+from backend.services.claude_usage_service import get_usage_service
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 class ApiKeyRequest(BaseModel):
     """Request body for setting API key."""
-    key: str
+    key: str = Field(..., min_length=1, max_length=500)
 
 
 class AuthStatusResponse(BaseModel):
@@ -41,6 +42,30 @@ class LoginCliResponse(BaseModel):
     """Response for CLI login operation."""
     success: bool
     message: str | None = None
+    error: str | None = None
+
+
+class RateLimitResponse(BaseModel):
+    """Response for rate limit status."""
+    method: str | None = None
+    tier: str | None = None
+    requests_limit: int | None = None
+    requests_remaining: int | None = None
+    requests_reset: str | None = None
+    tokens_limit: int | None = None
+    tokens_remaining: int | None = None
+    tokens_reset: str | None = None
+
+
+class UsageResponse(BaseModel):
+    """Response for Claude CLI usage data."""
+    session_percentage: int | None = None
+    session_reset_text: str | None = None
+    weekly_percentage: int | None = None
+    weekly_reset_text: str | None = None
+    sonnet_percentage: int | None = None
+    sonnet_reset_text: str | None = None
+    last_updated: str | None = None
     error: str | None = None
 
 
@@ -144,3 +169,43 @@ async def login_cli():
     except Exception as e:
         logger.error(f"Failed to open login page: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/rate-limit", response_model=RateLimitResponse)
+async def get_rate_limit():
+    """
+    Get current rate limit status.
+
+    For subscription: reads from credentials file
+    For API key: makes minimal API call to get headers
+
+    Returns:
+        RateLimitResponse with rate limit info
+    """
+    try:
+        service = get_auth_service()
+        result = await service.get_rate_limit_status()
+        return RateLimitResponse(**result)
+    except Exception as e:
+        logger.error(f"Failed to get rate limit: {e}")
+        return RateLimitResponse()
+
+
+@router.get("/usage", response_model=UsageResponse)
+async def get_usage():
+    """
+    Get real-time usage data from Claude CLI.
+
+    Executes `claude /usage` command and parses the output.
+    Returns session and weekly usage percentages with reset times.
+
+    Returns:
+        UsageResponse with usage data
+    """
+    try:
+        service = get_usage_service()
+        result = await service.get_usage()
+        return UsageResponse(**result)
+    except Exception as e:
+        logger.error(f"Failed to get usage: {e}")
+        return UsageResponse(error=str(e))

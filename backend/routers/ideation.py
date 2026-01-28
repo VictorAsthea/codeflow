@@ -25,28 +25,19 @@ from backend.services.ideation_service import (
     IdeationStorage,
     analyze_project,
     generate_suggestions,
+    research_trends,
     chat_ideation,
     get_ideation_storage,
 )
-from backend.services.workspace_service import get_workspace_service
-from backend.config import settings
+from backend.utils.project_helpers import get_active_project_path
+from backend.validation import SuggestionId
 
 router = APIRouter()
 
 
-def _get_active_project_path() -> str:
-    """Get the active project path from workspace service."""
-    try:
-        ws = get_workspace_service()
-        state = ws.get_workspace_state()
-        return state.get("active_project") or settings.project_path
-    except Exception:
-        return settings.project_path
-
-
 def get_storage() -> IdeationStorage:
     """Get storage for the active project."""
-    return get_ideation_storage(_get_active_project_path())
+    return get_ideation_storage(get_active_project_path())
 
 
 # ============== Analysis Endpoints ==============
@@ -59,7 +50,7 @@ async def analyze_project_endpoint():
     Scans files, detects patterns (tests, CI/CD, linting), and counts lines.
     Results are cached in .codeflow/ideation/analysis.json
     """
-    project_path = _get_active_project_path()
+    project_path = get_active_project_path()
     analysis = await analyze_project(project_path)
 
     return {
@@ -101,19 +92,53 @@ async def generate_suggestions_endpoint():
 
     # Run analysis if not done
     if not data.analysis:
-        project_path = _get_active_project_path()
+        project_path = get_active_project_path()
         data.analysis = await analyze_project(project_path)
 
     # Generate suggestions
     new_suggestions = await generate_suggestions(
         data.analysis,
-        _get_active_project_path()
+        get_active_project_path()
     )
 
     return {
         "suggestions": [s.model_dump(mode="json") for s in new_suggestions],
         "count": len(new_suggestions),
         "message": f"Generated {len(new_suggestions)} suggestions"
+    }
+
+
+@router.post("/ideation/research")
+async def research_trends_endpoint():
+    """
+    Research market trends, competitors, and new technologies via web.
+
+    Uses AI with web search to find:
+    - Competitor features and innovations
+    - Industry trends and best practices
+    - New technologies in the stack
+    - User expectations in the domain
+
+    Returns research-based suggestions that are appended to existing suggestions.
+    """
+    storage = get_storage()
+    data = storage.get_data()
+
+    # Run analysis if not done
+    if not data.analysis:
+        project_path = get_active_project_path()
+        data.analysis = await analyze_project(project_path)
+
+    # Research trends
+    new_suggestions = await research_trends(
+        data.analysis,
+        get_active_project_path()
+    )
+
+    return {
+        "suggestions": [s.model_dump(mode="json") for s in new_suggestions],
+        "count": len(new_suggestions),
+        "message": f"Found {len(new_suggestions)} ideas from market research"
     }
 
 
@@ -130,7 +155,7 @@ async def list_suggestions():
 
 
 @router.get("/ideation/suggestions/{suggestion_id}")
-async def get_suggestion(suggestion_id: str):
+async def get_suggestion(suggestion_id: SuggestionId):
     """Get a specific suggestion by ID."""
     storage = get_storage()
     suggestion = storage.get_suggestion(suggestion_id)
@@ -142,7 +167,7 @@ async def get_suggestion(suggestion_id: str):
 
 
 @router.post("/ideation/suggestions/{suggestion_id}/accept")
-async def accept_suggestion(suggestion_id: str):
+async def accept_suggestion(suggestion_id: SuggestionId):
     """
     Accept a suggestion and convert it to a Kanban task.
 
@@ -225,7 +250,7 @@ async def accept_suggestion(suggestion_id: str):
 
 
 @router.post("/ideation/suggestions/{suggestion_id}/dismiss")
-async def dismiss_suggestion(suggestion_id: str):
+async def dismiss_suggestion(suggestion_id: SuggestionId):
     """Dismiss a suggestion (mark as ignored)."""
     storage = get_storage()
     suggestion = storage.get_suggestion(suggestion_id)
@@ -244,7 +269,7 @@ async def dismiss_suggestion(suggestion_id: str):
 
 
 @router.delete("/ideation/suggestions/{suggestion_id}")
-async def delete_suggestion(suggestion_id: str):
+async def delete_suggestion(suggestion_id: SuggestionId):
     """Delete a suggestion permanently."""
     storage = get_storage()
 
@@ -264,7 +289,7 @@ async def chat_endpoint(request: ChatRequest):
     Have a conversation about ideas, improvements, and technical approaches.
     The AI has context about the project analysis.
     """
-    project_path = _get_active_project_path()
+    project_path = get_active_project_path()
 
     # Convert request context to ChatMessage objects
     context = [
