@@ -97,7 +97,11 @@ async def execute_phase(
     if phase_name not in task.phases:
         raise ValueError(f"Unknown phase: {phase_name}")
 
-    from backend.main import storage
+    from backend.services.json_storage import JSONStorage
+    from backend.utils.project_helpers import get_active_project_path
+    from pathlib import Path
+    project_path = Path(get_active_project_path())
+    storage = JSONStorage(base_path=project_path)
 
     phase = task.phases[phase_name]
     phase.status = PhaseStatus.RUNNING

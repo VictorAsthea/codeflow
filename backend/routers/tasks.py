@@ -1,15 +1,47 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from datetime import datetime
+from pathlib import Path
 import re
 import asyncio
 import threading
 import subprocess
+from pydantic import BaseModel, Field
 from backend.models import (
     Task, TaskCreate, TaskUpdate, TaskStatus, PhaseConfigUpdate,
     Phase, PhaseConfig, PhaseStatus, FixCommentsRequest, SubtaskStatus
 )
+
+
+# ============== Request Models for Queue Operations ==============
+
+class QueueTaskRequest(BaseModel):
+    """Request body for queuing a single task with priority"""
+    priority: str = Field(default="normal", pattern="^(high|normal|low)$")
+
+
+class BatchQueueRequest(BaseModel):
+    """Request body for batch queuing multiple tasks"""
+    tasks: list[dict] = Field(
+        ...,
+        description="List of task objects with 'task_id' and optional 'priority'"
+    )
+
+
+class ReorderQueueRequest(BaseModel):
+    """Request body for reordering the queue"""
+    task_order: list[str] = Field(
+        ...,
+        description="List of task IDs in desired execution order"
+    )
+
+
+class UpdatePriorityRequest(BaseModel):
+    """Request body for updating task priority"""
+    priority: str = Field(..., pattern="^(high|normal|low)$")
 from backend.config import settings
 from backend.services.subtask_executor import get_subtask_progress
+from backend.validation import TaskId, SubtaskId, PhaseName
+from backend.utils.project_helpers import get_active_project_path
 
 
 def get_storage():
@@ -18,7 +50,7 @@ def get_storage():
     return get_project_storage()
 from backend.services.worktree_manager import WorktreeManager
 from backend.services.phase_executor import execute_all_phases
-from backend.services.task_queue import task_queue
+from backend.services.task_queue import task_queue, TaskPriority
 from backend.websocket_manager import manager, kanban_manager
 
 router = APIRouter()
@@ -34,7 +66,9 @@ def generate_task_id(title: str, existing_tasks: list[Task]) -> str:
 
 
 @router.get("/tasks")
-async def list_tasks(include_archived: bool = False):
+async def list_tasks(
+    include_archived: bool = Query(default=False, description="Include archived tasks")
+):
     """List all tasks"""
     tasks = get_storage().load_tasks()
     if not include_archived:
@@ -103,7 +137,9 @@ async def create_new_task(task_data: TaskCreate):
         agent_profile=task_data.agent_profile,
         require_human_review_before_coding=task_data.require_human_review_before_coding,
         file_references=task_data.file_references,
-        screenshots=task_data.screenshots
+        screenshots=task_data.screenshots,
+        # Store the project path for multi-project support
+        project_path=get_active_project_path()
     )
 
     get_storage().create_task(task)
@@ -111,7 +147,7 @@ async def create_new_task(task_data: TaskCreate):
 
 
 @router.get("/tasks/{task_id}")
-async def get_task_detail(task_id: str):
+async def get_task_detail(task_id: TaskId):
     """Get task detail"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -120,7 +156,7 @@ async def get_task_detail(task_id: str):
 
 
 @router.patch("/tasks/{task_id}")
-async def update_task_detail(task_id: str, task_data: TaskUpdate):
+async def update_task_detail(task_id: TaskId, task_data: TaskUpdate):
     """Update task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -141,7 +177,7 @@ async def update_task_detail(task_id: str, task_data: TaskUpdate):
 
 
 @router.delete("/tasks/{task_id}")
-async def delete_task_endpoint(task_id: str):
+async def delete_task_endpoint(task_id: TaskId):
     """Delete a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -152,7 +188,7 @@ async def delete_task_endpoint(task_id: str):
 
 
 @router.patch("/tasks/{task_id}/archive")
-async def archive_task(task_id: str):
+async def archive_task(task_id: TaskId):
     """Archive a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -173,7 +209,7 @@ async def archive_task(task_id: str):
 
 
 @router.patch("/tasks/{task_id}/unarchive")
-async def unarchive_task(task_id: str):
+async def unarchive_task(task_id: TaskId):
     """Unarchive a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -219,14 +255,18 @@ async def execute_task_background(task_id: str, project_path: str):
         await log_handler(f"Starting task execution: {task.title}")
 
         branch_name = task.branch_name or f"task/{task.id}"
-        await log_handler(f"Creating worktree for branch: {branch_name}")
 
-        worktree_path = worktree_mgr.create(task.id, branch_name)
-        task.worktree_path = str(worktree_path)
-        task.branch_name = branch_name
-        get_storage().update_task(task)
-
-        await log_handler(f"Worktree created at: {worktree_path}")
+        # Check if worktree already exists (for task resumption)
+        if task.worktree_path and Path(task.worktree_path).exists():
+            worktree_path = Path(task.worktree_path)
+            await log_handler(f"Resuming with existing worktree: {worktree_path}")
+        else:
+            await log_handler(f"Creating worktree for branch: {branch_name}")
+            worktree_path = worktree_mgr.create(task.id, branch_name)
+            task.worktree_path = str(worktree_path)
+            task.branch_name = branch_name
+            get_storage().update_task(task)
+            await log_handler(f"Worktree created at: {worktree_path}")
 
         # v0.4: Use new task orchestrator with subtask-based workflow
         from backend.services.task_orchestrator import start_task
@@ -273,7 +313,7 @@ async def execute_task_background(task_id: str, project_path: str):
 
 
 @router.post("/tasks/{task_id}/start")
-async def start_task(task_id: str):
+async def start_task(task_id: TaskId):
     """Start task execution immediately (bypasses queue)"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -286,14 +326,20 @@ async def start_task(task_id: str):
     task.updated_at = datetime.now()
     get_storage().update_task(task)
 
-    asyncio.create_task(execute_task_background(task_id, settings.project_path))
+    # Use task's project_path if available, fallback to active project for backwards compatibility
+    project_path = task.project_path or get_active_project_path()
+    asyncio.create_task(execute_task_background(task_id, project_path))
 
     return {"message": "Task started", "task": task}
 
 
 @router.post("/tasks/{task_id}/queue")
-async def queue_task(task_id: str):
-    """Add task to the execution queue"""
+async def queue_task(task_id: TaskId, request: QueueTaskRequest = None):
+    """
+    Add task to the execution queue with optional priority.
+
+    Returns conflict warnings if the task may conflict with running/queued tasks.
+    """
     task = get_storage().get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -304,17 +350,40 @@ async def queue_task(task_id: str):
     if task.status == TaskStatus.QUEUED:
         raise HTTPException(status_code=400, detail="Task is already queued")
 
-    success = await task_queue.queue_task(task_id, settings.project_path)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to queue task")
+    # Parse priority from request
+    priority = TaskPriority.NORMAL
+    if request and request.priority:
+        try:
+            priority = TaskPriority(request.priority)
+        except ValueError:
+            priority = TaskPriority.NORMAL
+
+    # Use task's project_path if available, fallback to active project for backwards compatibility
+    project_path = task.project_path or get_active_project_path()
+    result = await task_queue.queue_task(task_id, project_path, priority)
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "Failed to queue task"))
 
     # Refresh task
     task = get_storage().get_task(task_id)
-    return {"message": "Task queued", "task": task, "queue_status": task_queue.get_status()}
+    response = {
+        "message": "Task queued",
+        "task": task,
+        "priority": priority.value,
+        "queue_status": task_queue.get_status()
+    }
+
+    # Include conflict warnings if any
+    if result.get("has_conflicts"):
+        response["conflicts"] = result.get("conflicts", [])
+        response["has_conflicts"] = True
+        response["message"] = "Task queued with conflict warnings"
+
+    return response
 
 
 @router.delete("/tasks/{task_id}/queue")
-async def unqueue_task(task_id: str):
+async def unqueue_task(task_id: TaskId):
     """Remove task from the queue"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -338,8 +407,162 @@ async def get_queue_status():
     return task_queue.get_status()
 
 
+@router.get("/queue/detailed")
+async def get_queue_detailed_status():
+    """Get detailed queue status with per-task progress info"""
+    return task_queue.get_detailed_status()
+
+
+@router.post("/queue/batch")
+async def batch_queue_tasks(request: BatchQueueRequest):
+    """
+    Queue multiple tasks at once with optional priorities.
+
+    Request body:
+    {
+        "tasks": [
+            {"task_id": "task-1", "priority": "high"},
+            {"task_id": "task-2", "priority": "normal"},
+            {"task_id": "task-3"}  // defaults to normal priority
+        ]
+    }
+    """
+    # Add project_path to each task (from stored task.project_path or fallback to active)
+    default_project_path = get_active_project_path()
+    tasks_with_path = []
+    for task_req in request.tasks:
+        task = get_storage().get_task(task_req.get("task_id"))
+        pp = task.project_path if task and task.project_path else default_project_path
+        tasks_with_path.append({**task_req, "project_path": pp})
+
+    result = await task_queue.batch_queue_tasks(tasks_with_path)
+    return result
+
+
+@router.put("/queue/reorder")
+async def reorder_queue(request: ReorderQueueRequest):
+    """
+    Reorder the task queue.
+
+    Request body:
+    {
+        "task_order": ["task-3", "task-1", "task-2"]
+    }
+
+    Tasks not in the list will be appended at the end.
+    """
+    success = await task_queue.reorder_queue(request.task_order)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to reorder queue")
+
+    return {
+        "message": "Queue reordered successfully",
+        "new_order": request.task_order,
+        "queue_status": task_queue.get_status()
+    }
+
+
+@router.post("/queue/pause")
+async def pause_queue():
+    """
+    Pause the task queue.
+
+    Running tasks will complete, but no new tasks will start from the queue.
+    """
+    success = await task_queue.pause()
+    if not success:
+        return {"message": "Queue is already paused", "paused": True}
+
+    return {"message": "Queue paused", "paused": True, "queue_status": task_queue.get_status()}
+
+
+@router.post("/queue/resume")
+async def resume_queue():
+    """
+    Resume the task queue after pause.
+
+    Queued tasks will start being processed again.
+    """
+    success = await task_queue.resume()
+    if not success:
+        return {"message": "Queue is not paused", "paused": False}
+
+    return {"message": "Queue resumed", "paused": False, "queue_status": task_queue.get_status()}
+
+
+@router.get("/queue/estimates")
+async def get_queue_estimates():
+    """
+    Get estimated completion times for all tasks in the queue.
+
+    Returns completion estimates for running and queued tasks based on:
+    - Historical execution data
+    - Subtask count
+    - Agent profile complexity
+    """
+    return task_queue.get_queue_estimated_completion()
+
+
+@router.post("/queue/optimize")
+async def optimize_queue():
+    """
+    Optimize queue order for maximum throughput.
+
+    Uses shortest job first heuristic with priority constraints
+    and starvation prevention.
+    """
+    optimized_order = await task_queue.optimize_queue_order()
+    if optimized_order:
+        success = await task_queue.reorder_queue(optimized_order)
+        if success:
+            return {
+                "message": "Queue optimized for throughput",
+                "new_order": optimized_order,
+                "queue_status": task_queue.get_status()
+            }
+
+    return {
+        "message": "Queue unchanged (empty or single task)",
+        "queue_status": task_queue.get_status()
+    }
+
+
+@router.patch("/tasks/{task_id}/priority")
+async def update_task_priority(task_id: TaskId, request: UpdatePriorityRequest):
+    """
+    Update the priority of a queued task.
+
+    Request body:
+    {
+        "priority": "high" | "normal" | "low"
+    }
+    """
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status != TaskStatus.QUEUED:
+        raise HTTPException(status_code=400, detail="Task is not queued - can only update priority of queued tasks")
+
+    try:
+        new_priority = TaskPriority(request.priority)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid priority: {request.priority}")
+
+    success = await task_queue.update_task_priority(task_id, new_priority)
+    if not success:
+        raise HTTPException(status_code=400, detail="Task not found in queue")
+
+    return {
+        "message": f"Task priority updated to {new_priority.value}",
+        "task_id": task_id,
+        "priority": new_priority.value,
+        "queue_status": task_queue.get_status()
+    }
+
+
 @router.post("/tasks/{task_id}/stop")
-async def stop_task(task_id: str):
+async def stop_task(task_id: TaskId):
     """Stop task execution"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -353,7 +576,7 @@ async def stop_task(task_id: str):
 
 
 @router.post("/tasks/{task_id}/resume")
-async def resume_task(task_id: str):
+async def resume_task(task_id: TaskId):
     """Resume a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -367,7 +590,7 @@ async def resume_task(task_id: str):
 
 
 @router.patch("/tasks/{task_id}/status")
-async def change_task_status(task_id: str, status_data: dict):
+async def change_task_status(task_id: TaskId, status_data: dict):
     """Change task status (for drag & drop)"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -403,7 +626,7 @@ async def change_task_status(task_id: str, status_data: dict):
 
 
 @router.patch("/tasks/{task_id}/phases/{phase_name}")
-async def update_phase_config(task_id: str, phase_name: str, config_data: PhaseConfigUpdate):
+async def update_phase_config(task_id: TaskId, phase_name: PhaseName, config_data: PhaseConfigUpdate):
     """Update phase configuration"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -427,7 +650,7 @@ async def update_phase_config(task_id: str, phase_name: str, config_data: PhaseC
 
 
 @router.post("/tasks/{task_id}/phases/{phase_name}/retry")
-async def retry_phase(task_id: str, phase_name: str):
+async def retry_phase(task_id: TaskId, phase_name: PhaseName):
     """Retry a failed phase"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -448,7 +671,7 @@ async def retry_phase(task_id: str, phase_name: str):
 
 
 @router.post("/tasks/{task_id}/review/accept")
-async def accept_review(task_id: str):
+async def accept_review(task_id: TaskId):
     """Accept AI review and proceed to human review"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -466,7 +689,7 @@ async def accept_review(task_id: str):
 
 
 @router.post("/tasks/{task_id}/review/skip")
-async def skip_review(task_id: str):
+async def skip_review(task_id: TaskId):
     """Skip AI review and proceed to human review"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -484,7 +707,7 @@ async def skip_review(task_id: str):
 
 
 @router.post("/tasks/{task_id}/review/retry")
-async def retry_review_fixes(task_id: str):
+async def retry_review_fixes(task_id: TaskId):
     """Retry with auto-fix for review issues"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -504,7 +727,7 @@ async def retry_review_fixes(task_id: str):
 
 
 @router.get("/tasks/{task_id}/review/status")
-async def get_review_status(task_id: str):
+async def get_review_status(task_id: TaskId):
     """Get review status for a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -521,7 +744,7 @@ async def get_review_status(task_id: str):
 
 
 @router.post("/tasks/{task_id}/create-pr")
-async def create_pull_request(task_id: str):
+async def create_pull_request(task_id: TaskId):
     """Create a pull request for the task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -629,7 +852,7 @@ async def create_pull_request(task_id: str):
 
 
 @router.post("/tasks/{task_id}/sync-pr")
-async def sync_pr_info(task_id: str):
+async def sync_pr_info(task_id: TaskId):
     """
     Sync PR info from GitHub for a task.
 
@@ -689,7 +912,7 @@ async def sync_pr_info(task_id: str):
 
 
 @router.get("/tasks/{task_id}/check-conflicts")
-async def check_conflicts(task_id: str):
+async def check_conflicts(task_id: TaskId):
     """Check if task branch has conflicts with develop"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -704,8 +927,62 @@ async def check_conflicts(task_id: str):
     return result
 
 
+@router.get("/tasks/{task_id}/potential-conflicts")
+async def get_potential_conflicts(task_id: TaskId):
+    """
+    Check for potential resource conflicts between this task and running/queued tasks.
+
+    Returns conflicts with other tasks that may modify the same files or directories.
+    This helps prevent parallel execution of tasks that would conflict.
+    """
+    task = get_storage().get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    from backend.services.conflict_detector import conflict_detector
+
+    # Get predicted files for this task
+    predicted = conflict_detector.analyze_task_files(task)
+
+    # Get running and queued tasks
+    running_ids = task_queue.get_status().get("running_task_ids", [])
+    queued_info = task_queue.get_detailed_status().get("queued_tasks", [])
+    queued_ids = [q.get("task_id") for q in queued_info if q.get("task_id")]
+
+    # Get all active task objects
+    active_tasks = []
+    for tid in running_ids + queued_ids:
+        if tid != task_id:
+            other_task = get_storage().get_task(tid)
+            if other_task:
+                active_tasks.append(other_task)
+
+    # Check conflicts
+    conflicts = conflict_detector.get_task_conflicts(task, active_tasks)
+
+    # Get safe parallel groups if there are multiple active tasks
+    all_tasks = [task] + active_tasks
+    safe_groups = []
+    if len(all_tasks) > 1:
+        groups = conflict_detector.get_safe_parallel_tasks(all_tasks)
+        safe_groups = [
+            [t.id for t in group]
+            for group in groups
+        ]
+
+    return {
+        "task_id": task_id,
+        "predicted_files": predicted.to_dict(),
+        "conflicts": [c.to_dict() for c in conflicts],
+        "has_conflicts": len(conflicts) > 0,
+        "high_severity_conflicts": len([c for c in conflicts if c.severity.value == "high"]),
+        "active_tasks": [{"id": t.id, "title": t.title, "status": t.status.value} for t in active_tasks],
+        "safe_parallel_groups": safe_groups
+    }
+
+
 @router.get("/tasks/{task_id}/pr-reviews")
-async def get_pr_reviews(task_id: str):
+async def get_pr_reviews(task_id: TaskId):
     """Get PR review comments for a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -716,12 +993,13 @@ async def get_pr_reviews(task_id: str):
 
     from backend.services.github_service import get_all_pr_reviews
 
-    result = await get_all_pr_reviews(task.pr_number, settings.project_path)
+    project_path = task.project_path or get_active_project_path()
+    result = await get_all_pr_reviews(task.pr_number, project_path)
     return result
 
 
 @router.post("/tasks/{task_id}/fix-comments")
-async def fix_comments(task_id: str, request: FixCommentsRequest):
+async def fix_comments(task_id: TaskId, request: FixCommentsRequest):
     """Fix selected PR review comments using Claude"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -741,12 +1019,13 @@ async def fix_comments(task_id: str, request: FixCommentsRequest):
     async def log_handler(message: str):
         await manager.send_log(task_id, message)
 
+    project_path = task.project_path or get_active_project_path()
     result = await fix_pr_comments(
         task_id=task_id,
         comment_ids=request.comment_ids,
         pr_number=task.pr_number,
         worktree_path=task.worktree_path,
-        project_path=settings.project_path,
+        project_path=project_path,
         log_callback=log_handler
     )
 
@@ -754,7 +1033,7 @@ async def fix_comments(task_id: str, request: FixCommentsRequest):
 
 
 @router.post("/tasks/{task_id}/resolve-conflicts")
-async def resolve_conflicts(task_id: str):
+async def resolve_conflicts(task_id: TaskId):
     """Resolve merge conflicts with develop using Claude"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -780,7 +1059,7 @@ async def resolve_conflicts(task_id: str):
 # ============== Subtasks Endpoints (v0.4) ==============
 
 @router.get("/tasks/{task_id}/subtasks")
-async def get_task_subtasks(task_id: str):
+async def get_task_subtasks(task_id: TaskId):
     """Get subtasks for a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -794,7 +1073,7 @@ async def get_task_subtasks(task_id: str):
 
 
 @router.get("/tasks/{task_id}/phases")
-async def get_task_phases(task_id: str):
+async def get_task_phases(task_id: TaskId):
     """Get phases state for a task"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -812,7 +1091,7 @@ async def get_task_phases(task_id: str):
 
 
 @router.post("/tasks/{task_id}/validate")
-async def trigger_validation(task_id: str, background_tasks: BackgroundTasks):
+async def trigger_validation(task_id: TaskId, background_tasks: BackgroundTasks):
     """Trigger validation phase manually"""
     task = get_storage().get_task(task_id)
     if not task:
@@ -826,13 +1105,15 @@ async def trigger_validation(task_id: str, background_tasks: BackgroundTasks):
 
     from backend.services.task_orchestrator import start_validation
 
+    project_path = task.project_path or get_active_project_path()
+
     async def run_validation():
         async def log_handler(message: str):
             await manager.send_log(task_id, message)
 
         await start_validation(
             task=task,
-            project_path=settings.project_path,
+            project_path=project_path,
             worktree_path=task.worktree_path,
             log_callback=log_handler
         )
@@ -843,7 +1124,7 @@ async def trigger_validation(task_id: str, background_tasks: BackgroundTasks):
 
 
 @router.post("/tasks/{task_id}/subtasks/{subtask_id}/retry")
-async def retry_subtask(task_id: str, subtask_id: str):
+async def retry_subtask(task_id: TaskId, subtask_id: SubtaskId):
     """Retry a failed subtask"""
     task = get_storage().get_task(task_id)
     if not task:

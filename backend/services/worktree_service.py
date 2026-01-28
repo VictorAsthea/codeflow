@@ -4,9 +4,10 @@ Worktree management service for listing, removing, and getting stats on git work
 import asyncio
 import subprocess
 import logging
+import os
 import re
 import shutil
-import fnmatch
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -338,218 +339,305 @@ async def get_worktree_by_task_id(project_path: str, task_id: str) -> Optional[d
     return None
 
 
-def _matches_pattern(file_path: Path, pattern: str, base_path: Path) -> bool:
+async def check_worktree_health(worktree_path: str) -> dict:
     """
-    Check if a file path matches a glob pattern.
-
-    Handles both simple patterns (*.py) and path patterns (tests/**).
-    """
-    relative_path = file_path.relative_to(base_path)
-    relative_str = str(relative_path).replace("\\", "/")
-
-    # Handle directory patterns (ending with /)
-    if pattern.endswith("/"):
-        dir_pattern = pattern.rstrip("/")
-        # Check if the file is inside a directory matching the pattern
-        parts = relative_str.split("/")
-        for i, part in enumerate(parts):
-            if fnmatch.fnmatch(part, dir_pattern):
-                return True
-        return False
-
-    # Handle path patterns with **
-    if "**" in pattern:
-        # Convert ** glob to regex-like matching
-        pattern_parts = pattern.replace("\\", "/").split("/")
-        path_parts = relative_str.split("/")
-        return _match_glob_pattern(path_parts, pattern_parts)
-
-    # Handle path patterns with /
-    if "/" in pattern:
-        return fnmatch.fnmatch(relative_str, pattern)
-
-    # Simple filename pattern - match against the filename only
-    return fnmatch.fnmatch(file_path.name, pattern)
-
-
-def _match_glob_pattern(path_parts: list[str], pattern_parts: list[str]) -> bool:
-    """
-    Match path parts against pattern parts, supporting ** wildcards.
-    """
-    if not pattern_parts:
-        return not path_parts
-
-    if not path_parts:
-        # Only match if remaining pattern is all **
-        return all(p == "**" for p in pattern_parts)
-
-    pattern = pattern_parts[0]
-
-    if pattern == "**":
-        # ** can match zero or more directories
-        if len(pattern_parts) == 1:
-            return True
-        # Try matching ** against 0, 1, 2, ... path components
-        for i in range(len(path_parts) + 1):
-            if _match_glob_pattern(path_parts[i:], pattern_parts[1:]):
-                return True
-        return False
-
-    if fnmatch.fnmatch(path_parts[0], pattern):
-        return _match_glob_pattern(path_parts[1:], pattern_parts[1:])
-
-    return False
-
-
-async def cleanup_worktree_files(
-    worktree_path: str,
-    patterns: list[str],
-    keep_patterns: list[str]
-) -> dict:
-    """
-    Clean up test/debug files from a worktree directory.
-
-    This function scans the worktree, matches files against cleanup patterns,
-    excludes files matching keep_patterns, and removes matched files/directories.
-
-    Args:
-        worktree_path: Path to the worktree directory
-        patterns: List of glob patterns for files to remove (e.g., "test_*.py", ".pytest_cache/")
-        keep_patterns: List of glob patterns for files to keep (e.g., "tests/**")
+    Check the health and integrity of a worktree.
 
     Returns:
         dict with keys:
-            - success: bool
-            - cleaned_files: list of removed file paths (relative to worktree)
-            - cleaned_dirs: list of removed directory paths (relative to worktree)
-            - skipped: list of files that matched cleanup but were kept
-            - errors: list of error messages
+            - healthy: bool (overall health status)
+            - exists: bool (directory exists)
+            - git_valid: bool (valid git worktree)
+            - has_uncommitted: bool (has uncommitted changes)
+            - branch: str | None (current branch)
+            - last_activity: str | None (ISO timestamp of last git activity)
+            - issues: list[str] (list of detected issues)
     """
     result = {
-        "success": True,
-        "cleaned_files": [],
-        "cleaned_dirs": [],
-        "skipped": [],
-        "errors": []
+        'healthy': True,
+        'exists': False,
+        'git_valid': False,
+        'has_uncommitted': False,
+        'branch': None,
+        'last_activity': None,
+        'issues': []
     }
 
-    base_path = Path(worktree_path)
+    path = Path(worktree_path)
 
-    if not base_path.exists():
-        result["success"] = False
-        result["errors"].append(f"Worktree path does not exist: {worktree_path}")
+    # Check if directory exists
+    if not path.exists():
+        result['healthy'] = False
+        result['issues'].append('Worktree directory does not exist')
         return result
 
-    if not base_path.is_dir():
-        result["success"] = False
-        result["errors"].append(f"Worktree path is not a directory: {worktree_path}")
+    result['exists'] = True
+
+    # Check if .git file exists (worktrees have .git file, not directory)
+    git_file = path / '.git'
+    if not git_file.exists():
+        result['healthy'] = False
+        result['issues'].append('Missing .git file - not a valid worktree')
         return result
 
-    # Separate directory patterns from file patterns
-    dir_patterns = [p.rstrip("/") for p in patterns if p.endswith("/")]
-    file_patterns = [p for p in patterns if not p.endswith("/")]
-
-    # First pass: find and remove matching directories
-    dirs_to_remove = set()
-
-    def scan_for_directories(current_path: Path):
-        """Recursively scan for directories matching cleanup patterns."""
-        try:
-            for item in current_path.iterdir():
-                if item.is_dir():
-                    # Check if directory name matches any dir pattern
-                    for pattern in dir_patterns:
-                        if fnmatch.fnmatch(item.name, pattern):
-                            relative = str(item.relative_to(base_path)).replace("\\", "/")
-                            # Check if it's protected by keep patterns
-                            should_keep = False
-                            for keep in keep_patterns:
-                                if _matches_pattern(item, keep, base_path):
-                                    should_keep = True
-                                    break
-                            if should_keep:
-                                result["skipped"].append(relative)
-                            else:
-                                dirs_to_remove.add(item)
-                            break
-                    else:
-                        # Recurse into non-matching directories
-                        scan_for_directories(item)
-        except PermissionError as e:
-            result["errors"].append(f"Permission denied: {e}")
-        except Exception as e:
-            result["errors"].append(f"Error scanning {current_path}: {e}")
-
-    # Run directory scan in thread to avoid blocking
-    await asyncio.to_thread(scan_for_directories, base_path)
-
-    # Remove matched directories
-    for dir_path in dirs_to_remove:
-        try:
-            relative = str(dir_path.relative_to(base_path)).replace("\\", "/")
-            await asyncio.to_thread(shutil.rmtree, dir_path)
-            result["cleaned_dirs"].append(relative)
-            logger.debug(f"Removed directory: {relative}")
-        except Exception as e:
-            result["errors"].append(f"Failed to remove directory {dir_path}: {e}")
-
-    # Second pass: find and remove matching files
-    files_to_remove = []
-
-    def scan_for_files(current_path: Path):
-        """Recursively scan for files matching cleanup patterns."""
-        try:
-            for item in current_path.iterdir():
-                if item.is_file():
-                    # Check if file matches any cleanup pattern
-                    for pattern in file_patterns:
-                        if _matches_pattern(item, pattern, base_path):
-                            relative = str(item.relative_to(base_path)).replace("\\", "/")
-                            # Check if it's protected by keep patterns
-                            should_keep = False
-                            for keep in keep_patterns:
-                                if _matches_pattern(item, keep, base_path):
-                                    should_keep = True
-                                    break
-                            if should_keep:
-                                result["skipped"].append(relative)
-                            else:
-                                files_to_remove.append(item)
-                            break
-                elif item.is_dir():
-                    # Recurse into directories (skip removed dirs)
-                    if item not in dirs_to_remove:
-                        scan_for_files(item)
-        except PermissionError as e:
-            result["errors"].append(f"Permission denied: {e}")
-        except Exception as e:
-            result["errors"].append(f"Error scanning {current_path}: {e}")
-
-    # Run file scan in thread
-    await asyncio.to_thread(scan_for_files, base_path)
-
-    # Remove matched files
-    for file_path in files_to_remove:
-        try:
-            relative = str(file_path.relative_to(base_path)).replace("\\", "/")
-            await asyncio.to_thread(file_path.unlink)
-            result["cleaned_files"].append(relative)
-            logger.debug(f"Removed file: {relative}")
-        except Exception as e:
-            result["errors"].append(f"Failed to remove file {file_path}: {e}")
-
-    # Log summary
-    total_cleaned = len(result["cleaned_files"]) + len(result["cleaned_dirs"])
-    if total_cleaned > 0:
-        logger.info(
-            f"Cleanup completed: removed {len(result['cleaned_files'])} files "
-            f"and {len(result['cleaned_dirs'])} directories from {worktree_path}"
+    try:
+        # Verify git worktree is valid by running git status
+        status_result = await asyncio.to_thread(
+            subprocess.run,
+            ['git', 'status', '--porcelain'],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True
         )
-    else:
-        logger.debug(f"Cleanup completed: no files to remove from {worktree_path}")
 
-    if result["errors"]:
-        result["success"] = False
-        logger.warning(f"Cleanup had {len(result['errors'])} errors")
+        if status_result.returncode != 0:
+            result['healthy'] = False
+            result['issues'].append(f'Git status failed: {status_result.stderr.strip()}')
+            return result
+
+        result['git_valid'] = True
+
+        # Check for uncommitted changes
+        if status_result.stdout.strip():
+            result['has_uncommitted'] = True
+            result['issues'].append('Has uncommitted changes')
+
+        # Get current branch
+        branch_result = await asyncio.to_thread(
+            subprocess.run,
+            ['git', 'branch', '--show-current'],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True
+        )
+
+        if branch_result.returncode == 0:
+            result['branch'] = branch_result.stdout.strip() or None
+
+        # Get last activity (last commit date)
+        log_result = await asyncio.to_thread(
+            subprocess.run,
+            ['git', 'log', '-1', '--format=%ci'],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True
+        )
+
+        if log_result.returncode == 0 and log_result.stdout.strip():
+            try:
+                # Parse git date format: "2024-01-15 10:30:45 +0000"
+                date_str = log_result.stdout.strip()
+                # Convert to ISO format
+                last_commit = datetime.strptime(date_str[:19], '%Y-%m-%d %H:%M:%S')
+                # Handle timezone offset
+                tz_str = date_str[20:].strip()
+                if tz_str:
+                    hours = int(tz_str[:3])
+                    minutes = int(tz_str[0] + tz_str[3:5])
+                    last_commit = last_commit.replace(tzinfo=timezone(timedelta(hours=hours, minutes=minutes)))
+                result['last_activity'] = last_commit.isoformat()
+            except (ValueError, IndexError):
+                pass
+
+        # Check if worktree is locked
+        lock_result = await asyncio.to_thread(
+            subprocess.run,
+            ['git', 'worktree', 'list', '--porcelain'],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True
+        )
+
+        if 'locked' in lock_result.stdout:
+            result['issues'].append('Worktree is locked')
+
+    except Exception as e:
+        result['healthy'] = False
+        result['issues'].append(f'Error checking worktree: {str(e)}')
+
+    # Overall health: no critical issues
+    if not result['git_valid']:
+        result['healthy'] = False
+
+    return result
+
+
+async def cleanup_stale_worktrees(project_path: str, max_age_hours: int = 72) -> dict:
+    """
+    Remove abandoned worktrees that haven't been active for a specified time.
+
+    Args:
+        project_path: Path to the main git repository
+        max_age_hours: Maximum hours of inactivity before considering a worktree stale
+
+    Returns:
+        dict with keys:
+            - cleaned: int (number of worktrees removed)
+            - skipped: int (number of worktrees skipped)
+            - errors: list[str] (errors encountered)
+            - details: list[dict] (details of each worktree processed)
+    """
+    result = {
+        'cleaned': 0,
+        'skipped': 0,
+        'errors': [],
+        'details': []
+    }
+
+    try:
+        worktrees = await list_worktrees(project_path)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+
+        for wt in worktrees:
+            path = wt.get('path', '')
+            detail = {'path': path, 'action': 'skipped', 'reason': ''}
+
+            # Skip main worktree
+            if wt.get('is_main'):
+                detail['reason'] = 'Main worktree'
+                result['skipped'] += 1
+                result['details'].append(detail)
+                continue
+
+            # Check health
+            health = await check_worktree_health(path)
+
+            # Skip if worktree doesn't exist (already gone)
+            if not health['exists']:
+                detail['reason'] = 'Does not exist'
+                result['skipped'] += 1
+                result['details'].append(detail)
+                continue
+
+            # Skip if has uncommitted changes
+            if health['has_uncommitted']:
+                detail['reason'] = 'Has uncommitted changes'
+                result['skipped'] += 1
+                result['details'].append(detail)
+                continue
+
+            # Check last activity
+            is_stale = False
+            if health['last_activity']:
+                try:
+                    last_activity = datetime.fromisoformat(health['last_activity'])
+                    if last_activity < cutoff_time:
+                        is_stale = True
+                except (ValueError, TypeError):
+                    # If we can't parse the date, check file modification time
+                    pass
+
+            # Fallback: check directory modification time
+            if not is_stale and health['last_activity'] is None:
+                try:
+                    path_obj = Path(path)
+                    mtime = datetime.fromtimestamp(path_obj.stat().st_mtime, tz=timezone.utc)
+                    if mtime < cutoff_time:
+                        is_stale = True
+                except (OSError, ValueError):
+                    pass
+
+            if not is_stale:
+                detail['reason'] = 'Recent activity'
+                result['skipped'] += 1
+                result['details'].append(detail)
+                continue
+
+            # Remove the stale worktree
+            remove_result = await remove_worktree(project_path, path)
+
+            if remove_result['success']:
+                detail['action'] = 'cleaned'
+                detail['reason'] = f'Inactive for more than {max_age_hours} hours'
+                result['cleaned'] += 1
+            else:
+                detail['action'] = 'error'
+                detail['reason'] = remove_result.get('error', 'Unknown error')
+                result['errors'].append(f"Failed to remove {path}: {detail['reason']}")
+
+            result['details'].append(detail)
+
+    except Exception as e:
+        logger.error(f"Error during worktree cleanup: {e}")
+        result['errors'].append(str(e))
+
+    return result
+
+
+async def get_worktree_disk_usage(project_path: str) -> dict:
+    """
+    Calculate total disk usage for all worktrees.
+
+    Returns:
+        dict with keys:
+            - total_bytes: int (total disk usage in bytes)
+            - total_formatted: str (human-readable total)
+            - worktrees: list[dict] (per-worktree usage)
+                - path: str
+                - bytes: int
+                - formatted: str
+    """
+    result = {
+        'total_bytes': 0,
+        'total_formatted': '0 B',
+        'worktrees': []
+    }
+
+    def format_bytes(size: int) -> str:
+        """Format bytes to human-readable string."""
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if abs(size) < 1024.0:
+                return f"{size:.1f} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} PB"
+
+    def get_dir_size(path: str) -> int:
+        """Calculate directory size in bytes."""
+        total = 0
+        try:
+            for dirpath, dirnames, filenames in os.walk(path):
+                # Skip .git internals for main repo (they're shared)
+                if '.git' in dirpath.split(os.sep):
+                    continue
+                for filename in filenames:
+                    filepath = os.path.join(dirpath, filename)
+                    try:
+                        total += os.path.getsize(filepath)
+                    except (OSError, FileNotFoundError):
+                        pass
+        except (OSError, PermissionError):
+            pass
+        return total
+
+    try:
+        worktrees = await list_worktrees(project_path)
+
+        for wt in worktrees:
+            path = wt.get('path', '')
+
+            # Skip main worktree (don't count main repo size)
+            if wt.get('is_main'):
+                continue
+
+            if not Path(path).exists():
+                continue
+
+            # Calculate size in thread to avoid blocking
+            size = await asyncio.to_thread(get_dir_size, path)
+
+            result['worktrees'].append({
+                'path': path,
+                'branch': wt.get('branch', ''),
+                'task_id': wt.get('task_id'),
+                'bytes': size,
+                'formatted': format_bytes(size)
+            })
+
+            result['total_bytes'] += size
+
+        result['total_formatted'] = format_bytes(result['total_bytes'])
+
+    except Exception as e:
+        logger.error(f"Error calculating disk usage: {e}")
 
     return result

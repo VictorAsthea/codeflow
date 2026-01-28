@@ -1,34 +1,27 @@
 import asyncio
 import subprocess
 import logging
+import re
 from typing import Callable, Any, Optional
 from datetime import datetime
 
 from backend.services.github_service import get_comments_by_ids
 from backend.services.claude_runner import run_claude_with_streaming
 
+# Use Haiku for fast PR fixes
+PR_FIX_MODEL = "claude-haiku-4-20250514"
+
 logger = logging.getLogger(__name__)
 
 
-def _build_fix_prompt(comments: list[dict], file_contents: dict[str, str]) -> str:
+def _build_fix_prompt(comments: list[dict]) -> str:
     """
-    Build a prompt for Claude to fix PR review comments.
-
-    Args:
-        comments: List of comment dicts from github_service
-        file_contents: Dict mapping file paths to their current content
-
-    Returns:
-        Formatted prompt string
+    Build a concise prompt for Claude to fix PR review comments.
+    Optimized for speed - only includes essential context.
     """
-    prompt_parts = [
-        "You are fixing PR review comments. Address each comment below by making the necessary code changes.",
-        "",
-        "## Review Comments to Address:",
-        ""
-    ]
+    prompt_parts = ["Fix these PR review comments. Make minimal changes.\n"]
 
-    # Group comments by file for context
+    # Group comments by file
     comments_by_file = {}
     for comment in comments:
         path = comment.get("path", "unknown")
@@ -37,45 +30,26 @@ def _build_fix_prompt(comments: list[dict], file_contents: dict[str, str]) -> st
         comments_by_file[path].append(comment)
 
     for file_path, file_comments in comments_by_file.items():
-        prompt_parts.append(f"### File: {file_path}")
-
-        # Include file content if available
-        if file_path in file_contents:
-            prompt_parts.append("Current content:")
-            prompt_parts.append("```")
-            prompt_parts.append(file_contents[file_path])
-            prompt_parts.append("```")
-            prompt_parts.append("")
+        prompt_parts.append(f"## {file_path}")
 
         for comment in file_comments:
-            line = comment.get("line", "N/A")
-            author = comment.get("author", "unknown")
+            line = comment.get("line", "?")
             body = comment.get("body", "")
             diff_hunk = comment.get("diff_hunk", "")
 
-            prompt_parts.append(f"**Comment by {author} on line {line}:**")
-            prompt_parts.append(body)
+            # Clean body - remove markdown images
+            clean_body = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', body).strip()
+
+            prompt_parts.append(f"Line {line}: {clean_body}")
 
             if diff_hunk:
-                prompt_parts.append("")
-                prompt_parts.append("Context from diff:")
+                # Only include relevant lines from diff (last 10 lines max)
+                hunk_lines = diff_hunk.strip().split('\n')[-10:]
                 prompt_parts.append("```diff")
-                prompt_parts.append(diff_hunk)
+                prompt_parts.append('\n'.join(hunk_lines))
                 prompt_parts.append("```")
 
-            prompt_parts.append("")
-
-    prompt_parts.extend([
-        "## Instructions:",
-        "1. Read each comment carefully and understand what change is requested",
-        "2. Make the minimal necessary changes to address each comment",
-        "3. Use the Edit tool to make changes to files",
-        "4. Do NOT create new files unless explicitly requested",
-        "5. Ensure your changes compile/work correctly",
-        "6. Do NOT add unnecessary code, comments, or over-engineer the solution",
-        "",
-        "Address all the review comments above."
-    ])
+    prompt_parts.append("\nUse Edit tool. No new files. Minimal changes only.")
 
     return "\n".join(prompt_parts)
 
@@ -201,25 +175,18 @@ async def fix_pr_comments(
             await log("[PR-FIXER] No comments found with the provided IDs")
             return {"success": False, "fixed_count": 0, "error": "No comments found"}
 
-        await log(f"[PR-FIXER] Found {len(comments)} comments to address")
+        await log(f"[PR-FIXER] Fixing {len(comments)} comments...")
 
-        # Get unique file paths
-        file_paths = list(set(c.get("path") for c in comments if c.get("path")))
-        await log(f"[PR-FIXER] Files involved: {', '.join(file_paths)}")
+        # Build concise prompt (no file reading needed - Claude will read if needed)
+        prompt = _build_fix_prompt(comments)
 
-        # Read file contents
-        file_contents = await _read_file_contents(file_paths, worktree_path)
-
-        # Build the prompt
-        prompt = _build_fix_prompt(comments, file_contents)
-        await log("[PR-FIXER] Built Claude prompt, starting code fixes...")
-
-        # Run Claude to make the fixes
+        # Run Claude with Haiku for speed (max 10 turns)
         result = await run_claude_with_streaming(
             prompt=prompt,
             working_dir=worktree_path,
-            allowed_tools=["Read", "Edit", "Write", "Glob", "Grep"],
-            max_turns=20,
+            model=PR_FIX_MODEL,
+            allowed_tools=["Read", "Edit", "Glob"],
+            max_turns=10,
             log_callback=log_callback
         )
 

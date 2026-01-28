@@ -9,12 +9,40 @@ class WorkspaceManager {
         this.tabsContainer = null;
         this.currentBrowsePath = null;
         this.selectedPath = null;
+        this.parallelDashboard = null;
     }
 
     async init() {
         this.tabsContainer = document.getElementById('project-tabs');
         await this.loadState();
         this.render();
+        this.initParallelDashboard();
+        this.setupViewChangeListener();
+    }
+
+    /**
+     * Initialize the parallel execution dashboard
+     */
+    initParallelDashboard() {
+        // Check if the dashboard container exists
+        const container = document.getElementById('parallel-dashboard-container');
+        if (container && typeof window.initParallelDashboard === 'function') {
+            this.parallelDashboard = window.initParallelDashboard('parallel-dashboard-container');
+        }
+    }
+
+    /**
+     * Setup listener for view changes to show/hide parallel dashboard
+     */
+    setupViewChangeListener() {
+        window.addEventListener('view-changed', (e) => {
+            const view = e.detail?.view;
+            if (view === 'parallel' && this.parallelDashboard) {
+                this.parallelDashboard.show();
+            } else if (this.parallelDashboard) {
+                this.parallelDashboard.hide();
+            }
+        });
     }
 
     async loadState() {
@@ -314,6 +342,11 @@ class WorkspaceManager {
     }
 
     async reloadProjectData() {
+        // Dispatch project-changed event for other components
+        window.dispatchEvent(new CustomEvent('project-changed', {
+            detail: { project: this.activeProject }
+        }));
+
         // Reload kanban
         if (typeof loadKanban === 'function') {
             await loadKanban();
@@ -329,6 +362,16 @@ class WorkspaceManager {
         // Reload settings
         if (typeof loadSettings === 'function') {
             await loadSettings();
+        }
+
+        // Reload roadmap if the function exists
+        if (typeof window.loadRoadmap === 'function') {
+            await window.loadRoadmap();
+        }
+
+        // Reload ideation if visible
+        if (typeof window.ideationManager !== 'undefined') {
+            window.ideationManager.load();
         }
     }
 

@@ -184,10 +184,149 @@ function setupSettingsTabs() {
                 renderSettingsGitHub();
             } else if (targetTab === 'auth') {
                 window.authManager?.loadSettingsAuthStatus();
+            } else if (targetTab === 'branches') {
+                loadBranchesTab();
             }
         });
     });
 }
+
+
+// ============== BRANCHES TAB ==============
+
+async function loadBranchesTab() {
+    const container = document.getElementById('settings-branches-content');
+    if (!container) return;
+
+    container.innerHTML = '<div class="loading">Chargement des branches...</div>';
+
+    try {
+        const response = await fetch('/api/git/branches');
+        if (!response.ok) throw new Error('Failed to load branches');
+
+        const data = await response.json();
+        container.innerHTML = renderBranchesContent(data);
+    } catch (error) {
+        container.innerHTML = `<p class="error-message">Erreur: ${error.message}</p>`;
+    }
+}
+
+function renderBranchesContent(data) {
+    const { current_branch, total, merged_count, branches } = data;
+
+    let html = `
+        <div class="branches-summary">
+            <div class="branches-stat">
+                <span class="stat-value">${total}</span>
+                <span class="stat-label">Branches</span>
+            </div>
+            <div class="branches-stat">
+                <span class="stat-value">${merged_count}</span>
+                <span class="stat-label">A supprimer</span>
+            </div>
+            <div class="branches-stat current">
+                <span class="stat-value">${current_branch}</span>
+                <span class="stat-label">Branche actuelle</span>
+            </div>
+        </div>
+    `;
+
+    if (merged_count > 0) {
+        html += `
+            <div class="branches-actions">
+                <button class="btn btn-danger" onclick="cleanupMergedBranches()">
+                    Supprimer ${merged_count} branche(s) mergee(s)
+                </button>
+            </div>
+        `;
+    }
+
+    html += '<div class="branches-list">';
+
+    for (const branch of branches) {
+        const statusClass = branch.is_current ? 'current' :
+                           branch.is_protected ? 'protected' :
+                           branch.is_merged ? 'merged' : '';
+        const statusBadge = branch.is_current ? '<span class="branch-badge current">actuelle</span>' :
+                           branch.is_protected ? '<span class="branch-badge protected">protegee</span>' :
+                           branch.is_merged ? '<span class="branch-badge merged">mergee</span>' : '';
+
+        html += `
+            <div class="branch-item ${statusClass}">
+                <div class="branch-info">
+                    <span class="branch-name">${branch.name}</span>
+                    ${statusBadge}
+                </div>
+                <div class="branch-meta">
+                    <span class="branch-date">${branch.last_commit}</span>
+                    ${branch.can_delete ? `<button class="btn btn-small btn-danger" onclick="deleteBranch('${branch.name}')">Supprimer</button>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+async function cleanupMergedBranches() {
+    if (!confirm('Supprimer toutes les branches mergees (sauf main/develop)?')) return;
+
+    try {
+        const response = await fetch('/api/git/cleanup-merged', { method: 'POST' });
+        const result = await response.json();
+
+        if (result.deleted_count > 0) {
+            if (window.showToast) {
+                window.showToast(`${result.deleted_count} branche(s) supprimee(s)`, 'success');
+            }
+        } else {
+            if (window.showToast) {
+                window.showToast('Aucune branche a supprimer', 'info');
+            }
+        }
+
+        // Reload the tab
+        loadBranchesTab();
+    } catch (error) {
+        if (window.showToast) {
+            window.showToast(`Erreur: ${error.message}`, 'error');
+        }
+    }
+}
+
+async function deleteBranch(branchName) {
+    if (!confirm(`Supprimer la branche "${branchName}"?`)) return;
+
+    try {
+        const response = await fetch('/api/git/branches', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ branches: [branchName], force: false })
+        });
+        const result = await response.json();
+
+        if (result.deleted_count > 0) {
+            if (window.showToast) {
+                window.showToast(`Branche "${branchName}" supprimee`, 'success');
+            }
+        } else if (result.failed.length > 0) {
+            if (window.showToast) {
+                window.showToast(`Erreur: ${result.failed[0].reason}`, 'error');
+            }
+        }
+
+        // Reload the tab
+        loadBranchesTab();
+    } catch (error) {
+        if (window.showToast) {
+            window.showToast(`Erreur: ${error.message}`, 'error');
+        }
+    }
+}
+
+window.cleanupMergedBranches = cleanupMergedBranches;
+window.deleteBranch = deleteBranch;
 
 // Initialize when settings modal opens
 document.addEventListener('DOMContentLoaded', () => {

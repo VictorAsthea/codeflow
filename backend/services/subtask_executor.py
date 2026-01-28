@@ -80,21 +80,32 @@ async def execute_subtask(
     prompt = build_subtask_prompt(task, subtask, project_path)
 
     try:
-        # Execute Claude Code CLI
-        success = await run_claude_for_coding(
+        # Execute Claude Code CLI (with retry support)
+        success, retry_metadata = await run_claude_for_coding(
             prompt=prompt,
             cwd=worktree_path,
             timeout=600,  # 10 min max per subtask
-            on_output=on_output
+            on_output=on_output,
+            task_id=f"{task.id}:{subtask.id}",  # Task:subtask ID for metrics tracking
         )
 
         if success:
             subtask.status = SubtaskStatus.COMPLETED
             subtask.completed_at = datetime.now()
-            logger.info(f"Subtask {subtask.id} completed successfully")
+            if retry_metadata and retry_metadata.had_retries:
+                logger.info(
+                    f"Subtask {subtask.id} completed successfully after "
+                    f"{retry_metadata.total_attempts} attempts"
+                )
+            else:
+                logger.info(f"Subtask {subtask.id} completed successfully")
         else:
             subtask.status = SubtaskStatus.FAILED
-            subtask.error = "Claude Code CLI execution failed"
+            error_msg = "Claude Code CLI execution failed"
+            if retry_metadata and retry_metadata.errors:
+                last_error = retry_metadata.errors[-1]
+                error_msg = f"{error_msg}: {last_error.get('error_type', 'unknown')}"
+            subtask.error = error_msg
             logger.error(f"Subtask {subtask.id} failed")
 
         return success

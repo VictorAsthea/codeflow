@@ -4,6 +4,8 @@ import hmac
 import logging
 from typing import Optional
 
+from backend.utils.project_helpers import get_active_project_path
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -68,7 +70,7 @@ async def github_webhook(
                 "message": f"PR #{pr_number} merged, syncing develop..."
             })
 
-            sync_result = await git_service.pull_develop(settings.project_path)
+            sync_result = await git_service.pull_develop(get_active_project_path())
 
             if sync_result["success"]:
                 await kanban_manager.broadcast("git:synced", {

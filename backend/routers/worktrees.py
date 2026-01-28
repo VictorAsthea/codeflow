@@ -1,13 +1,21 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from backend.config import settings
+from typing import Optional
 from backend.services.worktree_service import (
     list_worktrees,
     remove_worktree,
     merge_worktree,
     get_worktree_by_task_id,
-    cleanup_worktree_files
+    check_worktree_health,
+    cleanup_stale_worktrees,
+    get_worktree_disk_usage
 )
+from backend.utils.project_helpers import get_active_project_path
+
+
+class CleanupRequest(BaseModel):
+    """Request body for cleanup endpoint"""
+    max_age_hours: Optional[int] = 72
 
 
 class CleanupRequest(BaseModel):
@@ -21,18 +29,19 @@ router = APIRouter()
 @router.get("/worktrees")
 async def get_worktrees():
     """List all worktrees with their stats"""
-    worktrees = await list_worktrees(settings.project_path)
+    worktrees = await list_worktrees(get_active_project_path())
     return {"worktrees": worktrees}
 
 
 @router.delete("/worktrees/{task_id}")
 async def delete_worktree(task_id: str):
     """Remove a worktree by task ID"""
-    worktree = await get_worktree_by_task_id(settings.project_path, task_id)
+    project_path = get_active_project_path()
+    worktree = await get_worktree_by_task_id(project_path, task_id)
     if not worktree:
         raise HTTPException(status_code=404, detail=f"Worktree for task {task_id} not found")
 
-    result = await remove_worktree(settings.project_path, worktree['path'])
+    result = await remove_worktree(project_path, worktree['path'])
 
     if not result['success']:
         raise HTTPException(status_code=500, detail=result.get('error', 'Failed to remove worktree'))
@@ -41,13 +50,22 @@ async def delete_worktree(task_id: str):
 
 
 @router.post("/worktrees/{task_id}/merge")
-async def merge_worktree_endpoint(task_id: str, target: str = "develop"):
+async def merge_worktree_endpoint(
+    task_id: str,
+    target: str = Query(
+        default="develop",
+        max_length=100,
+        pattern=r"^[a-zA-Z0-9_\-/.]+$",
+        description="Target branch to merge into"
+    )
+):
     """Merge a worktree's branch into target branch"""
-    worktree = await get_worktree_by_task_id(settings.project_path, task_id)
+    project_path = get_active_project_path()
+    worktree = await get_worktree_by_task_id(project_path, task_id)
     if not worktree:
         raise HTTPException(status_code=404, detail=f"Worktree for task {task_id} not found")
 
-    result = await merge_worktree(settings.project_path, worktree['path'], target)
+    result = await merge_worktree(project_path, worktree['path'], target)
 
     if not result['success']:
         raise HTTPException(status_code=500, detail=result.get('error', 'Failed to merge worktree'))
@@ -55,54 +73,89 @@ async def merge_worktree_endpoint(task_id: str, target: str = "develop"):
     return {"message": result.get('message', 'Merge successful')}
 
 
-@router.post("/worktrees/{task_id}/cleanup")
-async def cleanup_worktree_endpoint(task_id: str, request: CleanupRequest | None = None):
+@router.get("/worktrees/health")
+async def get_worktrees_health():
     """
-    Clean up test/debug files from a worktree.
+    Get health status for all worktrees.
 
-    Removes files matching cleanup patterns (e.g., test_*.py, .pytest_cache/)
-    while preserving files in keep patterns (e.g., tests/**).
-
-    Args:
-        task_id: The task ID to identify the worktree
-        request: Optional request body with custom patterns
-            - patterns: List of glob patterns for files to remove (overrides defaults)
-            - keep_patterns: List of glob patterns for files to keep (overrides defaults)
-
-    Returns:
-        Cleanup result with lists of cleaned files, directories, skipped items, and errors
+    Returns health information for each worktree including:
+    - Whether the worktree is valid and accessible
+    - Uncommitted changes status
+    - Last activity timestamp
+    - Any detected issues
     """
-    worktree = await get_worktree_by_task_id(settings.project_path, task_id)
+    project_path = get_active_project_path()
+    worktrees = await list_worktrees(project_path)
+
+    health_results = []
+    for wt in worktrees:
+        path = wt.get('path', '')
+        health = await check_worktree_health(path)
+        health_results.append({
+            'path': path,
+            'branch': wt.get('branch', ''),
+            'task_id': wt.get('task_id'),
+            'is_main': wt.get('is_main', False),
+            **health
+        })
+
+    return {"worktrees": health_results}
+
+
+@router.get("/worktrees/{task_id}/health")
+async def get_worktree_health_by_task(task_id: str):
+    """Get health status for a specific worktree by task ID"""
+    project_path = get_active_project_path()
+    worktree = await get_worktree_by_task_id(project_path, task_id)
+
     if not worktree:
         raise HTTPException(status_code=404, detail=f"Worktree for task {task_id} not found")
 
-    # Check if cleanup is enabled (can be overridden by providing explicit patterns)
-    if not settings.cleanup_enabled and (request is None or request.patterns is None):
-        return {
-            "success": True,
-            "message": "Cleanup is disabled in settings",
-            "cleaned_files": [],
-            "cleaned_dirs": [],
-            "skipped": [],
-            "errors": []
-        }
+    health = await check_worktree_health(worktree['path'])
 
-    # Use provided patterns or fall back to settings defaults
-    patterns = request.patterns if request and request.patterns else settings.cleanup_patterns
-    keep_patterns = request.keep_patterns if request and request.keep_patterns else settings.cleanup_keep_patterns
+    return {
+        'path': worktree['path'],
+        'branch': worktree.get('branch', ''),
+        'task_id': task_id,
+        **health
+    }
 
-    result = await cleanup_worktree_files(
-        worktree_path=worktree['path'],
-        patterns=patterns,
-        keep_patterns=keep_patterns
-    )
 
-    if not result['success'] and result['errors']:
-        # Partial failure - some files cleaned but had errors
-        # Return 200 with the result so caller can see what was cleaned
-        pass
+@router.post("/worktrees/cleanup")
+async def cleanup_worktrees(request: CleanupRequest = CleanupRequest()):
+    """
+    Remove stale worktrees that have been inactive for a specified time.
 
-    total_cleaned = len(result['cleaned_files']) + len(result['cleaned_dirs'])
-    result['message'] = f"Cleaned {total_cleaned} items ({len(result['cleaned_files'])} files, {len(result['cleaned_dirs'])} directories)"
+    By default, removes worktrees inactive for more than 72 hours.
+    Skips worktrees that:
+    - Are the main worktree
+    - Have uncommitted changes
+    - Have recent activity
+    """
+    project_path = get_active_project_path()
+    result = await cleanup_stale_worktrees(project_path, request.max_age_hours)
 
-    return result
+    return {
+        "cleaned": result['cleaned'],
+        "skipped": result['skipped'],
+        "errors": result['errors'],
+        "details": result['details']
+    }
+
+
+@router.get("/worktrees/disk-usage")
+async def get_disk_usage():
+    """
+    Get disk usage for all worktrees.
+
+    Returns total disk usage and per-worktree breakdown.
+    Note: Main worktree is excluded from the calculation.
+    """
+    project_path = get_active_project_path()
+    result = await get_worktree_disk_usage(project_path)
+
+    return {
+        "total_bytes": result['total_bytes'],
+        "total_formatted": result['total_formatted'],
+        "worktrees": result['worktrees']
+    }

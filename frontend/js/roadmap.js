@@ -12,18 +12,18 @@ let initialized = false;
 
 // Priority labels
 const PRIORITY_LABELS = {
-    must: 'Must Have',
-    should: 'Should Have',
-    could: 'Could Have',
-    wont: "Won't Have"
+    must: 'Indispensable',
+    should: 'Important',
+    could: 'Souhaitable',
+    wont: 'Exclu'
 };
 
 // Phase labels
 const PHASE_LABELS = {
-    foundation: 'Foundation',
-    core: 'Core',
-    enhancement: 'Enhancement',
-    polish: 'Polish'
+    foundation: 'Fondation',
+    core: 'Cœur',
+    enhancement: 'Amélioration',
+    polish: 'Finition'
 };
 
 // Status mapping for columns
@@ -78,10 +78,10 @@ function showEmptyState() {
 
     board.innerHTML = `
         <div class="roadmap-empty" style="grid-column: 1 / -1;">
-            <h3>No features yet</h3>
-            <p>Generate your product roadmap using AI or add features manually.</p>
+            <h3>Aucune fonctionnalité</h3>
+            <p>Générez votre roadmap produit avec l'IA ou ajoutez des fonctionnalités manuellement.</p>
             <button class="btn btn-primary btn-generate-roadmap" id="btn-generate-wizard">
-                Generate Roadmap
+                Générer la Roadmap
             </button>
         </div>
     `;
@@ -105,7 +105,7 @@ function hideEmptyState() {
         board.innerHTML = `
             <div class="roadmap-column" data-status="under_review">
                 <div class="roadmap-column-header">
-                    <h3>Under Review</h3>
+                    <h3>À examiner</h3>
                     <span class="roadmap-count" id="count-under_review">0</span>
                 </div>
                 <div class="roadmap-column-body" id="column-under_review"></div>
@@ -113,7 +113,7 @@ function hideEmptyState() {
 
             <div class="roadmap-column" data-status="planned">
                 <div class="roadmap-column-header">
-                    <h3>Planned</h3>
+                    <h3>Planifié</h3>
                     <span class="roadmap-count" id="count-planned">0</span>
                 </div>
                 <div class="roadmap-column-body" id="column-planned"></div>
@@ -121,7 +121,7 @@ function hideEmptyState() {
 
             <div class="roadmap-column" data-status="in_progress">
                 <div class="roadmap-column-header">
-                    <h3>In Progress</h3>
+                    <h3>En cours</h3>
                     <span class="roadmap-count" id="count-in_progress_rm">0</span>
                 </div>
                 <div class="roadmap-column-body" id="column-in_progress_rm"></div>
@@ -129,7 +129,7 @@ function hideEmptyState() {
 
             <div class="roadmap-column" data-status="done">
                 <div class="roadmap-column-header">
-                    <h3>Done</h3>
+                    <h3>Terminé</h3>
                     <span class="roadmap-count" id="count-done_rm">0</span>
                 </div>
                 <div class="roadmap-column-body" id="column-done_rm"></div>
@@ -170,23 +170,23 @@ function updateStats() {
 
     stats.innerHTML = `
         <span class="roadmap-stat">
-            <span class="roadmap-stat-value">${features.length}</span> features
+            <span class="roadmap-stat-value">${features.length}</span> fonctionnalités
         </span>
         <span class="roadmap-stat">
-            <span class="roadmap-stat-value">${mustHave}</span> must-have
+            <span class="roadmap-stat-value">${mustHave}</span> indispensables
         </span>
         <span class="roadmap-stat">
-            <span class="roadmap-stat-value">${inProgress}</span> in progress
+            <span class="roadmap-stat-value">${inProgress}</span> en cours
         </span>
         <span class="roadmap-stat">
-            <span class="roadmap-stat-value">${done}</span> done
+            <span class="roadmap-stat-value">${done}</span> terminées
         </span>
     `;
 
     // Update subtitle
     if (roadmapData.project_name) {
         document.getElementById('roadmap-subtitle').textContent =
-            `${roadmapData.project_name} - ${roadmapData.project_description || 'Product roadmap'}`;
+            `${roadmapData.project_name} - ${roadmapData.project_description || 'Roadmap produit'}`;
     }
 }
 
@@ -256,8 +256,8 @@ function renderList() {
             <td><span class="feature-badge impact-${feature.impact}">${feature.impact}</span></td>
             <td>${feature.status.replace('_', ' ')}</td>
             <td>
-                <button class="btn btn-small btn-secondary btn-view-feature" data-id="${feature.id}">View</button>
-                ${!feature.task_id ? `<button class="btn btn-small btn-success btn-build-feature" data-id="${feature.id}">Build</button>` : ''}
+                <button class="btn btn-small btn-secondary btn-view-feature" data-id="${feature.id}">Voir</button>
+                ${!feature.task_id ? `<button class="btn btn-small btn-success btn-build-feature" data-id="${feature.id}">Créer</button>` : ''}
             </td>
         </tr>
     `).join('');
@@ -299,7 +299,7 @@ function createFeatureCard(feature) {
         <div class="feature-card-footer">
             ${feature.task_id
                 ? `<a href="#" class="feature-task-link" data-task-id="${feature.task_id}">${feature.task_id}</a>`
-                : `<button class="btn-feature-action btn-build" data-id="${feature.id}">Build</button>`
+                : `<button class="btn-feature-action btn-build" data-id="${feature.id}">Créer</button>`
             }
         </div>
     `;
@@ -365,6 +365,9 @@ function setupEventListeners() {
 
     // Add feature button
     document.getElementById('add-feature-btn')?.addEventListener('click', openAddFeatureModal);
+
+    // Regenerate roadmap button
+    document.getElementById('regenerate-roadmap-btn')?.addEventListener('click', regenerateRoadmap);
 
     // Add feature modal
     setupAddFeatureModal();
@@ -463,7 +466,7 @@ function setupAddFeatureModal() {
         const impact = document.getElementById('feature-impact').value;
 
         if (!title || !description) {
-            alert('Please fill in title and description');
+            alert('Veuillez remplir le titre et la description');
             return;
         }
 
@@ -482,7 +485,7 @@ function setupAddFeatureModal() {
             await loadRoadmap();
         } catch (error) {
             console.error('Failed to create feature:', error);
-            alert('Failed to create feature: ' + error.message);
+            alert('Échec de création: ' + error.message);
         }
     });
 
@@ -517,7 +520,7 @@ function openFeatureDetail(featureId) {
     document.getElementById('detail-priority').className = `feature-badge priority-badge priority-${feature.priority}`;
     document.getElementById('detail-phase').textContent = PHASE_LABELS[feature.phase];
     document.getElementById('detail-phase').className = `feature-badge phase-badge phase-${feature.phase}`;
-    document.getElementById('detail-complexity').textContent = `Complexity: ${feature.complexity}`;
+    document.getElementById('detail-complexity').textContent = `Complexité: ${feature.complexity}`;
     document.getElementById('detail-complexity').className = `feature-badge complexity-badge complexity-${feature.complexity}`;
     document.getElementById('detail-impact').textContent = `Impact: ${feature.impact}`;
     document.getElementById('detail-impact').className = `feature-badge impact-badge impact-${feature.impact}`;
@@ -576,7 +579,7 @@ function setupFeatureDetailModal() {
     document.getElementById('btn-delete-feature')?.addEventListener('click', async () => {
         if (!currentFeatureId) return;
 
-        if (!confirm('Are you sure you want to delete this feature?')) return;
+        if (!confirm('Êtes-vous sûr de vouloir supprimer cette fonctionnalité ?')) return;
 
         try {
             await API.roadmap.deleteFeature(currentFeatureId);
@@ -584,33 +587,34 @@ function setupFeatureDetailModal() {
             await loadRoadmap();
         } catch (error) {
             console.error('Failed to delete feature:', error);
-            alert('Failed to delete feature: ' + error.message);
+            alert('Échec de suppression: ' + error.message);
         }
     });
 
-    // Expand button
-    document.getElementById('btn-expand-feature')?.addEventListener('click', async () => {
+    // Expand button - now opens discussion modal
+    document.getElementById('btn-expand-feature')?.addEventListener('click', () => {
         if (!currentFeatureId) return;
 
-        try {
-            const btn = document.getElementById('btn-expand-feature');
-            btn.textContent = 'Expanding...';
-            btn.disabled = true;
+        const feature = roadmapData?.features?.find(f => f.id === currentFeatureId);
+        if (!feature) return;
 
-            await API.roadmap.expandFeature(currentFeatureId);
-            await loadRoadmap();
+        // Close detail modal
+        document.getElementById('feature-detail-modal').classList.add('hidden');
 
-            // Refresh modal
-            openFeatureDetail(currentFeatureId);
-
-            btn.textContent = 'Expand with AI';
-            btn.disabled = false;
-        } catch (error) {
-            console.error('Failed to expand feature:', error);
-            alert('Failed to expand feature: ' + error.message);
-            document.getElementById('btn-expand-feature').textContent = 'Expand with AI';
-            document.getElementById('btn-expand-feature').disabled = false;
-        }
+        // Open discussion modal
+        window.discussionModal?.open(
+            {
+                id: feature.id,
+                type: 'feature',
+                title: feature.title,
+                description: feature.description
+            },
+            // Callback when description is updated
+            async (featureId, newDescription) => {
+                // Reload roadmap to reflect changes
+                await loadRoadmap();
+            }
+        );
     });
 
     // Build button
@@ -652,7 +656,45 @@ async function buildFeature(featureId) {
         }
     } catch (error) {
         console.error('Failed to build feature:', error);
-        alert('Failed to create task: ' + error.message);
+        alert('Échec de création de la tâche: ' + error.message);
+    }
+}
+
+/**
+ * Regenerate roadmap - clear all features and start wizard
+ */
+async function regenerateRoadmap() {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer toutes les fonctionnalités et régénérer la roadmap ?\n\nCette action est irréversible.')) {
+        return;
+    }
+
+    const btn = document.getElementById('regenerate-roadmap-btn');
+    const originalText = btn.textContent;
+
+    try {
+        btn.textContent = '⏳ Suppression...';
+        btn.disabled = true;
+
+        // Clear roadmap via API
+        await API.roadmap.clear();
+
+        // Reset local state
+        roadmapData = null;
+
+        btn.textContent = '✓ Supprimé';
+
+        // Open wizard to regenerate
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+            window.dispatchEvent(new CustomEvent('open-roadmap-wizard'));
+        }, 500);
+
+    } catch (error) {
+        console.error('Failed to clear roadmap:', error);
+        alert('Échec de la suppression: ' + error.message);
+        btn.textContent = originalText;
+        btn.disabled = false;
     }
 }
 
@@ -682,6 +724,9 @@ function setupGlobalListeners() {
 
 // Setup global listeners immediately
 setupGlobalListeners();
+
+// Expose loadRoadmap globally for workspace switching
+window.loadRoadmap = loadRoadmap;
 
 // Export for other modules
 export { roadmapData };

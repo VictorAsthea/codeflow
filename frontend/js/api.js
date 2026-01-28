@@ -119,6 +119,13 @@ export const API = {
             method: 'PATCH',
             body: JSON.stringify(data),
         }),
+
+        getParallel: () => fetchJSON(`${API_BASE}/settings/parallel`),
+
+        updateParallel: (maxParallelTasks) => fetchJSON(`${API_BASE}/settings/parallel`, {
+            method: 'PATCH',
+            body: JSON.stringify({ max_parallel_tasks: maxParallelTasks }),
+        }),
     },
 
     git: {
@@ -133,6 +140,32 @@ export const API = {
 
     queue: {
         status: () => fetchJSON(`${API_BASE}/queue/status`),
+
+        detailed: () => fetchJSON(`${API_BASE}/queue/detailed`),
+
+        batch: (tasks) => fetchJSON(`${API_BASE}/queue/batch`, {
+            method: 'POST',
+            body: JSON.stringify({ tasks }),
+        }),
+
+        reorder: (taskOrder) => fetchJSON(`${API_BASE}/queue/reorder`, {
+            method: 'PUT',
+            body: JSON.stringify({ task_order: taskOrder }),
+        }),
+
+        pause: () => fetchJSON(`${API_BASE}/queue/pause`, {
+            method: 'POST',
+        }),
+
+        resume: () => fetchJSON(`${API_BASE}/queue/resume`, {
+            method: 'POST',
+        }),
+
+        estimates: () => fetchJSON(`${API_BASE}/queue/estimates`),
+
+        optimize: () => fetchJSON(`${API_BASE}/queue/optimize`, {
+            method: 'POST',
+        }),
     },
 
     worktrees: {
@@ -198,6 +231,10 @@ export const API = {
         getAnalysis: () => fetchJSON(`${API_BASE}/ideation/analysis`),
 
         suggest: () => fetchJSON(`${API_BASE}/ideation/suggest`, {
+            method: 'POST',
+        }),
+
+        research: () => fetchJSON(`${API_BASE}/ideation/research`, {
             method: 'POST',
         }),
 
@@ -282,6 +319,34 @@ export const API = {
 
         expandFeature: (id) => fetchJSON(`${API_BASE}/roadmap/features/${id}/expand`, {
             method: 'POST',
+        }),
+    },
+
+    discussions: {
+        list: () => fetchJSON(`${API_BASE}/discussions`),
+
+        get: (itemId) => fetchJSON(`${API_BASE}/discussions/${itemId}`),
+
+        chat: (itemId, message, itemType, itemTitle, itemDescription) => fetchJSON(`${API_BASE}/discussions/${itemId}/chat`, {
+            method: 'POST',
+            body: JSON.stringify({
+                message,
+                item_type: itemType,
+                item_title: itemTitle,
+                item_description: itemDescription
+            }),
+        }),
+
+        applyUpdate: (itemId, itemType, newDescription) => fetchJSON(`${API_BASE}/discussions/${itemId}/apply-update`, {
+            method: 'POST',
+            body: JSON.stringify({
+                item_type: itemType,
+                new_description: newDescription
+            }),
+        }),
+
+        delete: (itemId) => fetchJSON(`${API_BASE}/discussions/${itemId}`, {
+            method: 'DELETE',
         }),
     },
 };

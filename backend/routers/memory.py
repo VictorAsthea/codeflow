@@ -10,10 +10,11 @@ Provides endpoints for:
 """
 
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 
 from backend.models import Session, SessionDetail, SessionCreate, ResumeInfo
+from backend.validation import TaskId, SessionId
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,13 @@ def get_memory_service():
 
 
 @router.get("/sessions", response_model=list[Session])
-async def list_sessions(task_id: Optional[str] = None):
+async def list_sessions(
+    task_id: Optional[str] = Query(
+        default=None,
+        max_length=100,
+        description="Optional task ID to filter sessions"
+    )
+):
     """
     List all sessions, optionally filtered by task ID.
 
@@ -59,7 +66,7 @@ async def list_sessions(task_id: Optional[str] = None):
 
 
 @router.get("/sessions/{task_id}", response_model=list[Session])
-async def list_sessions_by_task(task_id: str):
+async def list_sessions_by_task(task_id: TaskId):
     """
     List all sessions for a specific task.
 
@@ -190,7 +197,13 @@ async def get_resume_info(session_id: str):
 
 
 @router.post("/import")
-async def import_claude_sessions(project_path: Optional[str] = None):
+async def import_claude_sessions(
+    project_path: Optional[str] = Query(
+        default=None,
+        max_length=500,
+        description="Optional project path to filter sessions"
+    )
+):
     """
     Import sessions from ~/.claude/projects/ if available.
 

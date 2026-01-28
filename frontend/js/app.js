@@ -73,6 +73,11 @@ function setupSettings() {
     const settingsModal = document.getElementById('settings-modal');
     const saveSettingsBtn = document.getElementById('btn-save-settings');
 
+    if (!settingsBtn || !settingsModal) {
+        console.warn('Settings elements not found, skipping setup');
+        return;
+    }
+
     settingsBtn.addEventListener('click', async () => {
         try {
             const config = await API.settings.get();
@@ -89,27 +94,34 @@ function setupSettings() {
         }
     });
 
-    saveSettingsBtn.addEventListener('click', async () => {
-        try {
-            const config = {
-                default_model: document.getElementById('default-model').value,
-                default_intensity: document.getElementById('default-intensity').value,
-                project_path: document.getElementById('project-path').value,
-                auto_review: document.getElementById('auto-review').checked,
-            };
+    if (saveSettingsBtn) {
+        saveSettingsBtn.addEventListener('click', async () => {
+            try {
+                const config = {
+                    default_model: document.getElementById('default-model').value,
+                    default_intensity: document.getElementById('default-intensity').value,
+                    project_path: document.getElementById('project-path').value,
+                    auto_review: document.getElementById('auto-review').checked,
+                };
 
-            await API.settings.update(config);
-            settingsModal.classList.add('hidden');
-            alert('Settings saved successfully');
-        } catch (error) {
-            console.error('Failed to save settings:', error);
-            alert('Failed to save settings: ' + error.message);
-        }
-    });
+                await API.settings.update(config);
+                settingsModal.classList.add('hidden');
+                alert('Settings saved successfully');
+            } catch (error) {
+                console.error('Failed to save settings:', error);
+                alert('Failed to save settings: ' + error.message);
+            }
+        });
+    }
 }
 
 function setupSyncButton() {
     const syncBtn = document.getElementById('sync-btn');
+
+    if (!syncBtn) {
+        console.warn('Sync button not found, skipping setup');
+        return;
+    }
 
     syncBtn.addEventListener('click', async () => {
         if (!confirm('Sync main with develop? This will merge all changes from develop into main.')) {
