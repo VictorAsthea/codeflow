@@ -321,4 +321,32 @@ export const API = {
             method: 'POST',
         }),
     },
+
+    discussions: {
+        list: () => fetchJSON(`${API_BASE}/discussions`),
+
+        get: (itemId) => fetchJSON(`${API_BASE}/discussions/${itemId}`),
+
+        chat: (itemId, message, itemType, itemTitle, itemDescription) => fetchJSON(`${API_BASE}/discussions/${itemId}/chat`, {
+            method: 'POST',
+            body: JSON.stringify({
+                message,
+                item_type: itemType,
+                item_title: itemTitle,
+                item_description: itemDescription
+            }),
+        }),
+
+        applyUpdate: (itemId, itemType, newDescription) => fetchJSON(`${API_BASE}/discussions/${itemId}/apply-update`, {
+            method: 'POST',
+            body: JSON.stringify({
+                item_type: itemType,
+                new_description: newDescription
+            }),
+        }),
+
+        delete: (itemId) => fetchJSON(`${API_BASE}/discussions/${itemId}`, {
+            method: 'DELETE',
+        }),
+    },
 };

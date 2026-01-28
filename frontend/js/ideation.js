@@ -178,6 +178,30 @@ class IdeationManager {
         }
     }
 
+    openDiscussion(suggestionId) {
+        const suggestion = this.suggestions.find(s => s.id === suggestionId);
+        if (!suggestion) return;
+
+        // Open discussion modal
+        window.discussionModal?.open(
+            {
+                id: suggestion.id,
+                type: 'suggestion',
+                title: suggestion.title,
+                description: suggestion.description
+            },
+            // Callback when description is updated
+            (id, newDescription) => {
+                // Update local state
+                const s = this.suggestions.find(s => s.id === id);
+                if (s) {
+                    s.description = newDescription;
+                    this.renderSuggestions();
+                }
+            }
+        );
+    }
+
     async sendChatMessage() {
         const message = this.chatInput?.value?.trim();
         if (!message || !this.chatMessages) return;
@@ -294,6 +318,9 @@ class IdeationManager {
                 <p class="suggestion-description">${s.description}</p>
                 <div class="suggestion-actions">
                     ${s.status === 'pending' ? `
+                        <button class="btn btn-sm btn-secondary" onclick="window.ideationManager.openDiscussion('${s.id}')">
+                            💬 Discuter
+                        </button>
                         <button class="btn btn-sm btn-primary" onclick="window.ideationManager.acceptSuggestion('${s.id}')">
                             ✅ Créer tâche
                         </button>

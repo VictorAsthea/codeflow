@@ -12,6 +12,7 @@ import shutil
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Callable, List, Optional
 
 from backend.services.retry_manager import (
@@ -223,6 +224,71 @@ def get_claude_command() -> str:
     return "claude"  # Fallback
 
 
+def _execute_claude_cli_sync(
+    cmd: list[str],
+    prompt: str,
+    cwd: str,
+    timeout: int,
+    env: dict,
+) -> tuple[bool, str, int | None, Exception | None]:
+    """Execute Claude CLI synchronously (runs in thread pool on Windows).
+
+    Note: on_output callback removed because it can't be called from thread safely.
+    Output is collected and returned as a whole.
+
+    Returns:
+        Tuple of (success, output, return_code, exception)
+    """
+    import subprocess
+    import sys
+
+    try:
+        # On Windows, .CMD files need to be run through cmd.exe
+        if sys.platform == 'win32' and cmd[0].lower().endswith('.cmd'):
+            cmd = ['cmd.exe', '/c'] + cmd
+
+        print(f"[CLAUDE_CLI_DEBUG] Executing command: {cmd}")
+        print(f"[CLAUDE_CLI_DEBUG] Working dir: {cwd}")
+        print(f"[CLAUDE_CLI_DEBUG] Prompt length: {len(prompt)} chars")
+
+        # Use Popen with communicate for simplicity and timeout support
+        process = subprocess.Popen(
+            cmd,
+            cwd=cwd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding='utf-8',
+            errors='replace'
+        )
+
+        try:
+            stdout, _ = process.communicate(input=prompt, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+            return False, "Timeout", 124, TimeoutError("Execution timed out")
+
+        return_code = process.returncode
+        success = return_code == 0
+
+        return success, stdout or "", return_code, None
+
+    except Exception as e:
+        import traceback
+        logger.error(f"Claude CLI error: {e}")
+        logger.error(f"Claude CLI traceback: {traceback.format_exc()}")
+        logger.error(f"Command was: {cmd}")
+        if process:
+            try:
+                process.kill()
+                process.wait()
+            except Exception:
+                pass
+        return False, str(e), None, e
+
+
 async def _execute_claude_cli_once(
     cmd: list[str],
     prompt: str,
@@ -231,80 +297,23 @@ async def _execute_claude_cli_once(
     env: dict,
     on_output: Callable[[str], None] | None = None,
 ) -> tuple[bool, str, int | None, Exception | None]:
-    """Execute Claude CLI once (internal helper for retry logic).
+    """Execute Claude CLI once (async wrapper for sync function).
 
-    Args:
-        cmd: Command and arguments to execute
-        prompt: The prompt to send via stdin
-        cwd: Working directory
-        timeout: Timeout in seconds for each line read
-        env: Environment variables
-        on_output: Callback for each output line
-
-    Returns:
-        Tuple of (success, output, return_code, exception)
+    Uses asyncio.to_thread to run subprocess in thread pool,
+    avoiding Windows asyncio subprocess issues.
     """
-    process = None
-    exception = None
+    success, output, return_code, exception = await asyncio.to_thread(
+        _execute_claude_cli_sync,
+        cmd, prompt, cwd, timeout, env
+    )
 
-    try:
-        # Create process with stdin pipe
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=cwd,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            env=env
-        )
+    # Stream output after execution if callback provided
+    if on_output and output:
+        for line in output.split('\n'):
+            if line:
+                on_output(line + '\n')
 
-        # Send prompt via stdin and close it
-        process.stdin.write(prompt.encode('utf-8'))
-        await process.stdin.drain()
-        process.stdin.close()
-        await process.stdin.wait_closed()
-
-        output_lines = []
-
-        while True:
-            try:
-                line = await asyncio.wait_for(
-                    process.stdout.readline(),
-                    timeout=timeout
-                )
-            except asyncio.TimeoutError as e:
-                process.kill()
-                await process.wait()
-                if on_output:
-                    on_output("ERROR: Execution timed out\n")
-                return False, "Timeout", 124, e
-
-            if not line:
-                break
-
-            decoded = line.decode('utf-8', errors='replace')
-            output_lines.append(decoded)
-
-            if on_output:
-                on_output(decoded)
-
-        await process.wait()
-
-        full_output = "".join(output_lines)
-        return_code = process.returncode
-        success = return_code == 0
-
-        return success, full_output, return_code, None
-
-    except Exception as e:
-        logger.error(f"Claude CLI error: {e}")
-        if process:
-            try:
-                process.kill()
-                await process.wait()
-            except Exception:
-                pass
-        return False, str(e), None, e
+    return success, output, return_code, exception
 
 
 async def run_claude_cli(
@@ -338,8 +347,26 @@ async def run_claude_cli(
     Returns:
         Tuple (success: bool, output: str, retry_metadata: RetryMetadata | None)
     """
+    import uuid
+
+    # Clear any cached Claude state in the working directory to avoid tool_use id conflicts
+    claude_cache_dir = Path(cwd) / ".claude"
+    if claude_cache_dir.exists():
+        try:
+            # Only remove session-related files, keep settings
+            for item in claude_cache_dir.iterdir():
+                if item.name not in ["settings.json", "settings.local.json"]:
+                    if item.is_dir():
+                        shutil.rmtree(item, ignore_errors=True)
+                    else:
+                        item.unlink(missing_ok=True)
+        except Exception as e:
+            logger.warning(f"Failed to clear Claude cache: {e}")
+
     claude_cmd = get_claude_command()
-    cmd = [claude_cmd, "--print", "--no-session-persistence"]
+    # Use unique session-id for each call to guarantee fresh conversation (avoids tool_use id conflicts)
+    session_id = str(uuid.uuid4())
+    cmd = [claude_cmd, "--print", "--no-session-persistence", "--session-id", session_id]
 
     if output_format == "json":
         cmd.extend(["--output-format", "json"])
@@ -365,6 +392,8 @@ async def run_claude_cli(
 
     # Log configuration
     logger.info(f"Running Claude CLI: {claude_cmd} (max_turns={max_turns}, timeout={timeout}s, mcps={mcp_count})")
+    logger.info(f"Full command: {' '.join(cmd)}")
+    logger.info(f"Prompt length: {len(prompt)} chars, first 200: {prompt[:200]}...")
     if allowed_tools:
         bash_count = sum(1 for t in allowed_tools if t.startswith("Bash("))
         logger.debug(f"Allowed tools: {len(allowed_tools)} total, {bash_count} bash commands")

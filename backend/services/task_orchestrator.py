@@ -41,9 +41,12 @@ def get_parallel_manager():
 
 
 def get_storage():
-    """Get storage instance (lazy import to avoid circular dependency)"""
-    from backend.main import storage
-    return storage
+    """Get storage instance for the active project (lazy import to avoid circular dependency)"""
+    from backend.services.json_storage import JSONStorage
+    from backend.utils.project_helpers import get_active_project_path
+    from pathlib import Path
+    project_path = Path(get_active_project_path())
+    return JSONStorage(base_path=project_path)
 
 
 async def update_task(task: Task):

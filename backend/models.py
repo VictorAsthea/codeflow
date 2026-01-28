@@ -291,6 +291,12 @@ class Task(BaseModel):
         default=None,
         description="Current retry state for recoverable error handling"
     )
+    # Multi-project support: store the project path the task belongs to
+    project_path: str | None = Field(
+        default=None,
+        max_length=MAX_PATH_LENGTH,
+        description="Project path this task belongs to (for multi-project support)"
+    )
 
     @field_validator("title", "description")
     @classmethod
@@ -302,11 +308,11 @@ class Task(BaseModel):
                 raise ValueError("Value cannot be empty or whitespace-only")
         return v
 
-    @field_validator("worktree_path")
+    @field_validator("worktree_path", "project_path")
     @classmethod
     def validate_worktree_path(cls, v: str | None) -> str | None:
-        """Validate worktree path for security issues."""
-        return validate_path_security_optional(v, "worktree_path")
+        """Validate worktree/project path for security issues."""
+        return validate_path_security_optional(v, "path")
 
 
 class GlobalConfig(BaseModel):

@@ -368,9 +368,7 @@ class AuthManager {
                 text.textContent = 'API';
                 indicator.classList.remove('warning', 'danger', 'subscription');
             }
-
-            // Also fetch usage data for the dropdown
-            this.loadUsageData();
+            // Usage data is now only loaded on manual refresh click
         } catch (error) {
             console.error('Failed to load rate limit:', error);
             text.textContent = '--';

@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from models import RetryConfig
+    from backend.models import RetryConfig
 
 
 # Agent profiles for different task execution strategies
@@ -80,7 +80,7 @@ class Settings(BaseSettings):
         Returns:
             RetryConfig: Configuration object for the retry system
         """
-        from models import RetryConfig
+        from backend.models import RetryConfig
         return RetryConfig(
             max_retries=self.retry_max_attempts,
             base_delay=self.retry_base_delay,

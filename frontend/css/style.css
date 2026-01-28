@@ -1053,7 +1053,7 @@ body {
 }
 
 .pr-comment {
-  padding: 0.75rem;
+  padding: 0.5rem 0.75rem;
   margin-bottom: 0.5rem;
   background-color: var(--bg-secondary);
   border-radius: 4px;
@@ -1072,7 +1072,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .pr-comment-checkbox-label {
@@ -1099,28 +1099,108 @@ body {
 
 .pr-comment-body {
   font-size: 0.9rem;
-  line-height: 1.5;
-  white-space: pre-wrap;
+  line-height: 1.4;
   word-break: break-word;
 }
 
-.pr-comment-diff {
-  margin-top: 0.5rem;
-}
-
-.pr-comment-diff summary {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
 .pr-comment-diff pre {
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
   padding: 0.5rem;
   background-color: var(--bg-tertiary);
   border-radius: 4px;
   overflow-x: auto;
   font-size: 0.75rem;
+}
+
+/* Fixed comments badge */
+.fixed-badge {
+  background: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  margin-left: 0.5rem;
+}
+
+/* PR Review - Severity Badges */
+.pr-severity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.severity-critical {
+  background: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
+}
+
+.severity-high {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+}
+
+.severity-medium {
+  background: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+}
+
+.severity-low {
+  background: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+}
+
+.severity-info {
+  background: rgba(102, 126, 234, 0.2);
+  color: var(--accent-blue);
+}
+
+/* PR Comment improved layout - border colors by severity */
+.pr-comment:has(.severity-critical) { border-left-color: #dc3545; }
+.pr-comment:has(.severity-high) { border-left-color: #ff9800; }
+.pr-comment:has(.severity-medium) { border-left-color: #ffc107; }
+.pr-comment:has(.severity-low) { border-left-color: #28a745; }
+.pr-comment:has(.severity-info) { border-left-color: var(--accent-blue); }
+
+.pr-comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.pr-comment-summary {
+  margin: 0 0 0.25rem 0;
+  line-height: 1.4;
+}
+
+.pr-comment-details {
+  margin: 0;
+}
+
+.pr-comment-details summary {
+  font-size: 0.8rem;
+  color: var(--accent-blue);
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.pr-comment-details p {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.pr-comment-diff {
+  margin-top: 0.25rem;
+}
+
+.pr-comment-diff summary {
+  padding: 0.25rem 0;
 }
 
 .pr-comment-diff code {
@@ -2738,6 +2818,32 @@ body {
   color: var(--accent-blue);
   border-radius: 4px;
   font-weight: 500;
+}
+
+/* Changelog Header */
+.changelog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.changelog-project-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.changelog-project-icon {
+  font-size: 1.25rem;
+}
+
+.changelog-project-name {
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .changelog-empty {
@@ -5660,4 +5766,184 @@ body.multiselect-mode .task-card[data-status="backlog"]:hover {
 #parallel-dashboard-container {
   flex: 1;
   overflow: hidden;
+}
+
+/* ============================================
+   Discussion Modal
+   ============================================ */
+
+.discussion-modal-content {
+  width: 600px;
+  max-width: 95vw;
+  height: 80vh;
+  max-height: 700px;
+  display: flex;
+  flex-direction: column;
+}
+
+.discussion-modal-content .modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.discussion-modal-content .modal-header h2 {
+  flex: 1;
+  font-size: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.discussion-type-badge {
+  background: var(--accent-purple);
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.discussion-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 1rem;
+}
+
+.discussion-context {
+  background: var(--bg-tertiary);
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.discussion-context strong {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.discussion-context p {
+  margin: 0.5rem 0 0 0;
+  color: var(--text-primary);
+  max-height: 60px;
+  overflow-y: auto;
+}
+
+.discussion-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.discussion-welcome {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}
+
+.discussion-welcome p {
+  margin: 0.5rem 0;
+}
+
+.discussion-message {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.discussion-message.user {
+  flex-direction: row-reverse;
+}
+
+.discussion-message-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.discussion-message-content {
+  background: var(--bg-tertiary);
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  max-width: 80%;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.discussion-message.user .discussion-message-content {
+  background: var(--accent-blue);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.discussion-message.assistant .discussion-message-content {
+  border-bottom-left-radius: 4px;
+}
+
+.discussion-message-content code {
+  background: rgba(0,0,0,0.2);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.85em;
+}
+
+.typing-indicator {
+  display: inline-block;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.discussion-update-banner {
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+  color: white;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+}
+
+.discussion-update-banner.hidden {
+  display: none;
+}
+
+.discussion-update-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.discussion-footer {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.discussion-input {
+  flex: 1;
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
 }

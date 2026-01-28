@@ -591,29 +591,30 @@ function setupFeatureDetailModal() {
         }
     });
 
-    // Expand button
-    document.getElementById('btn-expand-feature')?.addEventListener('click', async () => {
+    // Expand button - now opens discussion modal
+    document.getElementById('btn-expand-feature')?.addEventListener('click', () => {
         if (!currentFeatureId) return;
 
-        try {
-            const btn = document.getElementById('btn-expand-feature');
-            btn.textContent = 'Expansion...';
-            btn.disabled = true;
+        const feature = roadmapData?.features?.find(f => f.id === currentFeatureId);
+        if (!feature) return;
 
-            await API.roadmap.expandFeature(currentFeatureId);
-            await loadRoadmap();
+        // Close detail modal
+        document.getElementById('feature-detail-modal').classList.add('hidden');
 
-            // Refresh modal
-            openFeatureDetail(currentFeatureId);
-
-            btn.textContent = 'Enrichir avec l\'IA';
-            btn.disabled = false;
-        } catch (error) {
-            console.error('Failed to expand feature:', error);
-            alert('Échec de l\'expansion: ' + error.message);
-            document.getElementById('btn-expand-feature').textContent = 'Enrichir avec l\'IA';
-            document.getElementById('btn-expand-feature').disabled = false;
-        }
+        // Open discussion modal
+        window.discussionModal?.open(
+            {
+                id: feature.id,
+                type: 'feature',
+                title: feature.title,
+                description: feature.description
+            },
+            // Callback when description is updated
+            async (featureId, newDescription) => {
+                // Reload roadmap to reflect changes
+                await loadRoadmap();
+            }
+        );
     });
 
     // Build button

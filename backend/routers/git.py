@@ -72,6 +72,14 @@ async def sync_main():
         )
         current_branch = current_branch_result.stdout.strip()
 
+        # Fetch latest from remote first
+        subprocess.run(
+            ["git", "fetch", "origin"],
+            cwd=project_path,
+            capture_output=True,
+            text=True
+        )
+
         # Detect default branch (main or master)
         default_branch = "main"
         branch_list = subprocess.run(
@@ -118,9 +126,9 @@ async def sync_main():
                 check=True
             )
 
-        # Merge develop into main/master
+        # Merge origin/develop into main/master (use origin/develop to ensure it exists)
         merge_result = subprocess.run(
-            ["git", "merge", "develop", "-m", f"Merge develop into {default_branch}"],
+            ["git", "merge", "origin/develop", "-m", f"Merge develop into {default_branch}"],
             cwd=project_path,
             capture_output=True,
             text=True,

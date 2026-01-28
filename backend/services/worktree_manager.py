@@ -1,4 +1,5 @@
 import subprocess
+import json
 from pathlib import Path
 
 
@@ -6,6 +7,22 @@ class WorktreeManager:
     def __init__(self, project_path: str):
         self.project_path = Path(project_path)
         self.worktrees_dir = self.project_path / ".worktrees"
+
+    def _get_default_branch(self) -> str:
+        """Get the default branch from project config or git."""
+        # Try to read from .codeflow/config.json
+        config_path = self.project_path / ".codeflow" / "config.json"
+        if config_path.exists():
+            try:
+                config = json.loads(config_path.read_text(encoding='utf-8'))
+                if config.get("settings", {}).get("default_branch"):
+                    return config["settings"]["default_branch"]
+                if config.get("github", {}).get("default_branch"):
+                    return config["github"]["default_branch"]
+            except Exception:
+                pass
+        # Fallback to main
+        return "main"
 
     def create(self, task_id: str, branch_name: str) -> Path:
         """Create an isolated worktree for a task"""
@@ -15,10 +32,12 @@ class WorktreeManager:
         if worktree_path.exists():
             raise ValueError(f"Worktree already exists for task {task_id}")
 
+        base_branch = self._get_default_branch()
+
         try:
-            # Create worktree from develop branch
+            # Create worktree from the project's default branch
             subprocess.run(
-                ["git", "worktree", "add", "-b", branch_name, str(worktree_path), "develop"],
+                ["git", "worktree", "add", "-b", branch_name, str(worktree_path), base_branch],
                 cwd=self.project_path,
                 check=True,
                 capture_output=True,

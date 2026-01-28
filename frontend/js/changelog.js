@@ -10,6 +10,7 @@ class ChangelogManager {
         this.refreshBtn = document.getElementById('refresh-changelog-btn');
         this.commits = [];
         this.isLoading = false;
+        this.codeflowOnly = true;  // Toggle state
 
         this.init();
     }
@@ -18,6 +19,13 @@ class ChangelogManager {
         if (this.refreshBtn) {
             this.refreshBtn.addEventListener('click', () => this.refresh());
         }
+
+        // Listen for project changes to auto-reload
+        window.addEventListener('project-changed', () => {
+            if (document.getElementById('changelog-view')?.classList.contains('hidden') === false) {
+                this.load();
+            }
+        });
     }
 
     /**
@@ -25,12 +33,20 @@ class ChangelogManager {
      */
     async fetchChangelog() {
         try {
-            const response = await API.changelog.get();
+            const response = await API.changelog.get(50, 0, this.codeflowOnly);
             return response.commits || [];
         } catch (error) {
             console.error('Failed to fetch changelog:', error);
             throw error;
         }
+    }
+
+    /**
+     * Toggle between Codeflow commits only and all commits
+     */
+    async toggleCodeflowOnly() {
+        this.codeflowOnly = !this.codeflowOnly;
+        await this.load();
     }
 
     /**
@@ -138,14 +154,43 @@ class ChangelogManager {
     renderChangelog() {
         if (!this.container) return;
 
+        // Get current project name from tabs (use .tab-name to avoid close button)
+        const activeTab = document.querySelector('.project-tab.active .tab-name');
+        const projectName = activeTab?.textContent?.trim() || 'Projet';
+
+        // Render header with toggle
+        const toggleLabel = this.codeflowOnly ? 'Commits Codeflow' : 'Tous les commits';
+        const toggleIcon = this.codeflowOnly ? '🤖' : '📋';
+
+        const headerHtml = `
+            <div class="changelog-header">
+                <div class="changelog-project-info">
+                    <span class="changelog-project-icon">📂</span>
+                    <span class="changelog-project-name">${this.escapeHtml(projectName)}</span>
+                </div>
+                <button id="changelog-toggle-btn" class="btn btn-small ${this.codeflowOnly ? 'btn-primary' : 'btn-secondary'}">
+                    ${toggleIcon} ${toggleLabel}
+                </button>
+            </div>
+        `;
+
         if (this.commits.length === 0) {
+            const emptyMessage = this.codeflowOnly
+                ? 'Aucun commit Codeflow trouvé.'
+                : 'Aucun commit trouvé.';
+            const emptyHint = this.codeflowOnly
+                ? 'Les commits effectués par Codeflow apparaîtront ici.'
+                : 'Aucun commit dans l\'historique git.';
+
             this.container.innerHTML = `
+                ${headerHtml}
                 <div class="changelog-empty">
                     <span class="empty-icon">📝</span>
-                    <p>Aucun commit Codeflow trouve.</p>
-                    <p class="empty-hint">Les commits effectues par Codeflow apparaitront ici.</p>
+                    <p>${emptyMessage}</p>
+                    <p class="empty-hint">${emptyHint}</p>
                 </div>
             `;
+            this.attachToggleListener();
             return;
         }
 
@@ -156,6 +201,7 @@ class ChangelogManager {
         const groupsHtml = groupedCommits.map(group => this.renderDayGroup(group)).join('');
 
         this.container.innerHTML = `
+            ${headerHtml}
             <div class="changelog-list">
                 ${groupsHtml}
             </div>
@@ -163,6 +209,17 @@ class ChangelogManager {
 
         // Attach event listeners after rendering
         this.attachEventListeners();
+        this.attachToggleListener();
+    }
+
+    /**
+     * Attach toggle button listener
+     */
+    attachToggleListener() {
+        const toggleBtn = document.getElementById('changelog-toggle-btn');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => this.toggleCodeflowOnly());
+        }
     }
 
     /**

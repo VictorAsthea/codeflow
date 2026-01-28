@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from datetime import datetime
+from pathlib import Path
 import re
 import asyncio
 import threading
@@ -136,7 +137,9 @@ async def create_new_task(task_data: TaskCreate):
         agent_profile=task_data.agent_profile,
         require_human_review_before_coding=task_data.require_human_review_before_coding,
         file_references=task_data.file_references,
-        screenshots=task_data.screenshots
+        screenshots=task_data.screenshots,
+        # Store the project path for multi-project support
+        project_path=get_active_project_path()
     )
 
     get_storage().create_task(task)
@@ -252,14 +255,18 @@ async def execute_task_background(task_id: str, project_path: str):
         await log_handler(f"Starting task execution: {task.title}")
 
         branch_name = task.branch_name or f"task/{task.id}"
-        await log_handler(f"Creating worktree for branch: {branch_name}")
 
-        worktree_path = worktree_mgr.create(task.id, branch_name)
-        task.worktree_path = str(worktree_path)
-        task.branch_name = branch_name
-        get_storage().update_task(task)
-
-        await log_handler(f"Worktree created at: {worktree_path}")
+        # Check if worktree already exists (for task resumption)
+        if task.worktree_path and Path(task.worktree_path).exists():
+            worktree_path = Path(task.worktree_path)
+            await log_handler(f"Resuming with existing worktree: {worktree_path}")
+        else:
+            await log_handler(f"Creating worktree for branch: {branch_name}")
+            worktree_path = worktree_mgr.create(task.id, branch_name)
+            task.worktree_path = str(worktree_path)
+            task.branch_name = branch_name
+            get_storage().update_task(task)
+            await log_handler(f"Worktree created at: {worktree_path}")
 
         # v0.4: Use new task orchestrator with subtask-based workflow
         from backend.services.task_orchestrator import start_task
@@ -319,7 +326,9 @@ async def start_task(task_id: TaskId):
     task.updated_at = datetime.now()
     get_storage().update_task(task)
 
-    asyncio.create_task(execute_task_background(task_id, get_active_project_path()))
+    # Use task's project_path if available, fallback to active project for backwards compatibility
+    project_path = task.project_path or get_active_project_path()
+    asyncio.create_task(execute_task_background(task_id, project_path))
 
     return {"message": "Task started", "task": task}
 
@@ -349,7 +358,9 @@ async def queue_task(task_id: TaskId, request: QueueTaskRequest = None):
         except ValueError:
             priority = TaskPriority.NORMAL
 
-    result = await task_queue.queue_task(task_id, get_active_project_path(), priority)
+    # Use task's project_path if available, fallback to active project for backwards compatibility
+    project_path = task.project_path or get_active_project_path()
+    result = await task_queue.queue_task(task_id, project_path, priority)
     if not result.get("success"):
         raise HTTPException(status_code=500, detail=result.get("error", "Failed to queue task"))
 
@@ -416,12 +427,13 @@ async def batch_queue_tasks(request: BatchQueueRequest):
         ]
     }
     """
-    # Add project_path to each task
-    project_path = get_active_project_path()
-    tasks_with_path = [
-        {**task, "project_path": project_path}
-        for task in request.tasks
-    ]
+    # Add project_path to each task (from stored task.project_path or fallback to active)
+    default_project_path = get_active_project_path()
+    tasks_with_path = []
+    for task_req in request.tasks:
+        task = get_storage().get_task(task_req.get("task_id"))
+        pp = task.project_path if task and task.project_path else default_project_path
+        tasks_with_path.append({**task_req, "project_path": pp})
 
     result = await task_queue.batch_queue_tasks(tasks_with_path)
     return result
@@ -981,7 +993,8 @@ async def get_pr_reviews(task_id: TaskId):
 
     from backend.services.github_service import get_all_pr_reviews
 
-    result = await get_all_pr_reviews(task.pr_number, get_active_project_path())
+    project_path = task.project_path or get_active_project_path()
+    result = await get_all_pr_reviews(task.pr_number, project_path)
     return result
 
 
@@ -1006,12 +1019,13 @@ async def fix_comments(task_id: TaskId, request: FixCommentsRequest):
     async def log_handler(message: str):
         await manager.send_log(task_id, message)
 
+    project_path = task.project_path or get_active_project_path()
     result = await fix_pr_comments(
         task_id=task_id,
         comment_ids=request.comment_ids,
         pr_number=task.pr_number,
         worktree_path=task.worktree_path,
-        project_path=get_active_project_path(),
+        project_path=project_path,
         log_callback=log_handler
     )
 
@@ -1091,13 +1105,15 @@ async def trigger_validation(task_id: TaskId, background_tasks: BackgroundTasks)
 
     from backend.services.task_orchestrator import start_validation
 
+    project_path = task.project_path or get_active_project_path()
+
     async def run_validation():
         async def log_handler(message: str):
             await manager.send_log(task_id, message)
 
         await start_validation(
             task=task,
-            project_path=get_active_project_path(),
+            project_path=project_path,
             worktree_path=task.worktree_path,
             log_callback=log_handler
         )

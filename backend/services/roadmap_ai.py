@@ -135,7 +135,8 @@ def call_claude(
     prompt: str,
     timeout: int = 120,
     json_output: bool = False,
-    system_prompt: str | None = None
+    system_prompt: str | None = None,
+    model: str | None = None
 ) -> tuple[bool, str, str]:
     """
     Call Claude CLI with a prompt.
@@ -164,11 +165,13 @@ def call_claude(
         if system_prompt:
             cmd.extend(["--system-prompt", system_prompt])
 
-        # Tell Claude CLI to read prompt from stdin
+        if model:
+            cmd.extend(["--model", model])
+
+        # Use stdin for prompt
         cmd.append("-")
 
-        logger.info(f"Calling Claude CLI: {claude_cmd} (timeout={timeout}s, json={json_output})...")
-        logger.debug(f"Command: {' '.join(cmd[:4])}... [stdin]")
+        logger.info(f"Calling Claude CLI: {claude_cmd} (timeout={timeout}s, json={json_output}, model={model})...")
 
         # Prepare environment with npm path
         env = os.environ.copy()
@@ -176,17 +179,36 @@ def call_claude(
         if os.path.exists(npm_path):
             env["PATH"] = npm_path + os.pathsep + env.get("PATH", "")
 
-        result = subprocess.run(
+        # Use Popen for better stdin handling on Windows
+        # Run from temp dir to prevent Claude CLI from reading any project context
+        import tempfile
+        neutral_cwd = tempfile.gettempdir()
+
+        process = subprocess.Popen(
             cmd,
-            input=prompt,
-            capture_output=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             encoding='utf-8',
             errors='replace',
-            cwd=settings.project_path,
-            timeout=timeout,
+            cwd=neutral_cwd,
             env=env
         )
+
+        try:
+            stdout, stderr = process.communicate(input=prompt, timeout=timeout)
+            # Create a result-like object
+            class Result:
+                pass
+            result = Result()
+            result.returncode = process.returncode
+            result.stdout = stdout
+            result.stderr = stderr
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+            raise
 
         logger.info(f"Claude return code: {result.returncode}")
         if result.stderr:

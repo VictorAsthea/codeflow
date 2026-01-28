@@ -158,9 +158,12 @@ async def drag_feature(feature_id: FeatureId, data: StatusUpdateRequest):
 @router.post("/roadmap/features/{feature_id}/build")
 async def build_feature(feature_id: FeatureId):
     """Create a task from a feature."""
-    from backend.main import storage as task_storage
+    from backend.services.json_storage import JSONStorage
     from backend.models import Task, TaskStatus, Phase, PhaseConfig, PhaseStatus
 
+    # Use active project's storage, not global Codeflow storage
+    project_path = Path(get_active_project_path())
+    task_storage = JSONStorage(base_path=project_path)
     roadmap_storage = get_storage()
     feature = roadmap_storage.get_feature(feature_id)
 
@@ -207,7 +210,9 @@ async def build_feature(feature_id: FeatureId):
             "validation": Phase(name="validation", config=default_config),
         },
         created_at=datetime.now(),
-        updated_at=datetime.now()
+        updated_at=datetime.now(),
+        # Store the project path for multi-project support
+        project_path=str(project_path)
     )
 
     task_storage.create_task(task)

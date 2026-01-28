@@ -342,6 +342,11 @@ class WorkspaceManager {
     }
 
     async reloadProjectData() {
+        // Dispatch project-changed event for other components
+        window.dispatchEvent(new CustomEvent('project-changed', {
+            detail: { project: this.activeProject }
+        }));
+
         // Reload kanban
         if (typeof loadKanban === 'function') {
             await loadKanban();
@@ -362,6 +367,11 @@ class WorkspaceManager {
         // Reload roadmap if the function exists
         if (typeof window.loadRoadmap === 'function') {
             await window.loadRoadmap();
+        }
+
+        // Reload ideation if visible
+        if (typeof window.ideationManager !== 'undefined') {
+            window.ideationManager.load();
         }
     }
 
