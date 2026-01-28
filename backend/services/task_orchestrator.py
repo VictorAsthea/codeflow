@@ -30,6 +30,7 @@ from backend.services.validation_service import (
     should_auto_fix
 )
 from backend.services.git_service import commit_changes, push_branch
+from backend.services.worktree_service import cleanup_worktree_files
 
 logger = logging.getLogger(__name__)
 
@@ -686,6 +687,9 @@ class TaskOrchestrator:
             phase.completed_at = datetime.now()
             phase.metrics.progress_percentage = 100
 
+            # Run cleanup before transitioning to Human Review
+            await self._run_cleanup()
+
             self.task.status = TaskStatus.HUMAN_REVIEW
             self.task.review_status = "completed"
             await update_task(self.task)
@@ -722,6 +726,9 @@ class TaskOrchestrator:
             # Move to HUMAN_REVIEW with issues noted (user decides what to do)
             phase.status = PhaseStatus.DONE
             phase.completed_at = datetime.now()
+
+            # Run cleanup before transitioning to Human Review
+            await self._run_cleanup()
 
             self.task.status = TaskStatus.HUMAN_REVIEW
             self.task.review_status = "needs_attention"

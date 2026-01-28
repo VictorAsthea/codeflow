@@ -205,6 +205,9 @@ class ProjectInitService:
         github_repo = detect_github_repo(self.project_path)
         default_branch = detect_default_branch(self.project_path)
 
+        # Generate cleanup patterns based on detected stack
+        cleanup_patterns = self._generate_cleanup_patterns(stack_info)
+
         config = {
             "version": "0.4",
             "project_name": self.project_path.name,
@@ -226,11 +229,87 @@ class ProjectInitService:
                 "coding": {"enabled": True},
                 "validation": {"enabled": True}
             },
+            "cleanup": {
+                "enabled": True,
+                "patterns": cleanup_patterns["patterns"],
+                "keep_patterns": cleanup_patterns["keep_patterns"]
+            },
             "detected_stack": stack_info["detected_stack"]
         }
 
         config_file = self.codeflow_dir / "config.json"
         config_file.write_text(json.dumps(config, indent=2, ensure_ascii=False))
+
+    def _generate_cleanup_patterns(self, stack_info: Dict[str, Any]) -> Dict[str, list]:
+        """Génère les patterns de cleanup basés sur le stack détecté."""
+        detected = stack_info["detected_stack"]
+        languages = detected.get("languages", [])
+        frameworks = detected.get("frameworks", [])
+
+        # Base patterns common to all projects
+        patterns = [
+            "*-spec.md",
+            "*-debug.md",
+        ]
+
+        keep_patterns = [
+            ".github/**",
+        ]
+
+        # Python-specific patterns
+        if "python" in languages:
+            patterns.extend([
+                "test_*.py",
+                "*_test.py",
+                ".pytest_cache/",
+                "__pycache__/",
+                ".mypy_cache/",
+                "*.pyc",
+                "*.pyo",
+                "scripts/debug_*.py",
+                "scripts/test_*.py",
+            ])
+            keep_patterns.extend([
+                "tests/**",
+                "test/**",
+                "pytest.ini",
+                "pyproject.toml",
+            ])
+
+        # JavaScript/TypeScript-specific patterns
+        if "javascript" in languages or "typescript" in languages:
+            patterns.extend([
+                "*.test.ts",
+                "*.test.tsx",
+                "*.test.js",
+                "*.test.jsx",
+                "*.spec.ts",
+                "*.spec.tsx",
+                "*.spec.js",
+                "*.spec.jsx",
+                "scripts/*.test.*",
+            ])
+            keep_patterns.extend([
+                "__tests__/**",
+                "tests/**",
+                "test/**",
+                "jest.config.*",
+                "vitest.config.*",
+            ])
+
+        # Framework-specific adjustments
+        if "nextjs" in frameworks or "react" in frameworks:
+            # Next.js/React commonly have test files alongside components
+            keep_patterns.append("**/__tests__/**")
+
+        if "fastapi" in frameworks or "django" in frameworks or "flask" in frameworks:
+            # Python web frameworks
+            keep_patterns.append("**/tests/**")
+
+        return {
+            "patterns": list(set(patterns)),  # Remove duplicates
+            "keep_patterns": list(set(keep_patterns))
+        }
 
     def _generate_mcp_json(self, stack_info: Dict[str, Any]):
         """Génère le fichier mcp.json avec les MCPs recommandés."""

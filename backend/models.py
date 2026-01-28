@@ -281,6 +281,9 @@ class Task(BaseModel):
     review_cycles: int = 0
     review_status: str | None = None
     review_output: str | None = None
+    # Cleanup metadata
+    cleanup_performed: bool = False
+    cleanup_files: list[str] = Field(default_factory=list)
     archived: bool = False
     archived_at: datetime | None = None
     created_at: datetime = Field(default_factory=datetime.now)

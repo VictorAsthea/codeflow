@@ -204,6 +204,23 @@ function renderOverviewTab() {
             </div>
         </div>
         ` : ''}
+
+        ${currentTask.cleanup_performed && currentTask.cleanup_files?.length > 0 ? `
+        <div style="margin-bottom: 1.5rem;">
+            <h3 style="margin-bottom: 0.5rem;">Cleanup Summary</h3>
+            <div style="padding: 0.75rem; background-color: var(--bg-tertiary); border-radius: 6px; border-left: 3px solid var(--accent-green);">
+                <p style="margin-bottom: 0.5rem; color: var(--accent-green);">
+                    ${currentTask.cleanup_files.length} test/debug file(s) cleaned before review
+                </p>
+                <details style="font-size: 0.85rem; color: var(--text-secondary);">
+                    <summary style="cursor: pointer; margin-bottom: 0.5rem;">View cleaned files</summary>
+                    <ul style="margin: 0; padding-left: 1.5rem; max-height: 150px; overflow-y: auto;">
+                        ${currentTask.cleanup_files.map(f => `<li style="font-family: monospace; font-size: 0.8rem;">${escapeHtml(f)}</li>`).join('')}
+                    </ul>
+                </details>
+            </div>
+        </div>
+        ` : ''}
     `;
 
     // Add click handlers for screenshot lightbox

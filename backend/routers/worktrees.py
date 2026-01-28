@@ -17,6 +17,12 @@ class CleanupRequest(BaseModel):
     """Request body for cleanup endpoint"""
     max_age_hours: Optional[int] = 72
 
+
+class CleanupRequest(BaseModel):
+    """Request body for cleanup endpoint"""
+    patterns: list[str] | None = None
+    keep_patterns: list[str] | None = None
+
 router = APIRouter()
 
 
