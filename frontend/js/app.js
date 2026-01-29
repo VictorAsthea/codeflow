@@ -167,7 +167,8 @@ async function checkSyncStatus() {
         if (status.is_behind && status.behind_count > 0) {
             indicator.classList.remove('hidden');
             indicator.classList.add('behind');
-            statusText.textContent = `${status.behind_count} commit${status.behind_count > 1 ? 's' : ''} behind`;
+            const projectName = status.project_name || 'Project';
+            statusText.textContent = `${projectName}: ${status.behind_count} commit${status.behind_count > 1 ? 's' : ''} behind`;
         } else {
             indicator.classList.add('hidden');
             indicator.classList.remove('behind');

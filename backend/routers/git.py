@@ -20,8 +20,14 @@ class BranchDeleteRequest(BaseModel):
 @router.get("/git/sync-status")
 async def get_sync_status():
     """Get the sync status of local develop vs origin/develop for active project"""
+    from pathlib import Path
     project_path = get_active_project_path()
     result = await git_service.get_sync_status(project_path)
+
+    # Add project name for display
+    result["project_name"] = Path(project_path).name if project_path else None
+    result["project_path"] = project_path
+
     return result
 
 
